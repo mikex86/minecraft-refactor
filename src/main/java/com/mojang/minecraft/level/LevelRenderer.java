@@ -2,7 +2,6 @@ package com.mojang.minecraft.level;
 
 import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.level.tile.Tile;
-import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.Frustum;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.Textures;
@@ -131,65 +130,6 @@ public class LevelRenderer implements LevelListener {
                 dirtyChunks.get(i).rebuild();
             }
         }
-    }
-
-    /**
-     * Performs picking (determining which block the player is looking at).
-     */
-    public void pick(Player player, Frustum frustum) {
-        Tesselator tesselator = Tesselator.instance;
-
-        // Define a box around the player to limit pick testing
-        float pickRange = 3.0F;
-        AABB pickBox = player.bb.grow(pickRange, pickRange, pickRange);
-
-        int x0 = (int) pickBox.x0;
-        int x1 = (int) (pickBox.x1 + 1.0F);
-        int y0 = (int) pickBox.y0;
-        int y1 = (int) (pickBox.y1 + 1.0F);
-        int z0 = (int) pickBox.z0;
-        int z1 = (int) (pickBox.z1 + 1.0F);
-
-        // Initialize selection name stack
-        glInitNames();
-        glPushName(0);
-        glPushName(0);
-
-        // Loop through all blocks in the pick box
-        for (int x = x0; x < x1; ++x) {
-            glLoadName(x);
-            glPushName(0);
-
-            for (int y = y0; y < y1; ++y) {
-                glLoadName(y);
-                glPushName(0);
-
-                for (int z = z0; z < z1; ++z) {
-                    Tile tile = Tile.tiles[this.level.getTile(x, y, z)];
-                    if (tile != null && frustum.isVisible(tile.getTileAABB(x, y, z))) {
-                        glLoadName(z);
-                        glPushName(0);
-
-                        // Render each face for selection
-                        for (int face = 0; face < 6; ++face) {
-                            glLoadName(face);
-                            tesselator.init();
-                            tile.renderFaceNoTexture(tesselator, x, y, z, face);
-                            tesselator.flush();
-                        }
-
-                        glPopName();
-                    }
-                }
-
-                glPopName();
-            }
-
-            glPopName();
-        }
-
-        glPopName();
-        glPopName();
     }
 
     /**

@@ -119,6 +119,15 @@ public class Entity {
     }
 
     /**
+     * Gets the entity's eye height offset.
+     *
+     * @return The entity's height offset
+     */
+    public float getHeightOffset() {
+        return this.heightOffset;
+    }
+
+    /**
      * Sets the size of the entity's bounding box.
      *
      * @param width  Width of the entity
@@ -225,7 +234,7 @@ public class Entity {
 
         // Update position based on bounding box position
         this.x = (this.bb.x0 + this.bb.x1) / 2.0F;
-        this.y = this.bb.y0 + this.heightOffset;
+        this.y = this.bb.y0;
         this.z = (this.bb.z0 + this.bb.z1) / 2.0F;
     }
 

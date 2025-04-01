@@ -9,6 +9,7 @@ import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.util.math.MatrixUtils;
+import com.mojang.minecraft.util.math.RayCaster;
 import com.mojang.minecraft.world.HitResult;
 import org.lwjgl.BufferUtils;
 
@@ -74,30 +75,17 @@ public class GameRenderer {
         // Initialize buffers
         this.fogColor0 = BufferUtils.createFloatBuffer(4);
         this.fogColor1 = BufferUtils.createFloatBuffer(4);
-        this.lightBuffer = BufferUtils.createFloatBuffer(16);
+        this.lightBuffer = BufferUtils.createFloatBuffer(4);
         this.viewportBuffer = BufferUtils.createIntBuffer(16);
-        this.selectBuffer = BufferUtils.createIntBuffer(2000);
+        this.selectBuffer = BufferUtils.createIntBuffer(2048);
 
         // Set up fog colors
-        int skyColor = 16710650;  // Light blue
-        int fogColor = 920330;    // Dark blue
-
-        // Set up the sky color buffer
-        this.fogColor0.put(new float[]{
-                (float) (skyColor >> 16 & 255) / 255.0F,
-                (float) (skyColor >> 8 & 255) / 255.0F,
-                (float) (skyColor & 255) / 255.0F,
-                1.0F
-        });
+        this.fogColor0.clear();
+        this.fogColor0.put(0.5F).put(0.8F).put(1.0F).put(1.0F);
         this.fogColor0.flip();
 
-        // Set up the fog color buffer
-        this.fogColor1.put(new float[]{
-                (float) (fogColor >> 16 & 255) / 255.0F,
-                (float) (fogColor >> 8 & 255) / 255.0F,
-                (float) (fogColor & 255) / 255.0F,
-                1.0F
-        });
+        this.fogColor1.clear();
+        this.fogColor1.put(0.0F).put(0.0F).put(0.0F).put(1.0F);
         this.fogColor1.flip();
     }
 
@@ -118,20 +106,21 @@ public class GameRenderer {
      * @param partialTick Interpolation factor between ticks (0.0-1.0)
      */
     private void moveCameraToPlayer(float partialTick) {
-        // Position camera slightly behind the player's view point
-        glTranslatef(0.0F, 0.0F, -0.3F);
+        // Get interpolated player position
+        float playerX = player.xo + (player.x - player.xo) * partialTick;
+        float playerY = player.yo + (player.y - player.yo) * partialTick;
+        float playerZ = player.zo + (player.z - player.zo) * partialTick;
 
-        // Rotate camera based on player's orientation
-        glRotatef(this.player.xRot, 1.0F, 0.0F, 0.0F);
-        glRotatef(this.player.yRot, 0.0F, 1.0F, 0.0F);
+        // In Minecraft, player.y is already at the eye position, so we don't need to add heightOffset again
+        // We just need to position the camera at the player's position
 
-        // Calculate interpolated position between ticks
-        float x = this.player.xo + (this.player.x - this.player.xo) * partialTick;
-        float y = this.player.yo + (this.player.y - this.player.yo) * partialTick;
-        float z = this.player.zo + (this.player.z - this.player.zo) * partialTick;
+        // Translate to player position
+        glTranslatef(0.0F, 0.0F, -0.3F);  // Camera offset
+        glRotatef(player.xRot, 1.0F, 0.0F, 0.0F);  // Pitch
+        glRotatef(player.yRot, 0.0F, 1.0F, 0.0F);  // Yaw
 
-        // Position camera at player location
-        glTranslatef(-x, -y, -z);
+        // Translate to player position, no need to add eye height as it's already included in player.y
+        glTranslatef(-playerX, -playerY - player.getHeightOffset(), -playerZ);
     }
 
     /**
@@ -140,47 +129,13 @@ public class GameRenderer {
      * @param partialTick Interpolation factor between ticks (0.0-1.0)
      */
     private void setupCamera(float partialTick) {
-        // Set up perspective projection
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-
-        // Use 70 degree FOV, maintain proper aspect ratio, and reasonable near/far planes
+        // Calculate aspect ratio
         float aspectRatio = (float) this.width / (float) this.height;
 
-        MatrixUtils.perspective(70.0F, aspectRatio, 0.05F, 1000.0F);
-
-        // Set up camera transformation
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-        this.moveCameraToPlayer(partialTick);
-    }
-
-    /**
-     * Sets up the picking camera for selection in 3D space.
-     *
-     * @param partialTick Interpolation factor between ticks (0.0-1.0)
-     * @param x           X coordinate of pick center (usually screen center)
-     * @param y           Y coordinate of pick center (usually screen center)
-     */
-    private void setupPickCamera(float partialTick, int x, int y) {
-        // Set up projection matrix for picking
+        // Set up projection matrix
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
-
-        // Get current viewport dimensions
-        this.viewportBuffer.clear();
-        glGetIntegerv(GL_VIEWPORT, this.viewportBuffer);
-        this.viewportBuffer.flip();
-        this.viewportBuffer.limit(16);
-        int[] viewport = new int[4];
-        viewport[0] = this.viewportBuffer.get(0);
-        viewport[1] = this.viewportBuffer.get(1);
-        viewport[2] = this.viewportBuffer.get(2);
-        viewport[3] = this.viewportBuffer.get(3);
-
-        // Create picking matrix centered at the specified point
-        MatrixUtils.pickMatrix((float) x, (float) y, 5.0F, 5.0F, viewport);
-        MatrixUtils.perspective(70.0F, (float) this.width / (float) this.height, 0.05F, 1000.0F);
+        MatrixUtils.perspective(70.0F, aspectRatio, 0.05F, 1000.0F);
 
         // Set up camera transformation
         glMatrixMode(GL_MODELVIEW);
@@ -195,54 +150,7 @@ public class GameRenderer {
      * @return The hit result, or null if no block was hit
      */
     public HitResult pick(float partialTick) {
-        // Clear and set up the selection buffer
-        this.selectBuffer.clear();
-        glSelectBuffer(this.selectBuffer);
-        glRenderMode(GL_SELECT);
-
-        // Set up the camera for picking at screen center
-        this.setupPickCamera(partialTick, this.width / 2, this.height / 2);
-
-        // Render the world in selection mode
-        this.levelRenderer.pick(this.player, Frustum.getFrustum());
-
-        // Get the selection results
-        int hits = glRenderMode(GL_RENDER);
-        this.selectBuffer.flip();
-        this.selectBuffer.limit(this.selectBuffer.capacity());
-
-        // Find the closest hit
-        long closest = 0L;
-        int[] names = new int[10];
-        int hitNameCount = 0;
-
-        for (int i = 0; i < hits; ++i) {
-            int nameCount = this.selectBuffer.get();
-            long minZ = this.selectBuffer.get();
-            this.selectBuffer.get(); // Skip maxZ, we only care about minZ
-
-            if (minZ >= closest && i != 0) {
-                // Skip hits that are farther than the closest one found so far
-                for (int j = 0; j < nameCount; ++j) {
-                    this.selectBuffer.get();
-                }
-            } else {
-                // Found a closer hit, store it
-                closest = minZ;
-                hitNameCount = nameCount;
-
-                for (int j = 0; j < nameCount; ++j) {
-                    names[j] = this.selectBuffer.get();
-                }
-            }
-        }
-
-        // Create the hit result if a hit was found
-        if (hitNameCount > 0) {
-            return new HitResult(names[0], names[1], names[2], names[3], names[4]);
-        } else {
-            return null;
-        }
+        return RayCaster.raycast(this.player, this.level, partialTick);
     }
 
     /**
