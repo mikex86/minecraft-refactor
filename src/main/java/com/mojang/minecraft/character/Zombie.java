@@ -3,6 +3,9 @@ package com.mojang.minecraft.character;
 import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.renderer.Textures;
+import com.mojang.minecraft.renderer.model.Model;
+import com.mojang.minecraft.renderer.model.ModelRegistry;
+import com.mojang.minecraft.renderer.model.impl.ZombieModel;
 
 import static org.lwjgl.opengl.GL11.*;
 
@@ -34,15 +37,14 @@ public class Zombie extends Entity {
     private static final float ANIMATION_SPEED = 10.0F;
     private static final float DEGREES_TO_RADIANS = 57.29578F; // 180.0f / Math.PI
 
-    // Character model
-    private static final ZombieModel zombieModel = new ZombieModel();
-
     // Entity properties
     public float rot;          // Current rotation angle
     public float timeOffs;     // Time offset for animation
     public float speed;        // Movement speed
     public float rotA;         // Rotation acceleration/velocity
     private final Textures textures; // Texture manager
+
+    private static final Model ZOMBIE_MODEL = ModelRegistry.getInstance().getModel("zombie", ZombieModel::new);
 
     /**
      * Creates a new zombie entity at the specified position.
@@ -145,7 +147,7 @@ public class Zombie extends Entity {
         glRotatef(this.rot * DEGREES_TO_RADIANS + 180.0F, 0.0F, 1.0F, 0.0F);
 
         // Render the model
-        zombieModel.render((float) time);
+        ZOMBIE_MODEL.render((float) time);
 
         glPopMatrix();
         glDisable(GL_TEXTURE_2D);

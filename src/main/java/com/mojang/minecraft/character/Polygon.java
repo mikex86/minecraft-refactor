@@ -1,6 +1,6 @@
 package com.mojang.minecraft.character;
 
-import static org.lwjgl.opengl.GL11.*;
+import com.mojang.minecraft.renderer.model.ModelMesh;
 
 /**
  * Represents a polygon with texture mapping in a 3D model.
@@ -42,16 +42,21 @@ public class Polygon {
     }
 
     /**
-     * Renders this polygon with OpenGL.
+     * Adds this polygon's vertices to the given model mesh.
+     * 
+     * @param mesh The model mesh to add vertices to
      */
-    public void render() {
-        glColor3f(1.0F, 1.0F, 1.0F); // Set white color
-
-        // Render vertices in reverse order (counter-clockwise winding)
+    public void addToMesh(ModelMesh mesh) {
+        // Add vertices in reverse order (counter-clockwise winding)
         for (int i = 3; i >= 0; --i) {
             Vertex vertex = this.vertices[i];
-            glTexCoord2f(vertex.u / TEX_WIDTH_SCALE, vertex.v / TEX_HEIGHT_SCALE);
-            glVertex3f(vertex.pos.x, vertex.pos.y, vertex.pos.z);
+            mesh.addVertex(
+                vertex.pos.x, 
+                vertex.pos.y, 
+                vertex.pos.z, 
+                vertex.u / TEX_WIDTH_SCALE, 
+                vertex.v / TEX_HEIGHT_SCALE
+            );
         }
     }
 }

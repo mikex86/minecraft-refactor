@@ -7,6 +7,7 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.renderer.Textures;
+import com.mojang.minecraft.renderer.model.ModelRegistry;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +30,9 @@ public class GameState {
 
     // Resources
     private final Textures textures;
+
+    // Models
+    private final ModelRegistry modelRegistry = ModelRegistry.getInstance();
 
     /**
      * Creates a new game state manager.
@@ -146,13 +150,14 @@ public class GameState {
     public void dispose() {
         // Save the level first
         save();
-        
+
         // Clean up renderer resources
         if (this.levelRenderer != null) {
             this.levelRenderer.dispose();
         }
-        
         // Clear entity lists
         this.entities.clear();
+
+        this.modelRegistry.disposeAll();
     }
 } 

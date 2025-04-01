@@ -1,14 +1,13 @@
 package com.mojang.minecraft.character;
 
+import com.mojang.minecraft.renderer.model.ModelMesh;
+
 import static org.lwjgl.opengl.GL11.*;
 
 /**
  * Represents a 3D cube with texture mapping for character models.
  */
 public class Cube {
-    // OpenGL constants
-    private static final int GL_COMPILE = 4864;
-    private static final int GL_QUADS = 7;
     private static final float RADIANS_TO_DEGREES = 57.29578F; // 180.0f / Math.PI
 
     private Vertex[] vertices;
@@ -26,9 +25,9 @@ public class Cube {
     public float yRot;
     public float zRot;
 
-    // OpenGL display list
-    private boolean compiled = false;
-    private int displayList = 0;
+    // Mesh handling
+    private ModelMesh mesh;
+    private boolean dirty = true;
 
     /**
      * Creates a new cube with the given texture offsets.
@@ -39,6 +38,7 @@ public class Cube {
     public Cube(int xTexOffs, int yTexOffs) {
         this.xTexOffs = xTexOffs;
         this.yTexOffs = yTexOffs;
+        this.mesh = new ModelMesh();
     }
 
     /**
@@ -135,6 +135,9 @@ public class Cube {
                 this.xTexOffs + depth + width + depth, this.yTexOffs + depth,
                 this.xTexOffs + depth + width + depth + width, this.yTexOffs + depth + height
         );
+        
+        // Mark as dirty to rebuild the mesh
+        this.dirty = true;
     }
 
     /**
@@ -151,11 +154,31 @@ public class Cube {
     }
 
     /**
+     * Builds the mesh for this cube if needed.
+     */
+    private void buildMesh() {
+        if (!this.dirty) {
+            return;
+        }
+        
+        this.mesh.begin();
+        
+        // Add all polygons to the mesh
+        for (Polygon polygon : this.polygons) {
+            polygon.addToMesh(this.mesh);
+        }
+        
+        this.mesh.end();
+        this.dirty = false;
+    }
+
+    /**
      * Renders this cube.
      */
     public void render() {
-        if (!this.compiled) {
-            this.compile();
+        // Build the mesh if needed
+        if (this.dirty) {
+            buildMesh();
         }
 
         glPushMatrix();
@@ -163,24 +186,23 @@ public class Cube {
         glRotatef(this.zRot * RADIANS_TO_DEGREES, 0.0F, 0.0F, 1.0F);
         glRotatef(this.yRot * RADIANS_TO_DEGREES, 0.0F, 1.0F, 0.0F);
         glRotatef(this.xRot * RADIANS_TO_DEGREES, 1.0F, 0.0F, 0.0F);
-        glCallList(this.displayList);
+        
+        // Set white color for rendering
+        glColor3f(1.0F, 1.0F, 1.0F);
+        
+        // Render the mesh
+        this.mesh.render();
+        
         glPopMatrix();
     }
-
+    
     /**
-     * Compiles this cube into an OpenGL display list.
+     * Disposes of this cube's resources.
      */
-    private void compile() {
-        this.displayList = glGenLists(1);
-        glNewList(this.displayList, GL_COMPILE);
-        glBegin(GL_QUADS);
-
-        for (Polygon polygon : this.polygons) {
-            polygon.render();
+    public void dispose() {
+        if (this.mesh != null) {
+            this.mesh.dispose();
+            this.mesh = null;
         }
-
-        glEnd();
-        glEndList();
-        this.compiled = true;
     }
 }

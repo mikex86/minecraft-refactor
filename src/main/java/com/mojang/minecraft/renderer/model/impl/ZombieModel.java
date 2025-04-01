@@ -1,10 +1,13 @@
-package com.mojang.minecraft.character;
+package com.mojang.minecraft.renderer.model.impl;
+
+import com.mojang.minecraft.character.Cube;
+import com.mojang.minecraft.renderer.model.Model;
 
 /**
  * Represents the 3D model of a zombie character.
  * Consists of various cubes representing body parts that can be animated.
  */
-public class ZombieModel {
+public class ZombieModel implements Model {
     // Animation constants
     private static final float HEAD_SWING_FREQUENCY = 0.83F;
     private static final float HEAD_BOB_FREQUENCY = 1.0F;
@@ -60,6 +63,7 @@ public class ZombieModel {
      *
      * @param time Current animation time
      */
+    @Override
     public void render(float time) {
         // Animate the head
         this.head.yRot = (float) Math.sin(time * HEAD_SWING_FREQUENCY);
@@ -82,5 +86,19 @@ public class ZombieModel {
         this.leftArm.render();
         this.rightLeg.render();
         this.leftLeg.render();
+    }
+    
+    /**
+     * Disposes of all resources used by this model.
+     * Called by the ModelRegistry when the model is no longer needed.
+     */
+    @Override
+    public void dispose() {
+        this.head.dispose();
+        this.body.dispose();
+        this.leftArm.dispose();
+        this.rightArm.dispose();
+        this.leftLeg.dispose();
+        this.rightLeg.dispose();
     }
 }
