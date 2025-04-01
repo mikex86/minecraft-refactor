@@ -83,7 +83,7 @@ public class Zombie extends Entity {
         // Update rotation
         this.rot += this.rotA;
         this.rotA *= ROTATION_DECAY;
-        this.rotA += (Math.random() - Math.random()) * Math.random() * Math.random() * ROTATION_RANDOM_FACTOR;
+        this.rotA += (float) ((Math.random() - Math.random()) * Math.random() * Math.random() * ROTATION_RANDOM_FACTOR);
 
         // Calculate movement direction
         moveX = (float) Math.sin(this.rot);

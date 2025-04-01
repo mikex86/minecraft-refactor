@@ -101,9 +101,7 @@ public class Minecraft implements Runnable {
                 gameState.save();
             }
             engine.shutdown();
-            if (textures != null) {
-                textures.dispose();
-            }
+            textures.dispose();
         } catch (Exception e) {
             e.printStackTrace();
         }
