@@ -3,8 +3,6 @@ package com.mojang.minecraft.renderer;
 import org.lwjgl.BufferUtils;
 
 import java.nio.FloatBuffer;
-import java.util.ArrayList;
-import java.util.List;
 
 import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL11.*;
@@ -12,94 +10,84 @@ import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL30.*;
 
 /**
- * Handles VBO-based rendering for a chunk section.
- * Each chunk mesh contains vertex data for each render layer.
+ * Handles VBO-based rendering for a single chunk section.
+ * Each ChunkMesh represents one layer of rendering data for a section of a chunk.
+ * This design supports moving toward cubic chunks in the future.
  */
 public class ChunkMesh {
-    // Constants
-    private static final int LAYER_COUNT = 2;
+    // VBO data
+    private int vboId;
+    private int vertexCount;
     
-    // VBO data for each layer
-    private final int[] vboIds = new int[LAYER_COUNT];
-    private final int[] vertexCounts = new int[LAYER_COUNT];
-    
-    // Tesselators for each layer - one per mesh
-    private final Tesselator[] tesselators = new Tesselator[LAYER_COUNT];
+    // Tesselator for this mesh
+    private final Tesselator tesselator;
     
     // State tracking
-    private boolean[] dirty = new boolean[LAYER_COUNT];
+    private boolean dirty = true;
     private boolean disposed = false;
     
     /**
-     * Creates a new chunk mesh.
+     * Creates a new chunk section mesh.
      */
     public ChunkMesh() {
-        // Create VBOs
-        for (int i = 0; i < LAYER_COUNT; i++) {
-            vboIds[i] = glGenBuffers();
-            tesselators[i] = new Tesselator();
-            dirty[i] = true;
-            vertexCounts[i] = 0;
-        }
+        // Create VBO and tesselator
+        vboId = glGenBuffers();
+        tesselator = new Tesselator();
+        vertexCount = 0;
     }
     
     /**
-     * Gets the tesselator for the specified layer.
+     * Gets the tesselator for this mesh.
      */
-    public Tesselator getTesselator(int layer) {
-        return tesselators[layer];
+    public Tesselator getTesselator() {
+        return tesselator;
     }
     
     /**
      * Marks this mesh as dirty, requiring a rebuild.
      */
     public void setDirty() {
-        for (int i = 0; i < LAYER_COUNT; i++) {
-            dirty[i] = true;
-        }
+        dirty = true;
     }
     
     /**
      * Returns whether the mesh needs to be rebuilt.
      */
-    public boolean isDirty(int layer) {
-        return dirty[layer];
+    public boolean isDirty() {
+        return dirty;
     }
     
     /**
-     * Rebuilds the mesh for the specified layer.
+     * Rebuilds the mesh with the latest vertex data.
      */
-    public void rebuild(int layer) {
-        if (!dirty[layer]) {
+    public void rebuild() {
+        if (!dirty) {
             return;
         }
         
-        Tesselator tesselator = tesselators[layer];
         FloatBuffer buffer = tesselator.getBuffer();
-        vertexCounts[layer] = tesselator.getVertexCount();
+        vertexCount = tesselator.getVertexCount();
         
-        if (vertexCounts[layer] > 0) {
+        if (vertexCount > 0) {
             // Bind VBO and upload data
-            glBindBuffer(GL_ARRAY_BUFFER, vboIds[layer]);
+            glBindBuffer(GL_ARRAY_BUFFER, vboId);
             glBufferData(GL_ARRAY_BUFFER, buffer, GL_STATIC_DRAW);
             glBindBuffer(GL_ARRAY_BUFFER, 0);
         }
         
-        dirty[layer] = false;
+        dirty = false;
     }
     
     /**
-     * Renders the mesh for the specified layer.
+     * Renders the mesh.
      */
-    public void render(int layer) {
-        if (vertexCounts[layer] == 0) {
+    public void render() {
+        if (vertexCount == 0) {
             return;
         }
         
-        Tesselator tesselator = tesselators[layer];
-        
         // Bind the VBO
-        glBindBuffer(GL_ARRAY_BUFFER, vboIds[layer]);
+        glBindBuffer(GL_ARRAY_BUFFER, vboId);
         
         // Set up vertex arrays based on data format
         int stride = tesselator.getVertexSize() * 4; // in bytes
@@ -126,7 +114,7 @@ public class ChunkMesh {
         glVertexPointer(3, GL_FLOAT, stride, offset);
         
         // Draw the mesh
-        glDrawArrays(GL_QUADS, 0, vertexCounts[layer]);
+        glDrawArrays(GL_QUADS, 0, vertexCount);
         
         // Disable vertex arrays
         glDisableClientState(GL_VERTEX_ARRAY);
@@ -142,15 +130,22 @@ public class ChunkMesh {
     }
     
     /**
+     * Clears the vertex data but keeps the VBO allocated.
+     */
+    public void clear() {
+        tesselator.init();
+        vertexCount = 0;
+        setDirty();
+    }
+    
+    /**
      * Disposes of this mesh's resources.
      */
     public void dispose() {
         if (!disposed) {
-            for (int i = 0; i < LAYER_COUNT; i++) {
-                if (vboIds[i] != 0) {
-                    glDeleteBuffers(vboIds[i]);
-                    vboIds[i] = 0;
-                }
+            if (vboId != 0) {
+                glDeleteBuffers(vboId);
+                vboId = 0;
             }
             disposed = true;
         }

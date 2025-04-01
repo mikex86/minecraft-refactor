@@ -8,6 +8,7 @@ import com.mojang.minecraft.renderer.Tesselator;
 
 /**
  * Represents a chunk of the world that can be rendered independently.
+ * Designed to support cubic chunks in the future.
  */
 public class Chunk {
     // Constants
@@ -34,7 +35,7 @@ public class Chunk {
 
     // Rendering state
     private boolean dirty = true;
-    private ChunkMesh mesh;
+    private final ChunkMesh[] meshes;
     public long dirtiedTime = 0L;
 
     // Static rendering stats
@@ -65,16 +66,21 @@ public class Chunk {
         this.y = (float) (y0 + y1) / 2.0F;
         this.z = (float) (z0 + z1) / 2.0F;
 
-        // Create bounding box and mesh
+        // Create bounding box and meshes
         this.aabb = new AABB((float) x0, (float) y0, (float) z0, (float) x1, (float) y1, (float) z1);
-        this.mesh = new ChunkMesh();
+        this.meshes = new ChunkMesh[LAYER_COUNT];
+        
+        // Initialize meshes for each layer
+        for (int i = 0; i < LAYER_COUNT; i++) {
+            this.meshes[i] = new ChunkMesh();
+        }
     }
 
     /**
      * Rebuilds the chunk mesh for the specified layer.
      */
     private void rebuild(int layer) {
-        if (!this.mesh.isDirty(layer)) {
+        if (!this.dirty && !this.meshes[layer].isDirty()) {
             return;
         }
         
@@ -82,7 +88,8 @@ public class Chunk {
         long startTime = System.nanoTime();
         
         // Get the tesselator for this layer
-        Tesselator tesselator = this.mesh.getTesselator(layer);
+        ChunkMesh mesh = this.meshes[layer];
+        Tesselator tesselator = mesh.getTesselator();
         tesselator.init();
         
         int renderedTiles = 0;
@@ -101,7 +108,7 @@ public class Chunk {
         }
         
         // Rebuild the mesh with the accumulated data
-        this.mesh.rebuild(layer);
+        mesh.rebuild();
         
         long endTime = System.nanoTime();
 
@@ -113,11 +120,12 @@ public class Chunk {
     }
 
     /**
-     * Rebuilds both layers of the chunk.
+     * Rebuilds all layer meshes of the chunk.
      */
     public void rebuild() {
-        this.rebuild(0);
-        this.rebuild(1);
+        for (int i = 0; i < LAYER_COUNT; i++) {
+            this.rebuild(i);
+        }
         this.dirty = false;
     }
 
@@ -125,7 +133,9 @@ public class Chunk {
      * Renders the specified layer of the chunk.
      */
     public void render(int layer) {
-        this.mesh.render(layer);
+        if (layer >= 0 && layer < LAYER_COUNT) {
+            this.meshes[layer].render();
+        }
     }
 
     /**
@@ -136,7 +146,11 @@ public class Chunk {
             this.dirtiedTime = System.currentTimeMillis();
         }
         this.dirty = true;
-        this.mesh.setDirty();
+        
+        // Mark all meshes as dirty
+        for (ChunkMesh mesh : this.meshes) {
+            mesh.setDirty();
+        }
     }
 
     /**
@@ -161,9 +175,10 @@ public class Chunk {
      * Should be called when the chunk is no longer needed.
      */
     public void dispose() {
-        if (this.mesh != null) {
-            this.mesh.dispose();
-            this.mesh = null;
+        for (ChunkMesh mesh : this.meshes) {
+            if (mesh != null) {
+                mesh.dispose();
+            }
         }
     }
 }
