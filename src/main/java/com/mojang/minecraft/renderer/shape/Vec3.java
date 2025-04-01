@@ -1,4 +1,4 @@
-package com.mojang.minecraft.character;
+package com.mojang.minecraft.renderer.shape;
 
 /**
  * Represents a 3D vector with x, y, and z components.

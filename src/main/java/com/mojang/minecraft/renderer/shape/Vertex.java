@@ -1,4 +1,4 @@
-package com.mojang.minecraft.character;
+package com.mojang.minecraft.renderer.shape;
 
 /**
  * Represents a vertex in 3D space with texture coordinates.

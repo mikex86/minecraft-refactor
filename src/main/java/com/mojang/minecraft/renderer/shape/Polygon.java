@@ -1,4 +1,4 @@
-package com.mojang.minecraft.character;
+package com.mojang.minecraft.renderer.shape;
 
 import com.mojang.minecraft.renderer.model.ModelMesh;
 

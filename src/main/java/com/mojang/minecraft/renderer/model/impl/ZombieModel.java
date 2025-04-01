@@ -1,6 +1,6 @@
 package com.mojang.minecraft.renderer.model.impl;
 
-import com.mojang.minecraft.character.Cube;
+import com.mojang.minecraft.renderer.shape.Cube;
 import com.mojang.minecraft.renderer.model.Model;
 
 /**
