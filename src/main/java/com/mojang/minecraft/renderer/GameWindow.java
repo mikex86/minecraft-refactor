@@ -4,6 +4,7 @@ import static org.lwjgl.glfw.Callbacks.*;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
+import static org.lwjgl.opengl.GL11.*;
 
 import java.nio.IntBuffer;
 
@@ -125,6 +126,61 @@ public class GameWindow {
         
         // Initialize OpenGL capabilities
         GL.createCapabilities();
+    }
+    
+    /**
+     * Initializes OpenGL rendering state.
+     * Sets up default rendering parameters for Minecraft.
+     */
+    public void initOpenGL() {
+        float red = 0.5F;
+        float green = 0.8F;
+        float blue = 1.0F;
+        
+        // Configure OpenGL state
+        glEnable(GL_TEXTURE_2D);
+        glShadeModel(GL_SMOOTH);
+        glClearColor(red, green, blue, 0.0F);
+        glClearDepth(1.0F);
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);
+        glEnable(GL_ALPHA_TEST);
+        glAlphaFunc(GL_ALWAYS, 0.0F);
+        
+        // Initialize projection matrix
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glMatrixMode(GL_MODELVIEW);
+        
+        // Check for OpenGL errors
+        checkOpenGLError("OpenGL initialization");
+    }
+    
+    /**
+     * Helper method to check for OpenGL errors.
+     * 
+     * @param context Description of the current operation
+     * @throws RuntimeException if an OpenGL error is detected
+     */
+    private void checkOpenGLError(String context) {
+        int errorCode = glGetError();
+        if (errorCode != 0) {
+            String errorString;
+            switch (errorCode) {
+                case GL_INVALID_ENUM: errorString = "GL_INVALID_ENUM"; break;
+                case GL_INVALID_VALUE: errorString = "GL_INVALID_VALUE"; break;
+                case GL_INVALID_OPERATION: errorString = "GL_INVALID_OPERATION"; break;
+                case GL_OUT_OF_MEMORY: errorString = "GL_OUT_OF_MEMORY"; break;
+                case GL_STACK_UNDERFLOW: errorString = "GL_STACK_UNDERFLOW"; break;
+                case GL_STACK_OVERFLOW: errorString = "GL_STACK_OVERFLOW"; break;
+                default: errorString = "Unknown error code: " + errorCode;
+            }
+            
+            System.out.println("########## GL ERROR ##########");
+            System.out.println("@ " + context);
+            System.out.println(errorCode + ": " + errorString);
+            throw new RuntimeException("OpenGL error: " + errorString);
+        }
     }
     
     /**
