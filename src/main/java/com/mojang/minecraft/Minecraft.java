@@ -1,49 +1,38 @@
 package com.mojang.minecraft;
 
-import com.mojang.minecraft.character.Zombie;
 import com.mojang.minecraft.engine.GameEngine;
 import com.mojang.minecraft.gui.Font;
 import com.mojang.minecraft.input.GameInputHandler;
-import com.mojang.minecraft.level.Level;
-import com.mojang.minecraft.level.LevelRenderer;
-import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.renderer.GameRenderer;
 import com.mojang.minecraft.renderer.Textures;
+import com.mojang.minecraft.world.HitResult;
 
 import javax.swing.*;
 import java.io.IOException;
-import java.util.ArrayList;
 
 /**
  * Main game class for Minecraft Classic 0.0.11a.
- * Handles game-specific logic and delegates engine functionality to GameEngine.
+ * Coordinates the different components of the game.
  */
 public class Minecraft implements Runnable {
     // Constants
     public static final String VERSION_STRING = "0.0.11a";
 
-    // Game engine
+    // Core systems
     private final GameEngine engine;
+    private GameInputHandler gameInputHandler;
+    private GameRenderer renderer;
 
     // Game state
-    public Level level;
-    private LevelRenderer levelRenderer;
-    private Player player;
-    private ParticleEngine particleEngine;
-    private final ArrayList<Entity> entities = new ArrayList<>();
-
-    // Game input
-    private GameInputHandler gameInputHandler;
-
-    // Game flags
-    public volatile boolean pause = false;
-    private volatile boolean running = false;
+    private GameState gameState;
 
     // Game resources
-    public Textures textures;
+    private final Textures textures;
     private Font font;
-    private GameRenderer renderer;
-    private HitResult hitResult = null;
+
+    // Game flags
+    private volatile boolean running = false;
+    public volatile boolean pause = false;
 
     /**
      * Creates a new Minecraft game instance.
@@ -67,40 +56,33 @@ public class Minecraft implements Runnable {
             // Initialize the engine
             engine.initialize();
 
-            // Create game objects
-            this.level = new Level(256, 256, 64);
-            this.levelRenderer = new LevelRenderer(this.level, this.textures);
-            this.player = new Player(this.level);
-            this.particleEngine = new ParticleEngine(this.level, this.textures);
+            // Create game resources
             this.font = new Font("/default.gif", this.textures);
+
+            // Create game state (manages level, entities, player)
+            this.gameState = new GameState(this.textures);
+            this.gameState.initialize();
 
             // Create renderer
             this.renderer = new GameRenderer(
-                    this,
-                    this.levelRenderer,
-                    this.particleEngine,
-                    this.player,
-                    this.entities,
+                    this.gameState.getLevel(),
+                    gameState.getLevelRenderer(),
+                    gameState.getParticleEngine(),
+                    gameState.getPlayer(),
+                    gameState.getEntities(),
                     this.textures,
                     this.font,
                     engine.getWidth(),
                     engine.getHeight()
             );
 
-            // Add some zombies to the level
-            for (int i = 0; i < 10; ++i) {
-                Zombie zombie = new Zombie(this.level, this.textures, 128.0F, 0.0F, 128.0F);
-                zombie.resetPos();
-                this.entities.add(zombie);
-            }
-
             // Initialize game input handler
             this.gameInputHandler = new GameInputHandler(
                     engine.getInputHandler(),
-                    this.player,
-                    this.level,
-                    this.particleEngine,
-                    this.entities,
+                    gameState.getPlayer(),
+                    gameState.getLevel(),
+                    gameState.getParticleEngine(),
+                    gameState.getEntities(),
                     engine.isFullscreen()
             );
         } catch (Exception e) {
@@ -115,7 +97,9 @@ public class Minecraft implements Runnable {
      */
     public void destroy() {
         try {
-            this.level.save();
+            if (gameState != null) {
+                gameState.save();
+            }
             engine.shutdown();
             if (textures != null) {
                 textures.dispose();
@@ -152,28 +136,26 @@ public class Minecraft implements Runnable {
                         this.stop();
                     }
 
-                    // Process input
-                    gameInputHandler.processInput(this.hitResult);
-
                     // Get time information from engine
                     int ticksToProcess = engine.getTicksToProcess();
                     float partialTick = engine.getPartialTick();
 
+                    // Process input
+                    HitResult hitResult = this.renderer.pick(partialTick);
+                    gameInputHandler.processInput(hitResult);
+
                     // Process game ticks
                     for (int i = 0; i < ticksToProcess; ++i) {
-                        this.tick();
+                        gameState.tick();
                     }
 
                     // Handle mouse look
                     gameInputHandler.processMouseLook();
 
-                    // Perform picking to detect which block the player is looking at
-                    this.hitResult = this.renderer.pick(partialTick);
-
                     // Render the frame
                     this.renderer.render(
                             partialTick,
-                            this.hitResult,
+                            hitResult,
                             gameInputHandler.getEditMode(),
                             gameInputHandler.getPaintTexture(),
                             engine.getFpsString()
@@ -205,30 +187,6 @@ public class Minecraft implements Runnable {
      */
     public void stop() {
         this.running = false;
-    }
-
-    /**
-     * Updates the game state for one tick.
-     * Updates entities and the level.
-     */
-    public void tick() {
-        // Update all game entities
-        for (int i = 0; i < this.entities.size(); ++i) {
-            Entity entity = this.entities.get(i);
-            entity.tick();
-            if (entity.removed) {
-                this.entities.remove(i--);
-            }
-        }
-
-        // Update the player
-        this.player.tick();
-
-        // Update particle engine
-        this.particleEngine.tick();
-
-        // Update level
-        this.level.tick();
     }
 
     /**

@@ -1,4 +1,4 @@
-package com.mojang.minecraft;
+package com.mojang.minecraft.world;
 
 /**
  * Represents the result of a ray intersection with an object in the world.
@@ -41,4 +41,4 @@ public class HitResult {
         this.z = z;
         this.face = face;
     }
-}
+} 

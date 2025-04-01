@@ -1,14 +1,16 @@
 package com.mojang.minecraft.input;
 
-import com.mojang.minecraft.HitResult;
-import com.mojang.minecraft.Player;
+import com.mojang.minecraft.entity.Entity;
+import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.InputHandler;
+import com.mojang.minecraft.world.HitResult;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Handles high-level game input processing and mapping to game actions.
@@ -28,7 +30,7 @@ public class GameInputHandler {
     private final Player player;
     private final Level level;
     private final ParticleEngine particleEngine;
-    private final ArrayList<Object> entities;
+    private final ArrayList<Entity> entities;
     private final boolean fullscreen;
 
     /**
@@ -46,7 +48,7 @@ public class GameInputHandler {
             Player player,
             Level level,
             ParticleEngine particleEngine,
-            ArrayList<?> entities,
+            List<Entity> entities,
             boolean fullscreen) {
         this.inputHandler = inputHandler;
         this.player = player;
@@ -205,8 +207,8 @@ public class GameInputHandler {
         }
 
         // Check for collision with any entity
-        for (Object entity : this.entities) {
-            if (((com.mojang.minecraft.Entity) entity).bb.intersects(aabb)) {
+        for (Entity entity : this.entities) {
+            if (entity.bb.intersects(aabb)) {
                 return false;
             }
         }

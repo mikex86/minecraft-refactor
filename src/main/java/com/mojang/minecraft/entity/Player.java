@@ -1,4 +1,4 @@
-package com.mojang.minecraft;
+package com.mojang.minecraft.entity;
 
 import com.mojang.minecraft.level.Level;
 
@@ -100,4 +100,4 @@ public class Player extends Entity {
             this.zd *= 0.7F;
         }
     }
-}
+} 

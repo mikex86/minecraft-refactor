@@ -1,4 +1,4 @@
-package com.mojang.minecraft;
+package com.mojang.minecraft.entity;
 
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.phys.AABB;
@@ -103,7 +103,7 @@ public class Entity {
     /**
      * Resets the entity's position to a random location in the level.
      */
-    protected void resetPos() {
+    public void resetPos() {
         float x = (float) Math.random() * (float) this.level.width;
         float y = (float) (this.level.depth + 10);
         float z = (float) Math.random() * (float) this.level.height;
@@ -191,20 +191,20 @@ public class Entity {
         List<AABB> collisionBoxes = this.level.getCubes(this.bb.expand(xa, ya, za));
 
         // Handle Y-axis collisions first
-        for (int i = 0; i < collisionBoxes.size(); ++i) {
-            ya = collisionBoxes.get(i).clipYCollide(this.bb, ya);
+        for (AABB collisionBox : collisionBoxes) {
+            ya = collisionBox.clipYCollide(this.bb, ya);
         }
         this.bb.move(0.0F, ya, 0.0F);
 
         // Handle X-axis collisions
-        for (int i = 0; i < collisionBoxes.size(); ++i) {
-            xa = collisionBoxes.get(i).clipXCollide(this.bb, xa);
+        for (AABB box : collisionBoxes) {
+            xa = box.clipXCollide(this.bb, xa);
         }
         this.bb.move(xa, 0.0F, 0.0F);
 
         // Handle Z-axis collisions
-        for (int i = 0; i < collisionBoxes.size(); ++i) {
-            za = collisionBoxes.get(i).clipZCollide(this.bb, za);
+        for (AABB collisionBox : collisionBoxes) {
+            za = collisionBox.clipZCollide(this.bb, za);
         }
         this.bb.move(0.0F, 0.0F, za);
 
@@ -249,28 +249,30 @@ public class Entity {
         // Convert movement to global coordinates based on rotation
         float sin = (float) Math.sin(this.yRot * Math.PI / 180.0F);
         float cos = (float) Math.cos(this.yRot * Math.PI / 180.0F);
+
+        // Apply rotation matrix
         this.xd += xa * cos - za * sin;
         this.zd += za * cos + xa * sin;
     }
 
     /**
-     * Checks if the entity's position is in a lit area.
+     * Checks if the entity is in a lit area (for rendering brightness).
      *
-     * @return True if the block at the entity's position is lit
+     * @return true if the entity is in a lit area
      */
     public boolean isLit() {
-        int xTile = (int) this.x;
-        int yTile = (int) this.y;
-        int zTile = (int) this.z;
-        return this.level.isLit(xTile, yTile, zTile);
+        int blockX = (int) this.x;
+        int blockY = (int) this.y;
+        int blockZ = (int) this.z;
+        return this.level.isLit(blockX, blockY, blockZ);
     }
 
     /**
-     * Renders the entity. Override in subclasses to implement rendering.
+     * Default render method. Override in subclasses to provide specific rendering.
      *
-     * @param a Interpolation factor between ticks (0.0-1.0)
+     * @param partialTick Partial tick time for smooth animation
      */
-    public void render(float a) {
-        // Implemented by subclasses
+    public void render(float partialTick) {
+        // Default implementation does nothing
     }
-}
+} 

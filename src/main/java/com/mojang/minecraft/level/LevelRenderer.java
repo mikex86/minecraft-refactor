@@ -1,12 +1,12 @@
 package com.mojang.minecraft.level;
 
-import com.mojang.minecraft.HitResult;
-import com.mojang.minecraft.Player;
+import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.Frustum;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.Textures;
+import com.mojang.minecraft.world.HitResult;
 
 import java.util.ArrayList;
 import java.util.List;

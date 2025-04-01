@@ -1,13 +1,14 @@
 package com.mojang.minecraft.renderer;
 
-import com.mojang.minecraft.Entity;
-import com.mojang.minecraft.HitResult;
 import com.mojang.minecraft.Minecraft;
-import com.mojang.minecraft.Player;
+import com.mojang.minecraft.entity.Entity;
+import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.gui.Font;
+import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.particle.ParticleEngine;
+import com.mojang.minecraft.world.HitResult;
 import org.lwjgl.BufferUtils;
 
 import java.nio.FloatBuffer;
@@ -21,8 +22,7 @@ import static org.lwjgl.opengl.GL11.*;
  * Extracted from the main Minecraft class to separate rendering concerns.
  */
 public class GameRenderer {
-    // The Minecraft instance this renderer belongs to
-    private final Minecraft minecraft;
+    private final Level level;
 
     // Rendering resources
     private final FloatBuffer fogColor0;
@@ -46,7 +46,7 @@ public class GameRenderer {
     /**
      * Creates a new GameRenderer.
      *
-     * @param minecraft      The Minecraft instance this renderer belongs to
+     * @param level          The level to render
      * @param levelRenderer  The level renderer
      * @param particleEngine The particle engine
      * @param player         The player
@@ -56,11 +56,11 @@ public class GameRenderer {
      * @param width          The initial window width
      * @param height         The initial window height
      */
-    public GameRenderer(Minecraft minecraft, LevelRenderer levelRenderer,
+    public GameRenderer(Level level, LevelRenderer levelRenderer,
                         ParticleEngine particleEngine, Player player,
                         List<Entity> entities, Textures textures, Font font,
                         int width, int height) {
-        this.minecraft = minecraft;
+        this.level = level;
         this.levelRenderer = levelRenderer;
         this.particleEngine = particleEngine;
         this.player = player;
@@ -397,7 +397,7 @@ public class GameRenderer {
         glBindTexture(GL_TEXTURE_2D, textureId);
         glEnable(GL_TEXTURE_2D);
         t.init();
-        Tile.tiles[paintTexture].render(t, minecraft.level, 0, -2, 0, 0);
+        Tile.tiles[paintTexture].render(t, level, 0, -2, 0, 0);
         t.flush();
         glDisable(GL_TEXTURE_2D);
         glPopMatrix();

@@ -1,6 +1,6 @@
 package com.mojang.minecraft.level;
 
-import com.mojang.minecraft.Player;
+import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.renderer.Frustum;
 
 import java.util.Comparator;

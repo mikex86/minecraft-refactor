@@ -1,6 +1,6 @@
 package com.mojang.minecraft.particle;
 
-import com.mojang.minecraft.Player;
+import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.Textures;

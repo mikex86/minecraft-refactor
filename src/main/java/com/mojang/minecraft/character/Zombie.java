@@ -1,6 +1,6 @@
 package com.mojang.minecraft.character;
 
-import com.mojang.minecraft.Entity;
+import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.renderer.Textures;
 
