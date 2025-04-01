@@ -138,4 +138,21 @@ public class GameState {
     public ParticleEngine getParticleEngine() {
         return particleEngine;
     }
+
+    /**
+     * Disposes of all game state resources.
+     * Should be called when the game is shutting down.
+     */
+    public void dispose() {
+        // Save the level first
+        save();
+        
+        // Clean up renderer resources
+        if (this.levelRenderer != null) {
+            this.levelRenderer.dispose();
+        }
+        
+        // Clear entity lists
+        this.entities.clear();
+    }
 } 

@@ -98,7 +98,7 @@ public class Minecraft implements Runnable {
     public void destroy() {
         try {
             if (gameState != null) {
-                gameState.save();
+                gameState.dispose();
             }
             engine.shutdown();
             textures.dispose();

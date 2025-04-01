@@ -251,7 +251,21 @@ public class LevelRenderer implements LevelListener {
      */
     @Override
     public void allChanged() {
-        // Mark the entire level as dirty
-        this.setDirty(0, 0, 0, this.level.width, this.level.depth, this.level.height);
+        // Mark all chunks as dirty
+        for (Chunk chunk : this.chunks) {
+            chunk.setDirty();
+        }
+    }
+
+    /**
+     * Disposes all chunks and resources when the level is unloaded.
+     * This must be called when the level is no longer needed to prevent memory leaks.
+     */
+    public void dispose() {
+        for (Chunk chunk : this.chunks) {
+            if (chunk != null) {
+                chunk.dispose();
+            }
+        }
     }
 }

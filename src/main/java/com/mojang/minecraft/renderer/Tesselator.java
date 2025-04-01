@@ -7,7 +7,7 @@ import java.nio.FloatBuffer;
 import static org.lwjgl.opengl.GL11.*;
 
 /**
- * Handles efficient rendering of vertices for OpenGL rendering
+ * Handles efficient accumulation of vertices for VBO-based rendering
  */
 public class Tesselator {
     private static final int MAX_FLOATS = 524288;      // MAX_MEMORY_USE / 8 (size of float)
@@ -33,17 +33,58 @@ public class Tesselator {
     private boolean hasTexture = false;
     private boolean disableColors = false;
 
-    // Singleton instance
+    // Legacy singleton instance for backward compatibility
     public static Tesselator instance = new Tesselator();
 
     /**
-     * Private constructor for singleton pattern
+     * Creates a new tesselator
      */
-    private Tesselator() {
+    public Tesselator() {
+        clear();
     }
 
     /**
-     * Sends all accumulated vertices to the GPU and renders them
+     * Gets the vertex buffer with accumulated vertex data
+     */
+    public FloatBuffer getBuffer() {
+        vertexBuffer.clear();
+        vertexBuffer.put(vertexData, 0, dataIndex);
+        vertexBuffer.flip();
+        return vertexBuffer;
+    }
+
+    /**
+     * Gets the current vertex count
+     */
+    public int getVertexCount() {
+        return vertexCount;
+    }
+
+    /**
+     * Gets the vertex size in floats
+     */
+    public int getVertexSize() {
+        return vertexSize;
+    }
+
+    /**
+     * Returns whether this tesselator has texture coordinates
+     */
+    public boolean hasTexture() {
+        return hasTexture;
+    }
+
+    /**
+     * Returns whether this tesselator has color data
+     */
+    public boolean hasColor() {
+        return hasColor;
+    }
+
+    /**
+     * Legacy method - sends all accumulated vertices to the GPU and renders them directly
+     * This method is kept for backward compatibility but should be avoided in new code.
+     * Instead, use ChunkMesh for VBO-based rendering.
      */
     public void flush() {
         if (this.vertexCount > 0) {

@@ -3,16 +3,15 @@ package com.mojang.minecraft.level;
 import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.phys.AABB;
+import com.mojang.minecraft.renderer.ChunkMesh;
 import com.mojang.minecraft.renderer.Tesselator;
-
-import static org.lwjgl.opengl.GL11.*;
 
 /**
  * Represents a chunk of the world that can be rendered independently.
  */
 public class Chunk {
     // Constants
-    private static final int DISPLAY_LIST_COUNT = 2;
+    private static final int LAYER_COUNT = 2;
 
     // Bounding box for this chunk
     public AABB aabb;
@@ -35,17 +34,15 @@ public class Chunk {
 
     // Rendering state
     private boolean dirty = true;
-    private int displayListBase = -1;
+    private ChunkMesh mesh;
     public long dirtiedTime = 0L;
 
     // Static rendering stats
-    private static final Tesselator tesselator;
     public static int updates;
     private static long totalTime;
     private static int totalUpdates;
 
     static {
-        tesselator = Tesselator.instance;
         updates = 0;
         totalTime = 0L;
         totalUpdates = 0;
@@ -68,21 +65,26 @@ public class Chunk {
         this.y = (float) (y0 + y1) / 2.0F;
         this.z = (float) (z0 + z1) / 2.0F;
 
-        // Create bounding box and display lists
+        // Create bounding box and mesh
         this.aabb = new AABB((float) x0, (float) y0, (float) z0, (float) x1, (float) y1, (float) z1);
-        this.displayListBase = glGenLists(DISPLAY_LIST_COUNT);
+        this.mesh = new ChunkMesh();
     }
 
     /**
-     * Rebuilds the chunk display list for the specified layer.
+     * Rebuilds the chunk mesh for the specified layer.
      */
     private void rebuild(int layer) {
-        this.dirty = false;
+        if (!this.mesh.isDirty(layer)) {
+            return;
+        }
+        
         ++updates;
-
         long startTime = System.nanoTime();
-        glNewList(this.displayListBase + layer, GL_COMPILE);
+        
+        // Get the tesselator for this layer
+        Tesselator tesselator = this.mesh.getTesselator(layer);
         tesselator.init();
+        
         int renderedTiles = 0;
 
         // Render all visible tiles in the chunk
@@ -97,11 +99,11 @@ public class Chunk {
                 }
             }
         }
-
-        tesselator.flush();
-        glEndList();
+        
+        // Rebuild the mesh with the accumulated data
+        this.mesh.rebuild(layer);
+        
         long endTime = System.nanoTime();
-
 
         // Update rendering statistics
         if (renderedTiles > 0) {
@@ -116,13 +118,14 @@ public class Chunk {
     public void rebuild() {
         this.rebuild(0);
         this.rebuild(1);
+        this.dirty = false;
     }
 
     /**
      * Renders the specified layer of the chunk.
      */
     public void render(int layer) {
-        glCallList(this.displayListBase + layer);
+        this.mesh.render(layer);
     }
 
     /**
@@ -133,6 +136,7 @@ public class Chunk {
             this.dirtiedTime = System.currentTimeMillis();
         }
         this.dirty = true;
+        this.mesh.setDirty();
     }
 
     /**
@@ -150,5 +154,16 @@ public class Chunk {
         float yDistance = player.y - this.y;
         float zDistance = player.z - this.z;
         return xDistance * xDistance + yDistance * yDistance + zDistance * zDistance;
+    }
+    
+    /**
+     * Disposes of this chunk's resources.
+     * Should be called when the chunk is no longer needed.
+     */
+    public void dispose() {
+        if (this.mesh != null) {
+            this.mesh.dispose();
+            this.mesh = null;
+        }
     }
 }
