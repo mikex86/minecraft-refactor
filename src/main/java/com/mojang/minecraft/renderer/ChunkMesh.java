@@ -70,6 +70,7 @@ public class ChunkMesh implements Disposable {
         FloatBuffer buffer = tesselator.getBuffer();
         vertexCount = tesselator.getVertexCount();
 
+        // TODO: INTEGRATE THIS INTO TESSELATOR
         if (vertexCount > 0) {
             // Set up vertex format based on tesselator state
             VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(

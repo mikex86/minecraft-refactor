@@ -15,6 +15,7 @@ import static org.lwjgl.opengl.GL15.*;
  * This implementation uses LWJGL to interact with OpenGL.
  */
 public class OpenGLGraphicsAPI implements GraphicsAPI {
+
     // OpenGL-specific resources
     private final FloatBuffer matrixBuffer;
     private final FloatBuffer colorBuffer;

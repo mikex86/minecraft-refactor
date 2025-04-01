@@ -267,6 +267,26 @@ public class GameRenderer implements Disposable {
         graphics.translate(0.0F, 0.0F, -200.0F);
 
         // Draw the selected block preview
+        drawBlockPreview(graphics, screenWidth, screenHeight, paintTexture);
+
+        // Render debug string
+        graphics.setBlendState(true, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
+
+        drawDebugText(graphics, fpsString);
+
+        graphics.setBlendState(false, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
+
+        // Draw cross-hair
+        drawCrosshair(graphics, screenWidth, screenHeight);
+    }
+
+    private void drawDebugText(GraphicsAPI graphics, String fpsString) {
+        this.font.drawShadow(graphics, Minecraft.VERSION_STRING, 2, 2, 0xFFFFFF);
+        this.font.drawShadow(graphics, fpsString, 2, 12, 0xFFFFFF);
+    }
+
+    private void drawBlockPreview(GraphicsAPI graphics, int screenWidth, int screenHeight, int paintTexture) {
+        Tesselator t = Tesselator.instance;
         graphics.pushMatrix();
         graphics.translate(screenWidth - 16, 32, 0.0F);
         graphics.scale(16.0F, 16.0F, 16.0F);
@@ -277,24 +297,19 @@ public class GameRenderer implements Disposable {
         Texture texture = this.textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
         graphics.setTexture(texture);
         graphics.setTexturingEnabled(true);
-        Tesselator t = Tesselator.instance;
         t.init();
         Tile.tiles[paintTexture].render(t, null, 0, 0, 0, 0);
         t.flush();
         graphics.setTexturingEnabled(false);
         graphics.popMatrix();
+    }
 
-        // Render debug string
-        graphics.setBlendState(true, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
 
-        this.font.drawShadow(graphics, Minecraft.VERSION_STRING, 2, 2, 0xFFFFFF);
-        this.font.drawShadow(graphics, fpsString, 2, 12, 0xFFFFFF);
-
-        graphics.setBlendState(false, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
-
-        // Draw cross-hair
+    private void drawCrosshair(GraphicsAPI graphics, int screenWidth, int screenHeight) {
         int centerX = screenWidth / 2;
         int centerY = screenHeight / 2;
+
+        Tesselator t = Tesselator.instance;
         t.init();
         t.color(1, 1, 1);
 
@@ -311,8 +326,7 @@ public class GameRenderer implements Disposable {
         t.vertex(centerX + 5, centerY + 1, 0.0F);
 
         t.flush();
-
-     }
+    }
 
     @Override
     public void dispose() {
