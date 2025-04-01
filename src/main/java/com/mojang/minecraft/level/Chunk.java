@@ -4,13 +4,14 @@ import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.ChunkMesh;
+import com.mojang.minecraft.renderer.Disposable;
 import com.mojang.minecraft.renderer.Tesselator;
 
 /**
  * Represents a chunk of the world that can be rendered independently.
  * Designed to support cubic chunks in the future.
  */
-public class Chunk {
+public class Chunk implements Disposable {
     // Constants
     private static final int LAYER_COUNT = 2;
 
@@ -100,7 +101,7 @@ public class Chunk {
                 for (int z = this.z0; z < this.z1; ++z) {
                     int tileId = this.level.getTile(x, y, z);
                     if (tileId > 0) {
-                        Tile.tiles[tileId].render(tesselator, this.level, layer, x, y, z);
+                        Tile.tiles[tileId].render(tesselator, level, layer, x, y, z);
                         ++renderedTiles;
                     }
                 }
@@ -174,6 +175,7 @@ public class Chunk {
      * Disposes of this chunk's resources.
      * Should be called when the chunk is no longer needed.
      */
+    @Override
     public void dispose() {
         for (ChunkMesh mesh : this.meshes) {
             if (mesh != null) {

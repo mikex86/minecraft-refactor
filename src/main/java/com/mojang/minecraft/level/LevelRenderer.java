@@ -1,21 +1,20 @@
 package com.mojang.minecraft.level;
 
 import com.mojang.minecraft.entity.Player;
-import com.mojang.minecraft.level.tile.Tile;
+import com.mojang.minecraft.renderer.Disposable;
 import com.mojang.minecraft.renderer.Frustum;
-import com.mojang.minecraft.renderer.Tesselator;
-import com.mojang.minecraft.renderer.Textures;
-import com.mojang.minecraft.world.HitResult;
+import com.mojang.minecraft.renderer.TextureManager;
+import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
+import com.mojang.minecraft.renderer.graphics.Texture;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.lwjgl.opengl.GL11.*;
-
 /**
  * Handles rendering of the Minecraft level.
  */
-public class LevelRenderer implements LevelListener {
+public class LevelRenderer implements LevelListener, Disposable {
     // Constants
     public static final int MAX_REBUILDS_PER_FRAME = 8;
     public static final int CHUNK_SIZE = 16;
@@ -26,14 +25,20 @@ public class LevelRenderer implements LevelListener {
     private final int xChunks;
     private final int yChunks;
     private final int zChunks;
-    private final Textures textures;
+
+    // Graphics resources
+    private final GraphicsAPI graphics;
+    private final TextureManager textureManager;
 
     /**
-     * Creates a new LevelRenderer for the specified level.
+     * Creates a new GraphicsLevelRenderer for the specified level.
      */
-    public LevelRenderer(Level level, Textures textures) {
+    public LevelRenderer(Level level, TextureManager textureManager) {
         this.level = level;
-        this.textures = textures;
+        this.textureManager = textureManager;
+        this.graphics = GraphicsFactory.getGraphicsAPI();
+
+        // Register as a level listener
         level.addListener(this);
 
         // Calculate the number of chunks in each dimension
@@ -95,12 +100,15 @@ public class LevelRenderer implements LevelListener {
 
     /**
      * Renders the level for the specified layer.
+     *
+     * @param layer 0 for lit areas (day), 1 for unlit areas (night)
      */
-    public void render(Player player, int layer) {
+    public void render(int layer) {
         // Enable texturing and bind the terrain texture
-        glEnable(GL_TEXTURE_2D);
-        int textureId = this.textures.loadTexture("/terrain.png", GL_NEAREST);
-        glBindTexture(GL_TEXTURE_2D, textureId);
+        graphics.setTexturingEnabled(true);
+
+        Texture texture = textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
+        graphics.setTexture(texture);
 
         // Get the current view frustum
         Frustum frustum = Frustum.getFrustum();
@@ -112,7 +120,7 @@ public class LevelRenderer implements LevelListener {
             }
         }
 
-        glDisable(GL_TEXTURE_2D);
+        graphics.setTexturingEnabled(false);
     }
 
     /**
@@ -120,9 +128,9 @@ public class LevelRenderer implements LevelListener {
      */
     public void updateDirtyChunks(Player player) {
         List<Chunk> dirtyChunks = this.getAllDirtyChunks();
-        if (dirtyChunks != null) {
-            // Sort chunks by visibility, age, and distance to player
-            dirtyChunks.sort(new DirtyChunkSorter(player, Frustum.getFrustum()));
+        if (dirtyChunks != null && !dirtyChunks.isEmpty()) {
+            // Sort chunks by visibility, age, and distance to player (future implementation)
+            // TODO: Implement a sorter based on player position and frustum
 
             // Rebuild at most MAX_REBUILDS_PER_FRAME chunks per frame
             int rebuildCount = Math.min(MAX_REBUILDS_PER_FRAME, dirtyChunks.size());
@@ -130,71 +138,6 @@ public class LevelRenderer implements LevelListener {
                 dirtyChunks.get(i).rebuild();
             }
         }
-    }
-
-    /**
-     * Renders the highlighted block the player is looking at.
-     */
-    public void renderHit(HitResult hitResult, int mode, int tileType) {
-        Tesselator tesselator = Tesselator.instance;
-
-        // Enable blending for transparency
-        glEnable(GL_BLEND);
-
-        // Calculate the alpha value based on time for a pulsing effect
-        float pulsingAlpha = ((float) Math.sin(System.currentTimeMillis() / 100.0) * 0.2F + 0.4F) * 0.5F;
-
-        if (mode == 0) {
-            // Destruction mode - render an outline of the block being broken
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-            glColor4f(1.0F, 1.0F, 1.0F, pulsingAlpha);
-
-            tesselator.init();
-
-            // Render all faces
-            for (int face = 0; face < 6; ++face) {
-                Tile.rock.renderFaceNoTexture(tesselator, hitResult.x, hitResult.y, hitResult.z, face);
-            }
-
-            tesselator.flush();
-        } else {
-            // Building mode - render a preview of the block to be placed
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-            // Calculate brightness based on time
-            float brightness = (float) Math.sin(System.currentTimeMillis() / 100.0) * 0.2F + 0.8F;
-            float alpha = (float) Math.sin(System.currentTimeMillis() / 200.0) * 0.2F + 0.5F;
-            glColor4f(brightness, brightness, brightness, alpha);
-
-            // Enable texturing
-            glEnable(GL_TEXTURE_2D);
-            int textureId = this.textures.loadTexture("/terrain.png", GL_NEAREST);
-            glBindTexture(GL_TEXTURE_2D, textureId);
-
-            // Calculate the position to render the block preview
-            int x = hitResult.x;
-            int y = hitResult.y;
-            int z = hitResult.z;
-
-            // Adjust position based on which face was hit
-            if (hitResult.face == 0) --y;
-            if (hitResult.face == 1) ++y;
-            if (hitResult.face == 2) --z;
-            if (hitResult.face == 3) ++z;
-            if (hitResult.face == 4) --x;
-            if (hitResult.face == 5) ++x;
-
-            // Render the block preview
-            tesselator.init();
-            tesselator.noColor();
-            Tile.tiles[tileType].render(tesselator, this.level, 0, x, y, z);
-            Tile.tiles[tileType].render(tesselator, this.level, 1, x, y, z);
-            tesselator.flush();
-
-            glDisable(GL_TEXTURE_2D);
-        }
-
-        glDisable(GL_BLEND);
     }
 
     /**
@@ -261,6 +204,7 @@ public class LevelRenderer implements LevelListener {
      * Disposes all chunks and resources when the level is unloaded.
      * This must be called when the level is no longer needed to prevent memory leaks.
      */
+    @Override
     public void dispose() {
         for (Chunk chunk : this.chunks) {
             if (chunk != null) {

@@ -1,5 +1,6 @@
 package com.mojang.minecraft.util.math;
 
+import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.tile.Tile;
@@ -18,21 +19,21 @@ public class RayCaster {
     private static final float MAX_REACH_DISTANCE = 5.0F;
 
     /**
-     * Casts a ray from the player's position in the direction they are looking.
+     * Casts a ray from the entity's position in the direction they are looking.
      *
-     * @param player      The player casting the ray
+     * @param entity      The entity casting the ray
      * @param level       The level to cast the ray in
      * @param partialTick Partial tick value for interpolation
      * @return A HitResult with information about what was hit, or null if nothing was hit
      */
-    public static HitResult raycast(Player player, Level level, float partialTick) {
-        float rayStartX = player.xo + (player.x - player.xo) * partialTick;
-        float rayStartY = player.yo + player.getHeightOffset() + (player.y - player.yo) * partialTick;
-        float rayStartZ = player.zo + (player.z - player.zo) * partialTick;
+    public static HitResult raycast(Entity entity, Level level, float partialTick) {
+        float rayStartX = entity.xo + (entity.x - entity.xo) * partialTick;
+        float rayStartY = entity.yo + entity.getHeightOffset() + (entity.y - entity.yo) * partialTick;
+        float rayStartZ = entity.zo + (entity.z - entity.zo) * partialTick;
 
         // Calculate ray direction from player's rotation
-        float yaw = player.yRot;
-        float pitch = player.xRot;
+        float yaw = entity.yRot;
+        float pitch = entity.xRot;
 
         // Convert rotation angles to direction vector
         // Yaw: 0 is south (+Z), 90 is west (-X), 180 is north (-Z), 270 is east (+X)

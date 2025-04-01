@@ -6,7 +6,7 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.phys.AABB;
-import com.mojang.minecraft.renderer.InputHandler;
+import input.InputHandler;
 import com.mojang.minecraft.util.math.CollisionUtils;
 import com.mojang.minecraft.world.HitResult;
 
@@ -223,7 +223,7 @@ public class GameInputHandler {
     public void grabMouse() {
         if (!this.mouseGrabbed) {
             this.mouseGrabbed = true;
-            inputHandler.setCursorVisible(false);
+            inputHandler.setCursorCaptured(true);
         }
     }
 
@@ -233,7 +233,7 @@ public class GameInputHandler {
     public void releaseMouse() {
         if (this.mouseGrabbed) {
             this.mouseGrabbed = false;
-            inputHandler.setCursorVisible(true);
+            inputHandler.setCursorCaptured(false);
         }
     }
 

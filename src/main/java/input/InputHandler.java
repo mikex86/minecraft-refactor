@@ -1,4 +1,6 @@
-package com.mojang.minecraft.renderer;
+package input;
+
+import com.mojang.minecraft.renderer.GameWindow;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -198,7 +200,7 @@ public class InputHandler {
      * @param y Y position in pixels
      */
     public void setMousePosition(double x, double y) {
-        glfwSetCursorPos(window.getWindowHandle(), x, y);
+        this.window.setCursorPosition(x, y);
     }
 
     /**
@@ -224,12 +226,14 @@ public class InputHandler {
     }
 
     /**
-     * Makes the cursor visible or invisible.
+     * Captures or releases the cursor.
+     * When the cursor is captured, it is hidden and its position is reset to the center of the window.
+     * This is useful for first-person camera controls.
      *
-     * @param visible true to make the cursor visible, false to hide it
+     * @param visible true to capture the cursor, false to release it
      */
-    public void setCursorVisible(boolean visible) {
-        window.setCursorVisible(visible);
+    public void setCursorCaptured(boolean visible) {
+        window.setCursorCaptured(visible);
     }
 
     /**
@@ -239,6 +243,9 @@ public class InputHandler {
      */
     public GameWindow getWindow() {
         return window;
+    }
+
+    public void resetMouse() {
     }
 
     /**

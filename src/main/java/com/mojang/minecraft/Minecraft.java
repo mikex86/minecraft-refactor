@@ -5,7 +5,7 @@ import com.mojang.minecraft.engine.GameEngine;
 import com.mojang.minecraft.gui.Font;
 import com.mojang.minecraft.input.GameInputHandler;
 import com.mojang.minecraft.renderer.GameRenderer;
-import com.mojang.minecraft.renderer.Textures;
+import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.util.logging.LoggingUtils;
 import com.mojang.minecraft.world.HitResult;
 
@@ -28,8 +28,7 @@ public class Minecraft implements Runnable {
     private GameState gameState;
 
     // Game resources
-    private final Textures textures;
-    private Font font;
+    private final TextureManager textureManager;
 
     // Game flags
     private volatile boolean running = false;
@@ -44,7 +43,7 @@ public class Minecraft implements Runnable {
      */
     public Minecraft(int width, int height, boolean fullscreen) {
         this.engine = new GameEngine(width, height, fullscreen, "Minecraft " + VERSION_STRING);
-        this.textures = new Textures();
+        this.textureManager = new TextureManager();
     }
 
     /**
@@ -57,22 +56,18 @@ public class Minecraft implements Runnable {
             // Initialize the engine
             engine.initialize();
 
-            // Create game resources
-            this.font = new Font("/default.gif", this.textures);
-
             // Create game state (manages level, entities, player)
-            this.gameState = new GameState(this.textures);
+            this.gameState = new GameState(this.textureManager);
             this.gameState.initialize();
 
             // Create renderer
             this.renderer = new GameRenderer(
+                    this.textureManager,
                     this.gameState.getLevel(),
                     gameState.getLevelRenderer(),
                     gameState.getParticleEngine(),
                     gameState.getPlayer(),
                     gameState.getEntities(),
-                    this.textures,
-                    this.font,
                     engine.getWidth(),
                     engine.getHeight()
             );
@@ -101,7 +96,7 @@ public class Minecraft implements Runnable {
                 gameState.dispose();
             }
             engine.shutdown();
-            textures.dispose();
+            textureManager.dispose();
         } catch (Exception e) {
             CrashReporter.handleError("Failed to clean up resources during shutdown", e);
         }
@@ -138,7 +133,7 @@ public class Minecraft implements Runnable {
                     float partialTick = engine.getPartialTick();
 
                     // Process input
-                    HitResult hitResult = this.renderer.pick(partialTick);
+                    HitResult hitResult = this.gameState.getLevel().raycast(this.gameState.getPlayer(), partialTick);
                     gameInputHandler.processInput(hitResult);
 
                     // Process game ticks
@@ -148,6 +143,7 @@ public class Minecraft implements Runnable {
 
                     // Handle mouse look
                     gameInputHandler.processMouseLook();
+                    engine.resetMouse();
 
                     // Render the frame
                     this.renderer.render(

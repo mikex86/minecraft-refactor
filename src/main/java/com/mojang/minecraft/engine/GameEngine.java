@@ -3,8 +3,8 @@ package com.mojang.minecraft.engine;
 import com.mojang.minecraft.crash.CrashReporter;
 import com.mojang.minecraft.level.Chunk;
 import com.mojang.minecraft.renderer.GameWindow;
-import com.mojang.minecraft.renderer.InputHandler;
 import com.mojang.minecraft.util.time.Timer;
+import input.InputHandler;
 
 import java.io.IOException;
 
@@ -69,9 +69,6 @@ public class GameEngine {
 
             System.out.println("Initialized window with dimensions: " + width + "x" + height);
 
-            // Initialize OpenGL
-            window.initOpenGL();
-
             // Initialize timing
             lastFpsUpdateTime = System.currentTimeMillis();
             framesCounter = 0;
@@ -131,7 +128,7 @@ public class GameEngine {
      */
     public void shutdown() {
         if (window != null) {
-            window.destroy();
+            window.dispose();
             window = null;
         }
     }
@@ -225,4 +222,8 @@ public class GameEngine {
     public boolean isFullscreen() {
         return fullscreen;
     }
-} 
+
+    public void resetMouse() {
+        inputHandler.resetMouse();
+    }
+}

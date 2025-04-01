@@ -2,6 +2,7 @@ package com.mojang.minecraft.entity;
 
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.phys.AABB;
+import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.util.math.CollisionUtils;
 
 import java.util.List;
@@ -280,9 +281,10 @@ public class Entity {
     /**
      * Default render method. Override in subclasses to provide specific rendering.
      *
+     * @param graphics The graphics api
      * @param partialTick Partial tick time for smooth animation
      */
-    public void render(float partialTick) {
+    public void render(GraphicsAPI graphics, float partialTick) {
         // Default implementation does nothing
     }
 } 

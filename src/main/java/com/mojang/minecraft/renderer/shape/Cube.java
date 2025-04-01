@@ -1,8 +1,7 @@
 package com.mojang.minecraft.renderer.shape;
 
+import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.model.ModelMesh;
-
-import static org.lwjgl.opengl.GL11.*;
 
 /**
  * Represents a 3D cube with texture mapping for character models.
@@ -135,7 +134,7 @@ public class Cube {
                 this.xTexOffs + depth + width + depth, this.yTexOffs + depth,
                 this.xTexOffs + depth + width + depth + width, this.yTexOffs + depth + height
         );
-        
+
         // Mark as dirty to rebuild the mesh
         this.dirty = true;
     }
@@ -160,42 +159,41 @@ public class Cube {
         if (!this.dirty) {
             return;
         }
-        
+
         this.mesh.begin();
-        
+
         // Add all polygons to the mesh
         for (Polygon polygon : this.polygons) {
             polygon.addToMesh(this.mesh);
         }
-        
+
         this.mesh.end();
         this.dirty = false;
     }
 
     /**
      * Renders this cube.
+     *
+     * @param graphics the graphics API to render with
      */
-    public void render() {
+    public void render(GraphicsAPI graphics) {
         // Build the mesh if needed
         if (this.dirty) {
             buildMesh();
         }
 
-        glPushMatrix();
-        glTranslatef(this.x, this.y, this.z);
-        glRotatef(this.zRot * RADIANS_TO_DEGREES, 0.0F, 0.0F, 1.0F);
-        glRotatef(this.yRot * RADIANS_TO_DEGREES, 0.0F, 1.0F, 0.0F);
-        glRotatef(this.xRot * RADIANS_TO_DEGREES, 1.0F, 0.0F, 0.0F);
-        
-        // Set white color for rendering
-        glColor3f(1.0F, 1.0F, 1.0F);
-        
+        graphics.pushMatrix();
+        graphics.translate(this.x, this.y, this.z);
+        graphics.rotateX(this.zRot * RADIANS_TO_DEGREES);
+        graphics.rotateY(this.yRot * RADIANS_TO_DEGREES);
+        graphics.rotateZ(this.xRot * RADIANS_TO_DEGREES);
+
         // Render the mesh
         this.mesh.render();
-        
-        glPopMatrix();
+
+        graphics.popMatrix();
     }
-    
+
     /**
      * Disposes of this cube's resources.
      */

@@ -1,6 +1,7 @@
 package com.mojang.minecraft.renderer.model;
 
 import com.mojang.minecraft.renderer.Disposable;
+import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 
 /**
  * Interface for all 3D models in the game.
@@ -9,8 +10,9 @@ import com.mojang.minecraft.renderer.Disposable;
 public interface Model extends Disposable {
     /**
      * Renders the model with the given animation time.
-     * 
-     * @param time Animation time in seconds
+     *
+     * @param graphics The graphics API to use for rendering
+     * @param time     Animation time in seconds
      */
-    void render(float time);
+    void render(GraphicsAPI graphics, float time);
 } 

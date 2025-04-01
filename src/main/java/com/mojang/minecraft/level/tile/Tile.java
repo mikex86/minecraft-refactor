@@ -146,6 +146,9 @@ public class Tile {
      * @return True if the face should be rendered
      */
     private boolean shouldRenderFace(Level level, int x, int y, int z, int layer) {
+        if (level == null) {
+            return true;
+        }
         return !level.isSolidTile(x, y, z) && (level.isLit(x, y, z) ^ layer == 1);
     }
 

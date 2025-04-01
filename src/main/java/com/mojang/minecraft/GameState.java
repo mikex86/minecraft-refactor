@@ -6,7 +6,7 @@ import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.particle.ParticleEngine;
-import com.mojang.minecraft.renderer.Textures;
+import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.model.ModelRegistry;
 
 import java.util.ArrayList;
@@ -29,7 +29,7 @@ public class GameState {
     private ParticleEngine particleEngine;
 
     // Resources
-    private final Textures textures;
+    private final TextureManager textureManager;
 
     // Models
     private final ModelRegistry modelRegistry = ModelRegistry.getInstance();
@@ -37,10 +37,10 @@ public class GameState {
     /**
      * Creates a new game state manager.
      *
-     * @param textures The texture manager to use
+     * @param textureManager The texture manager to use
      */
-    public GameState(Textures textures) {
-        this.textures = textures;
+    public GameState(TextureManager textureManager) {
+        this.textureManager = textureManager;
     }
 
     /**
@@ -49,17 +49,17 @@ public class GameState {
     public void initialize() {
         // Create level and renderer
         this.level = new Level(256, 256, 64);
-        this.levelRenderer = new LevelRenderer(this.level, this.textures);
+        this.levelRenderer = new LevelRenderer(this.level, this.textureManager);
 
         // Create player
         this.player = new Player(this.level);
 
         // Create particle engine
-        this.particleEngine = new ParticleEngine(this.level, this.textures);
+        this.particleEngine = new ParticleEngine(this.level, this.textureManager);
 
         // Add initial entities (zombies)
         for (int i = 0; i < 10; ++i) {
-            Zombie zombie = new Zombie(this.level, this.textures, 128.0F, 0.0F, 128.0F);
+            Zombie zombie = new Zombie(this.level, this.textureManager, 128.0F, 0.0F, 128.0F);
             zombie.resetPos();
             this.entities.add(zombie);
         }

@@ -1,8 +1,11 @@
 package com.mojang.minecraft.level;
 
 import com.mojang.minecraft.crash.CrashReporter;
+import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.phys.AABB;
+import com.mojang.minecraft.util.math.RayCaster;
+import com.mojang.minecraft.world.HitResult;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -250,5 +253,9 @@ public class Level {
                 tile.tick(this, x, y, z, this.random);
             }
         }
+    }
+
+    public HitResult raycast(Entity entity, float partialTick) {
+        return RayCaster.raycast(entity, this, partialTick);
     }
 }

@@ -8,78 +8,82 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.particle.ParticleEngine;
-import com.mojang.minecraft.util.math.MatrixUtils;
-import com.mojang.minecraft.util.math.RayCaster;
+import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
+import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
+import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.world.HitResult;
 import org.lwjgl.BufferUtils;
 
 import java.nio.FloatBuffer;
-import java.nio.IntBuffer;
 import java.util.List;
-
-import static org.lwjgl.opengl.GL11.*;
 
 /**
  * Handles all rendering operations for Minecraft.
  * Extracted from the main Minecraft class to separate rendering concerns.
  */
-public class GameRenderer {
-    private final Level level;
+public class GameRenderer implements Disposable {
 
-    // Rendering resources
+    // Graphics context
+    private final GraphicsAPI graphics;
+
+    // Texture manager
+    private final TextureManager textureManager;
+
+    // Buffers for graphic operations
     private final FloatBuffer fogColor0;
     private final FloatBuffer fogColor1;
-    private final FloatBuffer lightBuffer;
-    private final IntBuffer viewportBuffer;
-    private final IntBuffer selectBuffer;
 
-    // Game components needed for rendering
+    // Font renderer
+    private Font font;
+
+    // Game components
+    private final Level level;
     private final LevelRenderer levelRenderer;
     private final ParticleEngine particleEngine;
     private final Player player;
     private final List<Entity> entities;
-    private final Textures textures;
-    private final Font font;
 
     // Window dimensions
     private int width;
     private int height;
 
     /**
-     * Creates a new GameRenderer.
+     * Creates a new graphics renderer.
      *
-     * @param level          The level to render
+     * @param textureManager The texture manager
+     * @param level          The level
      * @param levelRenderer  The level renderer
      * @param particleEngine The particle engine
      * @param player         The player
-     * @param entities       The list of entities
-     * @param textures       The texture manager
-     * @param font           The font for rendering text
+     * @param entities       The entity list
      * @param width          The initial window width
      * @param height         The initial window height
      */
-    public GameRenderer(Level level, LevelRenderer levelRenderer,
+    public GameRenderer(TextureManager textureManager, Level level, LevelRenderer levelRenderer,
                         ParticleEngine particleEngine, Player player,
-                        List<Entity> entities, Textures textures, Font font,
-                        int width, int height) {
+                        List<Entity> entities, int width, int height) {
+        // Get graphics API instance
+        this.graphics = GraphicsFactory.getGraphicsAPI();
+
+        this.textureManager = textureManager;
         this.level = level;
         this.levelRenderer = levelRenderer;
         this.particleEngine = particleEngine;
         this.player = player;
         this.entities = entities;
-        this.textures = textures;
-        this.font = font;
         this.width = width;
         this.height = height;
 
-        // Initialize buffers
+        // Create game resources
+        this.font = new Font("/default.gif", textureManager);
+
+
+        // Create fog color buffers
         this.fogColor0 = BufferUtils.createFloatBuffer(4);
         this.fogColor1 = BufferUtils.createFloatBuffer(4);
-        this.lightBuffer = BufferUtils.createFloatBuffer(4);
-        this.viewportBuffer = BufferUtils.createIntBuffer(16);
-        this.selectBuffer = BufferUtils.createIntBuffer(2048);
 
-        // Set up fog colors
+        // Initialize fog colors
         this.fogColor0.clear();
         this.fogColor0.put(0.5F).put(0.8F).put(1.0F).put(1.0F);
         this.fogColor0.flip();
@@ -90,7 +94,7 @@ public class GameRenderer {
     }
 
     /**
-     * Sets the window dimensions, used for proper viewport configuration.
+     * Sets the window dimensions for proper viewport configuration.
      *
      * @param width  New window width
      * @param height New window height
@@ -98,6 +102,29 @@ public class GameRenderer {
     public void setDimensions(int width, int height) {
         this.width = width;
         this.height = height;
+    }
+
+    /**
+     * Sets up the perspective camera for 3D rendering.
+     *
+     * @param partialTick Interpolation factor between ticks (0.0-1.0)
+     */
+    private void setupCamera(float partialTick) {
+        // Calculate aspect ratio
+        float aspectRatio = (float) this.width / (float) this.height;
+
+        // Set viewport
+        graphics.setViewport(0, 0, this.width, this.height);
+
+        // Set up projection matrix
+        graphics.setMatrixMode(GraphicsAPI.MatrixMode.PROJECTION);
+        graphics.loadIdentity();
+        graphics.setPerspectiveProjection(70.0F, aspectRatio, 0.05F, 1000.0F);
+
+        // Set up camera transformation
+        graphics.setMatrixMode(GraphicsAPI.MatrixMode.MODELVIEW);
+        graphics.loadIdentity();
+        this.moveCameraToPlayer(partialTick);
     }
 
     /**
@@ -111,46 +138,11 @@ public class GameRenderer {
         float playerY = player.yo + (player.y - player.yo) * partialTick;
         float playerZ = player.zo + (player.z - player.zo) * partialTick;
 
-        // In Minecraft, player.y is already at the eye position, so we don't need to add heightOffset again
-        // We just need to position the camera at the player's position
-
-        // Translate to player position
-        glTranslatef(0.0F, 0.0F, -0.3F);  // Camera offset
-        glRotatef(player.xRot, 1.0F, 0.0F, 0.0F);  // Pitch
-        glRotatef(player.yRot, 0.0F, 1.0F, 0.0F);  // Yaw
-
-        // Translate to player position, no need to add eye height as it's already included in player.y
-        glTranslatef(-playerX, -playerY - player.getHeightOffset(), -playerZ);
-    }
-
-    /**
-     * Sets up the perspective camera for 3D rendering.
-     *
-     * @param partialTick Interpolation factor between ticks (0.0-1.0)
-     */
-    private void setupCamera(float partialTick) {
-        // Calculate aspect ratio
-        float aspectRatio = (float) this.width / (float) this.height;
-
-        // Set up projection matrix
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        MatrixUtils.perspective(70.0F, aspectRatio, 0.05F, 1000.0F);
-
-        // Set up camera transformation
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-        this.moveCameraToPlayer(partialTick);
-    }
-
-    /**
-     * Performs picking to detect which block the player is looking at.
-     *
-     * @param partialTick Interpolation factor between ticks (0.0-1.0)
-     * @return The hit result, or null if no block was hit
-     */
-    public HitResult pick(float partialTick) {
-        return RayCaster.raycast(this.player, this.level, partialTick);
+        // Apply camera transforms
+        graphics.translate(0.0F, 0.0F, -0.3F);  // Camera offset
+        graphics.rotateX(player.xRot);          // Pitch
+        graphics.rotateY(player.yRot);          // Yaw
+        graphics.translate(-playerX, -playerY - player.getHeightOffset(), -playerZ);
     }
 
     /**
@@ -161,38 +153,16 @@ public class GameRenderer {
     private void setupFog(int mode) {
         if (mode == 0) {
             // Day fog (lighter, more distant)
-            glFogi(GL_FOG_MODE, GL_EXP);
-            glFogf(GL_FOG_DENSITY, 0.001F);
-            glFogfv(GL_FOG_COLOR, this.fogColor0);
-            glDisable(GL_LIGHTING);
+            graphics.setFog(true, GraphicsAPI.FogMode.EXP, 0.001F, 0.0F, 0.0F,
+                    0.5F, 0.8F, 1.0F, 1.0F);
+            graphics.setLighting(false, 0.0F, 0.0F, 0.0F);
+
         } else if (mode == 1) {
             // Night fog (darker, closer)
-            glFogi(GL_FOG_MODE, GL_EXP);
-            glFogf(GL_FOG_DENSITY, 0.01F);
-            glFogfv(GL_FOG_COLOR, this.fogColor1);
-            glEnable(GL_LIGHTING);
-            glEnable(GL_COLOR_MATERIAL);
-
-            // Set ambient light level
-            float brightness = 0.6F;
-            glLightModelfv(GL_LIGHT_MODEL_AMBIENT, this.getBuffer(brightness, brightness, brightness, 1.0F));
+            graphics.setFog(true, GraphicsAPI.FogMode.EXP, 0.01F, 0.0F, 0.0F,
+                    0.0F, 0.0F, 0.0F, 1.0F);
+            graphics.setLighting(true, 0.6F, 0.6F, 0.6F);
         }
-    }
-
-    /**
-     * Helper method to create a float buffer with the specified RGBA values.
-     *
-     * @param r Red component (0.0-1.0)
-     * @param g Green component (0.0-1.0)
-     * @param b Blue component (0.0-1.0)
-     * @param a Alpha component (0.0-1.0)
-     * @return A FloatBuffer containing the RGBA values
-     */
-    private FloatBuffer getBuffer(float r, float g, float b, float a) {
-        this.lightBuffer.clear();
-        this.lightBuffer.put(r).put(g).put(b).put(a);
-        this.lightBuffer.flip();
-        return this.lightBuffer;
     }
 
     /**
@@ -204,18 +174,18 @@ public class GameRenderer {
      * @param paintTexture The current block to place
      * @param fpsString    String containing FPS information to display
      */
-    public void render(float partialTick, HitResult hitResult, int editMode, int paintTexture, String fpsString) {
-        // Set viewport to full window size
-        glViewport(0, 0, this.width, this.height);
-
-        // Clear the color and depth buffers
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    public void render(float partialTick, HitResult hitResult, int editMode,
+                       int paintTexture, String fpsString) {
+        // Set viewport and clear buffers
+        graphics.setViewport(0, 0, this.width, this.height);
+        graphics.clear(true, true, 0.5F, 0.8F, 1.0F, 0.0F);
 
         // Set up the 3D camera
         this.setupCamera(partialTick);
 
         // Enable face culling for performance
-        glEnable(GL_CULL_FACE);
+        graphics.setRasterizerState(GraphicsEnums.CullMode.BACK, GraphicsEnums.FillMode.SOLID);
+        graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS);
 
         // Create frustum for culling
         Frustum frustum = Frustum.getFrustum();
@@ -225,108 +195,108 @@ public class GameRenderer {
 
         // Render lit parts of the level
         this.setupFog(0);
-        glEnable(GL_FOG);
-        this.levelRenderer.render(this.player, 0);
+        this.levelRenderer.render(0);
 
         // Render lit entities
         for (Entity entity : this.entities) {
             if (entity.isLit() && frustum.isVisible(entity.bb)) {
-                entity.render(partialTick);
+                entity.render(this.graphics, partialTick);
             }
         }
 
         // Render lit particles
-        this.particleEngine.render(this.player, partialTick, 0);
+        this.particleEngine.render(this.graphics, this.player, partialTick, 0);
 
         // Render unlit parts of the level
         this.setupFog(1);
-        this.levelRenderer.render(this.player, 1);
+        this.levelRenderer.render(1);
 
         // Render unlit entities
         for (Entity entity : this.entities) {
             if (!entity.isLit() && frustum.isVisible(entity.bb)) {
-                entity.render(partialTick);
+                entity.render(this.graphics, partialTick);
             }
         }
 
         // Render unlit particles
-        this.particleEngine.render(this.player, partialTick, 1);
-
-        // Disable 3D rendering features
-        glDisable(GL_LIGHTING);
-        glDisable(GL_TEXTURE_2D);
-        glDisable(GL_FOG);
+        this.particleEngine.render(this.graphics, this.player, partialTick, 1);
 
         // Render block selection highlight
         if (hitResult != null) {
-            glDisable(GL_ALPHA_TEST);
-            this.levelRenderer.renderHit(hitResult, editMode, paintTexture);
-            glEnable(GL_ALPHA_TEST);
+            renderBlockOutline(hitResult);
         }
 
-        // Render 2D GUI elements
-        this.drawGui(partialTick, paintTexture, fpsString);
+        // Render HUD elements
+        renderHud(graphics, fpsString, editMode, paintTexture);
     }
 
     /**
-     * Draws the 2D GUI elements (HUD, crosshair, selected block).
+     * Renders an outline around the selected block.
      *
-     * @param partialTick  Interpolation factor between ticks (0.0-1.0)
-     * @param paintTexture The current block to place
-     * @param fpsString    String containing FPS information to display
+     * @param hitResult The hit result containing the block to highlight
      */
-    private void drawGui(float partialTick, int paintTexture, String fpsString) {
-        // Use actual screen dimensions for the GUI
+    private void renderBlockOutline(HitResult hitResult) {
+        // Implementation would go here
+    }
+
+    /**
+     * Renders the HUD (head-up display) elements.
+     *
+     * @param graphics     The graphics api
+     * @param fpsString    The FPS string to display
+     * @param editMode     The current edit mode
+     * @param paintTexture The current block to place
+     */
+    private void renderHud(GraphicsAPI graphics, String fpsString, int editMode, int paintTexture) {
+        // disable depth test
+        graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
+
+        graphics.setLighting(false, 0.0F, 0.0F, 0.0F);
+        graphics.setTexturingEnabled(false);
+        graphics.setFog(false, GraphicsAPI.FogMode.LINEAR, 0, 0, 0, 0, 0, 0, 0);
+
         int screenWidth = this.width * 240 / this.height;
         int screenHeight = this.height * 240 / this.height;
 
-        // Clear depth buffer only
-        glClear(GL_DEPTH_BUFFER_BIT);
-
-        // Set up orthographic projection for 2D rendering
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glOrtho(0.0F, screenWidth, screenHeight, 0.0F, 100.0F, 300.0F);
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-        glTranslatef(0.0F, 0.0F, -200.0F);
+        graphics.clear(false, true, 0.0F, 0.0F, 0.0F, 0.0F);
+        graphics.setMatrixMode(GraphicsAPI.MatrixMode.PROJECTION);
+        graphics.loadIdentity();
+        graphics.setOrthographicProjection(0.0F, screenWidth, screenHeight, 0.0F, 100.0F, 300.0F);
+        graphics.setMatrixMode(GraphicsAPI.MatrixMode.MODELVIEW);
+        graphics.loadIdentity();
+        graphics.translate(0.0F, 0.0F, -200.0F);
 
         // Draw the selected block preview
-        glPushMatrix();
-        glTranslatef(screenWidth - 16, 16.0F, 0.0F);
+        graphics.pushMatrix();
+        graphics.translate(screenWidth - 16, 32, 0.0F);
+        graphics.scale(16.0F, 16.0F, 16.0F);
+        graphics.rotateX(30.0F);
+        graphics.rotateY(45.0F);
+        graphics.scale(-1.0F, -1.0F, 1.0F);
+
+        Texture texture = this.textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
+        graphics.setTexture(texture);
+        graphics.setTexturingEnabled(true);
         Tesselator t = Tesselator.instance;
-        glScalef(16.0F, 16.0F, 16.0F);
-        glRotatef(30.0F, 1.0F, 0.0F, 0.0F);
-        glRotatef(45.0F, 0.0F, 1.0F, 0.0F);
-        glTranslatef(-1.5F, 0.5F, -0.5F);
-        glScalef(-1.0F, -1.0F, 1.0F);
-
-        // Bind texture and render the selected block
-        int textureId = this.textures.loadTexture("/terrain.png", GL_NEAREST);
-        glBindTexture(GL_TEXTURE_2D, textureId);
-        glEnable(GL_TEXTURE_2D);
         t.init();
-        Tile.tiles[paintTexture].render(t, level, 0, -2, 0, 0);
+        Tile.tiles[paintTexture].render(t, null, 0, 0, 0, 0);
         t.flush();
-        glDisable(GL_TEXTURE_2D);
-        glPopMatrix();
+        graphics.setTexturingEnabled(false);
+        graphics.popMatrix();
 
-        // Enable blending for text rendering
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        // Render debug string
+        graphics.setBlendState(true, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
 
-        // Draw version and FPS text
-        this.font.drawShadow(Minecraft.VERSION_STRING, 2, 2, 0xFFFFFF);
-        this.font.drawShadow(fpsString, 2, 12, 0xFFFFFF);
+        this.font.drawShadow(graphics, Minecraft.VERSION_STRING, 2, 2, 0xFFFFFF);
+        this.font.drawShadow(graphics, fpsString, 2, 12, 0xFFFFFF);
 
-        // Disable blending after text rendering
-        glDisable(GL_BLEND);
+        graphics.setBlendState(false, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
 
-        // Draw crosshair
+        // Draw cross-hair
         int centerX = screenWidth / 2;
         int centerY = screenHeight / 2;
-        glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
         t.init();
+        t.color(1, 1, 1);
 
         // Vertical line
         t.vertex(centerX + 1, centerY - 4, 0.0F);
@@ -341,5 +311,11 @@ public class GameRenderer {
         t.vertex(centerX + 5, centerY + 1, 0.0F);
 
         t.flush();
+
+     }
+
+    @Override
+    public void dispose() {
+        // Dispose of any resources if needed
     }
 } 

@@ -1,16 +1,19 @@
 package com.mojang.minecraft.renderer;
 
+import com.mojang.minecraft.renderer.graphics.*;
+import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BufferUsage;
+import com.mojang.minecraft.renderer.graphics.GraphicsEnums.PrimitiveType;
 import org.lwjgl.BufferUtils;
 
 import java.nio.FloatBuffer;
 
-import static org.lwjgl.opengl.GL11.*;
-
 /**
- * Handles efficient accumulation of vertices for VBO-based rendering
+ * Tesselator implementation that uses the GraphicsAPI.
+ * This provides the same functionality as the original Tesselator, but
+ * uses the abstracted graphics API instead of direct OpenGL calls.
  */
-public class Tesselator {
-    private static final int MAX_FLOATS = 524288;      // MAX_MEMORY_USE / 8 (size of float)
+public class Tesselator implements Disposable {
+    private static final int MAX_FLOATS = 524288; // MAX_MEMORY_USE / 8 (size of float)
 
     // Vertex data storage
     private final FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(MAX_FLOATS);
@@ -32,6 +35,11 @@ public class Tesselator {
     private boolean hasColor = false;
     private boolean hasTexture = false;
     private boolean disableColors = false;
+    
+    // Graphics API and resources
+    private final GraphicsAPI graphics;
+    private VertexBuffer buffer;
+    private VertexBuffer.VertexFormat format;
 
     // Legacy singleton instance for backward compatibility
     public static Tesselator instance = new Tesselator();
@@ -40,6 +48,8 @@ public class Tesselator {
      * Creates a new tesselator
      */
     public Tesselator() {
+        this.graphics = GraphicsFactory.getGraphicsAPI();
+        this.buffer = graphics.createVertexBuffer(BufferUsage.DYNAMIC);
         clear();
     }
 
@@ -82,9 +92,7 @@ public class Tesselator {
     }
 
     /**
-     * Legacy method - sends all accumulated vertices to the GPU and renders them directly
-     * This method is kept for backward compatibility but should be avoided in new code.
-     * Instead, use ChunkMesh for VBO-based rendering.
+     * Sends all accumulated vertices to the GPU and renders them directly
      */
     public void flush() {
         if (this.vertexCount > 0) {
@@ -93,36 +101,36 @@ public class Tesselator {
             this.vertexBuffer.put(this.vertexData, 0, this.dataIndex);
             this.vertexBuffer.flip();
 
-            // Set up vertex data format
-            if (this.hasTexture && this.hasColor) {
-                glInterleavedArrays(GL_T2F_C3F_V3F, 0, this.vertexBuffer);
-            } else if (this.hasTexture) {
-                glInterleavedArrays(GL_T2F_V3F, 0, this.vertexBuffer);
-            } else if (this.hasColor) {
-                glInterleavedArrays(GL_C3F_V3F, 0, this.vertexBuffer);
+            // Update format
+            format = new VertexBuffer.VertexFormat(
+                    true,                 // Always has positions
+                    this.hasColor,        // May have colors
+                    this.hasTexture,      // May have textures
+                    false                 // No normals
+            );
+            
+            buffer.setFormat(format);
+            
+            // Upload data
+            buffer.setData(vertexBuffer, dataIndex * 4); // 4 bytes per float
+            
+            // Configure rendering state
+            if (this.hasTexture) {
+                graphics.setTexturingEnabled(true);
             } else {
-                glInterleavedArrays(GL_V3F, 0, this.vertexBuffer);
+                graphics.setTexturingEnabled(false);
             }
-
-            // Enable required vertex arrays
-            glEnableClientState(GL_VERTEX_ARRAY);
-            if (this.hasTexture) {
-                glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-            }
+            
             if (this.hasColor) {
-                glEnableClientState(GL_COLOR_ARRAY);
+                graphics.setVertexColorEnabled(true);
             }
-
+            
             // Draw the vertices
-            glDrawArrays(GL_QUADS, 0, this.vertexCount);
-
-            // Disable vertex arrays
-            glDisableClientState(GL_VERTEX_ARRAY);
-            if (this.hasTexture) {
-                glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-            }
+            graphics.drawPrimitives(buffer, PrimitiveType.QUADS, 0, this.vertexCount);
+            
+            // Reset state
             if (this.hasColor) {
-                glDisableClientState(GL_COLOR_ARRAY);
+                graphics.setVertexColorEnabled(false);
             }
         }
 
@@ -246,11 +254,15 @@ public class Tesselator {
         float b = (float) (c & 255) / 255.0F;
         this.color(r, g, b);
     }
-
+    
     /**
-     * Disable coloring for future vertices
+     * Disposes of any GPU resources held by this tesselator.
      */
-    public void noColor() {
-        this.disableColors = true;
+    @Override
+    public void dispose() {
+        if (buffer != null) {
+            buffer.dispose();
+            buffer = null;
+        }
     }
-}
+} 

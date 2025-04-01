@@ -1,7 +1,8 @@
 package com.mojang.minecraft.renderer;
 
-import org.lwjgl.glfw.GLFWErrorCallback;
-import org.lwjgl.glfw.GLFWVidMode;
+import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
+import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
 
@@ -9,7 +10,6 @@ import java.nio.IntBuffer;
 
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
@@ -17,7 +17,8 @@ import static org.lwjgl.system.MemoryUtil.NULL;
  * GameWindow implementation using GLFW for windowing and input handling.
  * Replaces the old LWJGL 2 Display system.
  */
-public class GameWindow {
+public class GameWindow implements Disposable {
+
     // Window handle
     private final long window;
 
@@ -29,11 +30,20 @@ public class GameWindow {
     private KeyboardCallback keyboardCallback;
     private MouseCallback mouseCallback;
 
+    // Graphics context
+    private final GraphicsAPI graphics;
+
     // Flag to check if window was created or is embedded
     private final boolean isStandalone;
 
+    // callbacks
+    private GLFWKeyCallback keyCallback;
+    private GLFWMouseButtonCallback mousebuttonCallback;
+    private GLFWCursorPosCallback cursorPosCallback;
+    private GLFWScrollCallback scrollCallback;
+
     /**
-     * Creates a new GameWindow with specified dimensions.
+     * Creates a new game window with specified dimensions.
      *
      * @param width      Window width
      * @param height     Window height
@@ -57,9 +67,6 @@ public class GameWindow {
         glfwDefaultWindowHints();
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-
-        // Use OpenGL compatibility profile to support fixed-function pipeline
-        // (we're removing the core profile requirements for now)
 
         // Create the window
         if (fullscreen) {
@@ -124,76 +131,32 @@ public class GameWindow {
         // Show the window
         glfwShowWindow(window);
 
-        // Initialize OpenGL capabilities
+        // Initialize OpenGL capabilities (needed for LWJGL to work with OpenGL)
         GL.createCapabilities();
+
+        // Get the graphics API
+        this.graphics = GraphicsFactory.getGraphicsAPI();
+
+        // Initialize the graphics API
+        graphics.initialize();
     }
 
     /**
-     * Initializes OpenGL rendering state.
-     * Sets up default rendering parameters for Minecraft.
-     */
-    public void initOpenGL() {
-        float red = 0.5F;
-        float green = 0.8F;
-        float blue = 1.0F;
-
-        // Configure OpenGL state
-        glEnable(GL_TEXTURE_2D);
-        glShadeModel(GL_SMOOTH);
-        glClearColor(red, green, blue, 0.0F);
-        glClearDepth(1.0F);
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LEQUAL);
-        glEnable(GL_ALPHA_TEST);
-        glAlphaFunc(GL_ALWAYS, 0.0F);
-
-        // Initialize projection matrix
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glMatrixMode(GL_MODELVIEW);
-
-        // Check for OpenGL errors
-        checkOpenGLError("OpenGL initialization");
-    }
-
-    /**
-     * Helper method to check for OpenGL errors.
+     * Gets the window width.
      *
-     * @param context Description of the current operation
-     * @throws RuntimeException if an OpenGL error is detected
+     * @return Window width in pixels
      */
-    private void checkOpenGLError(String context) {
-        int errorCode = glGetError();
-        if (errorCode != 0) {
-            String errorString;
-            switch (errorCode) {
-                case GL_INVALID_ENUM:
-                    errorString = "GL_INVALID_ENUM";
-                    break;
-                case GL_INVALID_VALUE:
-                    errorString = "GL_INVALID_VALUE";
-                    break;
-                case GL_INVALID_OPERATION:
-                    errorString = "GL_INVALID_OPERATION";
-                    break;
-                case GL_OUT_OF_MEMORY:
-                    errorString = "GL_OUT_OF_MEMORY";
-                    break;
-                case GL_STACK_UNDERFLOW:
-                    errorString = "GL_STACK_UNDERFLOW";
-                    break;
-                case GL_STACK_OVERFLOW:
-                    errorString = "GL_STACK_OVERFLOW";
-                    break;
-                default:
-                    errorString = "Unknown error code: " + errorCode;
-            }
+    public int getWidth() {
+        return width;
+    }
 
-            System.out.println("########## GL ERROR ##########");
-            System.out.println("@ " + context);
-            System.out.println(errorCode + ": " + errorString);
-            throw new RuntimeException("OpenGL error: " + errorString);
-        }
+    /**
+     * Gets the window height.
+     *
+     * @return Window height in pixels
+     */
+    public int getHeight() {
+        return height;
     }
 
     /**
@@ -208,15 +171,21 @@ public class GameWindow {
         // Poll for events
         glfwPollEvents();
 
-        // update window width & height
+        // Update window width & height
         try (MemoryStack stack = stackPush()) {
             IntBuffer pWidth = stack.mallocInt(1);
             IntBuffer pHeight = stack.mallocInt(1);
 
             glfwGetFramebufferSize(window, pWidth, pHeight);
 
-            this.width = pWidth.get(0);
-            this.height = pHeight.get(0);
+            int newWidth = pWidth.get(0);
+            int newHeight = pHeight.get(0);
+
+            if (newWidth != width || newHeight != height) {
+                width = newWidth;
+                height = newHeight;
+                graphics.setViewport(0, 0, width, height);
+            }
         }
 
         // Check if window should close
@@ -224,9 +193,91 @@ public class GameWindow {
     }
 
     /**
-     * Destroys the window and cleans up GLFW resources.
+     * Checks if the window has focus.
+     *
+     * @return true if the window has focus
      */
-    public void destroy() {
+    public boolean hasFocus() {
+        return glfwGetWindowAttrib(window, GLFW_FOCUSED) == GLFW_TRUE;
+    }
+
+    /**
+     * Sets a keyboard callback for key events.
+     *
+     * @param callback The keyboard callback
+     */
+    public void setKeyboardCallback(KeyboardCallback callback) {
+        this.keyboardCallback = callback;
+
+        this.keyCallback = glfwSetKeyCallback(window, (window, key, scancode, action, mods) -> {
+            if (keyboardCallback != null) {
+                keyboardCallback.onKey(key, scancode, action, mods);
+            }
+        });
+    }
+
+    /**
+     * Sets a mouse callback for mouse button and movement events.
+     *
+     * @param callback The mouse callback
+     */
+    public void setMouseCallback(MouseCallback callback) {
+        this.mouseCallback = callback;
+
+        // Mouse button callback
+        if (this.mousebuttonCallback != null) {
+            this.mousebuttonCallback.free();
+        }
+        this.mousebuttonCallback = glfwSetMouseButtonCallback(window, (window, button, action, mods) -> {
+            if (mouseCallback != null) {
+                mouseCallback.onMouseButton(button, action, mods);
+            }
+        });
+
+        // Mouse position callback
+        if (this.cursorPosCallback != null) {
+            this.cursorPosCallback.free();
+        }
+        this.cursorPosCallback = glfwSetCursorPosCallback(window, (window, xpos, ypos) -> {
+            if (mouseCallback != null) {
+                mouseCallback.onCursorPos(xpos, ypos);
+            }
+        });
+
+        // Scroll callback
+        if (this.scrollCallback != null) {
+            this.scrollCallback.free();
+        }
+        this.scrollCallback = glfwSetScrollCallback(window, (window, xoffset, yoffset) -> {
+            if (mouseCallback != null) {
+                mouseCallback.onScroll(xoffset, yoffset);
+            }
+        });
+    }
+
+    /**
+     * Sets the mouse cursor mode.
+     *
+     * @param mode The cursor mode (GLFW_CURSOR_NORMAL, GLFW_CURSOR_HIDDEN, or GLFW_CURSOR_DISABLED)
+     */
+    public void setCursorMode(int mode) {
+        glfwSetInputMode(window, GLFW_CURSOR, mode);
+    }
+
+    @Override
+    public void dispose() {
+        if (keyCallback != null) {
+            keyCallback.free();
+        }
+        if (mousebuttonCallback != null) {
+            mousebuttonCallback.free();
+        }
+        if (cursorPosCallback != null) {
+            cursorPosCallback.free();
+        }
+        if (scrollCallback != null) {
+            scrollCallback.free();
+        }
         if (isStandalone) {
             // Free the callbacks
             glfwFreeCallbacks(window);
@@ -234,145 +285,63 @@ public class GameWindow {
             // Destroy the window
             glfwDestroyWindow(window);
 
+            // Shutdown the graphics API
+            graphics.shutdown();
+
             // Terminate GLFW
             glfwTerminate();
-
-            // Remove the error callback
-            GLFWErrorCallback callback = glfwSetErrorCallback(null);
-            if (callback != null) {
-                callback.free();
-            }
         }
     }
 
-    /**
-     * Gets the window width.
-     *
-     * @return Window width
-     */
-    public int getWidth() {
-        return width;
+    public void setCursorPosition(double x, double y) {
+        glfwSetCursorPos(window, x, y);
+    }
+
+    public void setCursorCaptured(boolean captured) {
+        glfwSetInputMode(window, GLFW_CURSOR, !captured ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
     }
 
     /**
-     * Gets the window height.
-     *
-     * @return Window height
-     */
-    public int getHeight() {
-        return height;
-    }
-
-    /**
-     * Gets the GLFW window handle.
-     *
-     * @return Window handle
-     */
-    public long getWindowHandle() {
-        return window;
-    }
-
-    /**
-     * Checks if the window currently has focus.
-     *
-     * @return true if the window has focus, false otherwise
-     */
-    public boolean hasFocus() {
-        return glfwGetWindowAttrib(window, GLFW_FOCUSED) == GLFW_TRUE;
-    }
-
-    /**
-     * Sets the keyboard callback.
-     *
-     * @param callback Keyboard callback to set
-     */
-    public void setKeyboardCallback(KeyboardCallback callback) {
-        this.keyboardCallback = callback;
-
-        glfwSetKeyCallback(window, (windowHandle, key, scancode, action, mods) -> {
-            if (callback != null) {
-                callback.invoke(key, scancode, action, mods);
-            }
-        });
-    }
-
-    /**
-     * Sets the mouse callback.
-     *
-     * @param callback Mouse callback to set
-     */
-    public void setMouseCallback(MouseCallback callback) {
-        this.mouseCallback = callback;
-
-        glfwSetCursorPosCallback(window, (windowHandle, xpos, ypos) -> {
-            if (callback != null) {
-                callback.onCursorPos(xpos, ypos);
-            }
-        });
-
-        glfwSetMouseButtonCallback(window, (windowHandle, button, action, mods) -> {
-            if (callback != null) {
-                callback.onMouseButton(button, action, mods);
-            }
-        });
-
-        glfwSetScrollCallback(window, (windowHandle, xoffset, yoffset) -> {
-            if (callback != null) {
-                callback.onScroll(xoffset, yoffset);
-            }
-        });
-    }
-
-    /**
-     * Sets whether the cursor should be visible or hidden.
-     *
-     * @param visible true to show cursor, false to hide it
-     */
-    public void setCursorVisible(boolean visible) {
-        glfwSetInputMode(window, GLFW_CURSOR, visible ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
-    }
-
-    /**
-     * Interface for keyboard callbacks.
+     * Interface for keyboard input callbacks.
      */
     public interface KeyboardCallback {
         /**
-         * Called when a keyboard event occurs.
+         * Called when a key event occurs.
          *
-         * @param key      GLFW key code
-         * @param scancode Platform-specific scancode
-         * @param action   GLFW action (press, release, repeat)
-         * @param mods     Modifier keys
+         * @param key      The key code
+         * @param scancode The platform-specific scan code
+         * @param action   The key action (GLFW_PRESS, GLFW_RELEASE, or GLFW_REPEAT)
+         * @param mods     The modifier keys
          */
-        void invoke(int key, int scancode, int action, int mods);
+        void onKey(int key, int scancode, int action, int mods);
     }
 
     /**
-     * Interface for mouse callbacks.
+     * Interface for mouse input callbacks.
      */
     public interface MouseCallback {
         /**
-         * Called when the cursor position changes.
+         * Called when a mouse button event occurs.
          *
-         * @param xpos X position of cursor
-         * @param ypos Y position of cursor
-         */
-        void onCursorPos(double xpos, double ypos);
-
-        /**
-         * Called when a mouse button is pressed or released.
-         *
-         * @param button GLFW mouse button
-         * @param action GLFW action (press or release)
-         * @param mods   Modifier keys
+         * @param button The mouse button
+         * @param action The button action (GLFW_PRESS or GLFW_RELEASE)
+         * @param mods   The modifier keys
          */
         void onMouseButton(int button, int action, int mods);
 
         /**
-         * Called when the scroll wheel is moved.
+         * Called when the mouse cursor moves.
          *
-         * @param xoffset Horizontal scroll offset
-         * @param yoffset Vertical scroll offset
+         * @param xpos The new x position
+         * @param ypos The new y position
+         */
+        void onCursorPos(double xpos, double ypos);
+
+        /**
+         * Called when the mouse wheel is scrolled.
+         *
+         * @param xoffset The scroll offset along the x-axis
+         * @param yoffset The scroll offset along the y-axis
          */
         void onScroll(double xoffset, double yoffset);
     }

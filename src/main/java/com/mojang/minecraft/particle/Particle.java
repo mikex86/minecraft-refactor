@@ -102,7 +102,7 @@ public class Particle extends Entity {
     /**
      * Renders the particle as a textured quad.
      */
-    public void render(Tesselator t, float a, float xa, float ya, float za, float xa2, float za2) {
+    public void render(Tesselator t, float partialTick, float xa, float ya, float za, float xa2, float za2) {
         // Calculate texture coordinates
         float u0 = ((float) (this.tex % 16) + this.uo / 4.0F) / 16.0F;
         float u1 = u0 + PARTICLE_UV_SIZE;
@@ -111,9 +111,9 @@ public class Particle extends Entity {
 
         // Calculate particle size and interpolated position
         float size = 0.1F * this.size;
-        float x = this.xo + (this.x - this.xo) * a;
-        float y = this.yo + (this.y - this.yo) * a;
-        float z = this.zo + (this.z - this.zo) * a;
+        float x = this.xo + (this.x - this.xo) * partialTick;
+        float y = this.yo + (this.y - this.yo) * partialTick;
+        float z = this.zo + (this.z - this.zo) * partialTick;
 
         // Render the quad
         t.vertexUV(x - xa * size - xa2 * size, y - ya * size, z - za * size - za2 * size, u0, v1);

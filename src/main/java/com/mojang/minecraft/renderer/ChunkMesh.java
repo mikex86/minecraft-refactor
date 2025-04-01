@@ -1,62 +1,64 @@
 package com.mojang.minecraft.renderer;
 
-import org.lwjgl.BufferUtils;
+import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
+import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
+import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 
 import java.nio.FloatBuffer;
-
-import static org.lwjgl.opengl.GL15.*;
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL20.*;
-import static org.lwjgl.opengl.GL30.*;
 
 /**
  * Handles VBO-based rendering for a single chunk section.
  * Each ChunkMesh represents one layer of rendering data for a section of a chunk.
  * This design supports moving toward cubic chunks in the future.
  */
-public class ChunkMesh {
-    // VBO data
-    private int vboId;
+public class ChunkMesh implements Disposable {
+    // Graphics resources
+    private final GraphicsAPI graphics;
+    private final VertexBuffer vertexBuffer;
     private int vertexCount;
-    
-    // Tesselator for this mesh
+
+    // Tesselator for building this mesh
     private final Tesselator tesselator;
-    
+
     // State tracking
     private boolean dirty = true;
     private boolean disposed = false;
-    
+
     /**
-     * Creates a new chunk section mesh.
+     * Creates a new chunk renderer.
      */
     public ChunkMesh() {
-        // Create VBO and tesselator
-        vboId = glGenBuffers();
-        tesselator = new Tesselator();
-        vertexCount = 0;
+        // Get graphics API instance
+        this.graphics = GraphicsFactory.getGraphicsAPI();
+
+        // Create resources
+        this.vertexBuffer = graphics.createVertexBuffer(GraphicsEnums.BufferUsage.STATIC);
+        this.tesselator = new Tesselator();
+        this.vertexCount = 0;
     }
-    
+
     /**
      * Gets the tesselator for this mesh.
      */
     public Tesselator getTesselator() {
         return tesselator;
     }
-    
+
     /**
      * Marks this mesh as dirty, requiring a rebuild.
      */
     public void setDirty() {
         dirty = true;
     }
-    
+
     /**
      * Returns whether the mesh needs to be rebuilt.
      */
     public boolean isDirty() {
         return dirty;
     }
-    
+
     /**
      * Rebuilds the mesh with the latest vertex data.
      */
@@ -64,20 +66,28 @@ public class ChunkMesh {
         if (!dirty) {
             return;
         }
-        
+
         FloatBuffer buffer = tesselator.getBuffer();
         vertexCount = tesselator.getVertexCount();
-        
+
         if (vertexCount > 0) {
-            // Bind VBO and upload data
-            glBindBuffer(GL_ARRAY_BUFFER, vboId);
-            glBufferData(GL_ARRAY_BUFFER, buffer, GL_STATIC_DRAW);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            // Set up vertex format based on tesselator state
+            VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
+                    true,                      // Always has positions
+                    tesselator.hasColor(),     // May have colors
+                    tesselator.hasTexture(),   // May have texture coords
+                    false                      // No normals
+            );
+
+            vertexBuffer.setFormat(format);
+
+            // Upload data
+            vertexBuffer.setData(buffer, buffer.remaining() * 4); // 4 bytes per float
         }
-        
+
         dirty = false;
     }
-    
+
     /**
      * Renders the mesh.
      */
@@ -85,68 +95,44 @@ public class ChunkMesh {
         if (vertexCount == 0) {
             return;
         }
-        
-        // Bind the VBO
-        glBindBuffer(GL_ARRAY_BUFFER, vboId);
-        
-        // Set up vertex arrays based on data format
-        int stride = tesselator.getVertexSize() * 4; // in bytes
-        int offset = 0;
-        
-        // Enable vertex arrays
-        glEnableClientState(GL_VERTEX_ARRAY);
-        
-        // Set up texture coordinates if present
-        if (tesselator.hasTexture()) {
-            glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-            glTexCoordPointer(2, GL_FLOAT, stride, offset);
-            offset += 2 * 4; // 2 floats * 4 bytes
+
+        // Configure rendering state
+        if (vertexBuffer.getFormat().hasTexCoords()) {
+            graphics.setTexturingEnabled(true);
+        } else {
+            graphics.setTexturingEnabled(false);
         }
-        
-        // Set up colors if present
-        if (tesselator.hasColor()) {
-            glEnableClientState(GL_COLOR_ARRAY);
-            glColorPointer(3, GL_FLOAT, stride, offset);
-            offset += 3 * 4; // 3 floats * 4 bytes
+
+        if (vertexBuffer.getFormat().hasColors()) {
+            graphics.setVertexColorEnabled(true);
         }
-        
-        // Set up vertices
-        glVertexPointer(3, GL_FLOAT, stride, offset);
-        
+
         // Draw the mesh
-        glDrawArrays(GL_QUADS, 0, vertexCount);
-        
-        // Disable vertex arrays
-        glDisableClientState(GL_VERTEX_ARRAY);
-        if (tesselator.hasTexture()) {
-            glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+        graphics.drawPrimitives(vertexBuffer, GraphicsEnums.PrimitiveType.QUADS, 0, vertexCount);
+
+        // Reset state
+        if (vertexBuffer.getFormat().hasColors()) {
+            graphics.setVertexColorEnabled(false);
         }
-        if (tesselator.hasColor()) {
-            glDisableClientState(GL_COLOR_ARRAY);
-        }
-        
-        // Unbind VBO
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
-    
+
     /**
-     * Clears the vertex data but keeps the VBO allocated.
+     * Clears the vertex data but keeps the buffer allocated.
      */
     public void clear() {
         tesselator.init();
         vertexCount = 0;
         setDirty();
     }
-    
+
     /**
-     * Disposes of this mesh's resources.
+     * Disposes of the resources held by this mesh.
      */
+    @Override
     public void dispose() {
         if (!disposed) {
-            if (vboId != 0) {
-                glDeleteBuffers(vboId);
-                vboId = 0;
-            }
+            vertexBuffer.dispose();
+            tesselator.dispose();
             disposed = true;
         }
     }

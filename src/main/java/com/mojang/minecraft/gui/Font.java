@@ -1,14 +1,15 @@
 package com.mojang.minecraft.gui;
 
 import com.mojang.minecraft.renderer.Tesselator;
-import com.mojang.minecraft.renderer.Textures;
+import com.mojang.minecraft.renderer.TextureManager;
+import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
+import com.mojang.minecraft.renderer.graphics.Texture;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.Objects;
-
-import static org.lwjgl.opengl.GL11.*;
 
 /**
  * Handles text rendering in the Minecraft GUI.
@@ -28,24 +29,22 @@ public class Font {
 
     // Bitmap font specific constants
     private static final int PIXEL_THRESHOLD = 128;
-    private static final int DEFAULT_TEXTURE_PARAM = 9728; // GL_NEAREST
     private static final int COLOR_DARKEN_MASK = 16579836; // Used for shadow effect
-    private static final float ALPHA_THRESHOLD = 0.01F;
 
     // Character width mapping for proportional font rendering
     private final int[] charWidths = new int[256];
-    private int fontTexture = 0;
+    private final Texture fontTexture;
 
     /**
      * Creates a new Font instance from a texture resource.
      *
-     * @param name     The path to the font texture resource
-     * @param textures The textures manager to register the font texture with
+     * @param name           The path to the font texture resource
+     * @param textureManager The textures manager to register the font texture with
      */
-    public Font(String name, Textures textures) {
+    public Font(String name, TextureManager textureManager) {
         BufferedImage fontImage;
         try {
-            fontImage = ImageIO.read(Objects.requireNonNull(Textures.class.getResourceAsStream(name)));
+            fontImage = ImageIO.read(Objects.requireNonNull(TextureManager.class.getResourceAsStream(name)));
         } catch (IOException e) {
             throw new RuntimeException("Failed to load font texture: " + name, e);
         }
@@ -60,7 +59,7 @@ public class Font {
         calculateCharacterWidths(rawPixels, imageWidth);
 
         // Load the font texture
-        this.fontTexture = textures.loadTexture(name, DEFAULT_TEXTURE_PARAM);
+        this.fontTexture = textureManager.loadTexture(name, Texture.FilterMode.NEAREST);
     }
 
     /**
@@ -103,14 +102,15 @@ public class Font {
     /**
      * Draws text with a drop shadow.
      *
-     * @param text  The text to draw
-     * @param x     The x position
-     * @param y     The y position
-     * @param color The color of the text (RGB format)
+     * @param graphics The graphics API to use for rendering
+     * @param text     The text to draw
+     * @param x        The x position
+     * @param y        The y position
+     * @param color    The color of the text (RGB format)
      */
-    public void drawShadow(String text, int x, int y, int color) {
-        this.draw(text, x + 1, y + 1, color, true);
-        this.draw(text, x, y, color);
+    public void drawShadow(GraphicsAPI graphics, String text, int x, int y, int color) {
+        this.draw(graphics, text, x + 1, y + 1, color, true);
+        this.draw(graphics, text, x, y, color);
     }
 
     /**
@@ -121,32 +121,29 @@ public class Font {
      * @param y     The y position
      * @param color The color of the text (RGB format)
      */
-    public void draw(String text, int x, int y, int color) {
-        this.draw(text, x, y, color, false);
+    public void draw(GraphicsAPI graphics, String text, int x, int y, int color) {
+        this.draw(graphics, text, x, y, color, false);
     }
 
     /**
      * Internal method to draw text with optional shadow effect.
      *
-     * @param text   The text to draw
-     * @param x      The x position
-     * @param y      The y position
-     * @param color  The color of the text (RGB format)
-     * @param darken Whether to darken the color (for shadow effect)
+     * @param graphics The graphics API to use for rendering
+     * @param text     The text to draw
+     * @param x        The x position
+     * @param y        The y position
+     * @param color    The color of the text (RGB format)
+     * @param darken   Whether to darken the color (for shadow effect)
      */
-    public void draw(String text, int x, int y, int color, boolean darken) {
+    public void draw(GraphicsAPI graphics, String text, int x, int y, int color, boolean darken) {
         char[] chars = text.toCharArray();
         if (darken) {
             color = (color & COLOR_DARKEN_MASK) >> 2;
         }
 
         // Set up OpenGL for texture rendering
-        glEnable(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, this.fontTexture);
-
-        // Enable alpha testing to handle transparency properly
-        glEnable(GL_ALPHA_TEST);
-        glAlphaFunc(GL_GREATER, ALPHA_THRESHOLD);
+        graphics.setTexturingEnabled(true);
+        graphics.setTexture(this.fontTexture);
 
         // Initialize the tessellator for rendering
         Tesselator tessellator = Tesselator.instance;
@@ -223,7 +220,6 @@ public class Font {
 
         // Render the text and clean up OpenGL state
         tessellator.flush();
-        glDisable(GL_TEXTURE_2D);
     }
 
     /**

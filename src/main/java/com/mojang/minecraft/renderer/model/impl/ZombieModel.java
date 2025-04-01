@@ -1,5 +1,6 @@
 package com.mojang.minecraft.renderer.model.impl;
 
+import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.shape.Cube;
 import com.mojang.minecraft.renderer.model.Model;
 
@@ -64,7 +65,7 @@ public class ZombieModel implements Model {
      * @param time Current animation time
      */
     @Override
-    public void render(float time) {
+    public void render(GraphicsAPI graphics, float time) {
         // Animate the head
         this.head.yRot = (float) Math.sin(time * HEAD_SWING_FREQUENCY);
         this.head.xRot = (float) Math.sin(time * HEAD_BOB_FREQUENCY) * HEAD_BOB_AMPLITUDE;
@@ -80,12 +81,12 @@ public class ZombieModel implements Model {
         this.leftLeg.xRot = (float) Math.sin(time * ARM_SWING_FREQUENCY + Math.PI) * LEG_SWING_AMPLITUDE;
 
         // Render all body parts
-        this.head.render();
-        this.body.render();
-        this.rightArm.render();
-        this.leftArm.render();
-        this.rightLeg.render();
-        this.leftLeg.render();
+        this.head.render(graphics);
+        this.body.render(graphics);
+        this.rightArm.render(graphics);
+        this.leftArm.render(graphics);
+        this.rightLeg.render(graphics);
+        this.leftLeg.render(graphics);
     }
     
     /**

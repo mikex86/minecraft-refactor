@@ -3,12 +3,12 @@ package com.mojang.minecraft.particle;
 import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.renderer.Tesselator;
-import com.mojang.minecraft.renderer.Textures;
+import com.mojang.minecraft.renderer.TextureManager;
+import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.Texture;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import static org.lwjgl.opengl.GL11.*;
 
 /**
  * Manages particle creation, updates, and rendering in the game world.
@@ -20,17 +20,17 @@ public class ParticleEngine {
     // Core properties
     protected Level level;
     private final List<Particle> particles = new ArrayList<>();
-    private final Textures textures;
+    private final TextureManager textureManager;
 
     /**
      * Creates a new particle engine for the specified level.
      *
-     * @param level    The game level
-     * @param textures The texture manager
+     * @param level          The game level
+     * @param textureManager The texture manager
      */
-    public ParticleEngine(Level level, Textures textures) {
+    public ParticleEngine(Level level, TextureManager textureManager) {
         this.level = level;
-        this.textures = textures;
+        this.textureManager = textureManager;
     }
 
     /**
@@ -59,19 +59,20 @@ public class ParticleEngine {
     /**
      * Renders all particles relative to the player's view.
      *
-     * @param player The player viewing the particles
-     * @param a      Interpolation factor
-     * @param layer  Rendering layer (0 for unlit, 1 for lit)
+     * @param graphics     The graphics api
+     * @param player       The player viewing the particles
+     * @param partialTick Interpolation factor
+     * @param layer        Rendering layer (0 for unlit, 1 for lit)
      */
-    public void render(Player player, float a, int layer) {
+    public void render(GraphicsAPI graphics, Player player, float partialTick, int layer) {
         if (this.particles.isEmpty()) {
             return;
         }
 
         // Setup texture
-        glEnable(GL_TEXTURE_2D);
-        int textureId = this.textures.loadTexture("/terrain.png", GL_NEAREST);
-        glBindTexture(GL_TEXTURE_2D, textureId);
+        graphics.setTexturingEnabled(true);
+        Texture texture = this.textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
+        graphics.setTexture(texture);
 
         // Calculate view vectors based on player rotation
         float xa = -((float) Math.cos(player.yRot * DEG_TO_RAD));
@@ -82,19 +83,19 @@ public class ParticleEngine {
 
         // Setup rendering
         Tesselator tesselator = Tesselator.instance;
-        glColor4f(0.8F, 0.8F, 0.8F, 1.0F);
         tesselator.init();
+        tesselator.color(0.8F, 0.8F, 0.8F);
 
         // Render each particle
         for (Particle particle : this.particles) {
             // Render particle if it matches the current lighting layer
             if (particle.isLit() ^ layer == 1) {
-                particle.render(tesselator, a, xa, ya, za, xa2, za2);
+                particle.render(tesselator, partialTick, xa, ya, za, xa2, za2);
             }
         }
 
         // Finish rendering
         tesselator.flush();
-        glDisable(GL_TEXTURE_2D);
+        graphics.setTexturingEnabled(false);
     }
 }
