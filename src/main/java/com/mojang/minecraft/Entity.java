@@ -117,7 +117,7 @@ public class Entity {
      */
     public void turn(float yRotation, float xRotation) {
         this.yRot = (float)((double)this.yRot + (double)yRotation * 0.15);
-        this.xRot = (float)((double)this.xRot - (double)xRotation * 0.15);
+        this.xRot = (float)((double)this.xRot + (double)xRotation * 0.15);
         
         // Clamp pitch to prevent camera flipping
         if (this.xRot < -90.0F) {

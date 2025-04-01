@@ -100,7 +100,7 @@ public class LevelRenderer implements LevelListener {
     public void render(Player player, int layer) {
         // Enable texturing and bind the terrain texture
         glEnable(GL_TEXTURE_2D);
-        int textureId = this.textures.loadTexture("/terrain.png", 9728);
+        int textureId = this.textures.loadTexture("/terrain.png", GL_NEAREST);
         glBindTexture(GL_TEXTURE_2D, textureId);
         
         // Get the current view frustum
@@ -228,7 +228,7 @@ public class LevelRenderer implements LevelListener {
             
             // Enable texturing
             glEnable(GL_TEXTURE_2D);
-            int textureId = this.textures.loadTexture("/terrain.png", 9728);
+            int textureId = this.textures.loadTexture("/terrain.png", GL_NEAREST);
             glBindTexture(GL_TEXTURE_2D, textureId);
             
             // Calculate the position to render the block preview

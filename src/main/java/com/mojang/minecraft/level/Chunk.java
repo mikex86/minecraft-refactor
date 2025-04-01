@@ -102,6 +102,7 @@ public class Chunk {
         glEndList();
         long endTime = System.nanoTime();
 
+        
         // Update rendering statistics
         if (renderedTiles > 0) {
             totalTime += endTime - startTime;

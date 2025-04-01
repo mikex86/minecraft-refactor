@@ -1,5 +1,7 @@
 package com.mojang.minecraft.renderer;
 
+import static org.lwjgl.opengl.GL11.*;
+
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -10,10 +12,6 @@ import java.util.Objects;
 import javax.imageio.ImageIO;
 
 import org.lwjgl.BufferUtils;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.util.glu.GLU;
-
-import static org.lwjgl.opengl.GL11.*;
 
 /**
  * Manages texture loading and caching for OpenGL rendering
@@ -37,10 +35,7 @@ public class Textures {
             }
             
             // Generate a new texture ID
-            IntBuffer textureIdBuffer = BufferUtils.createIntBuffer(1);
-            textureIdBuffer.clear();
-            glGenTextures(textureIdBuffer);
-            int textureId = textureIdBuffer.get(0);
+            int textureId = glGenTextures();
             
             // Cache the new texture ID
             this.textureCache.put(resourceName, textureId);
@@ -63,7 +58,7 @@ public class Textures {
             // Get the RGB data from the image
             image.getRGB(0, 0, width, height, pixels, 0, width);
             
-            // Convert from ARGB to ABGR (required by OpenGL)
+            // Convert from ARGB to RGBA (required by OpenGL)
             for (int i = 0; i < pixels.length; i++) {
                 int argb = pixels[i];
                 int a = (argb >> 24) & 0xFF;
@@ -71,19 +66,31 @@ public class Textures {
                 int g = (argb >> 8) & 0xFF;
                 int b = argb & 0xFF;
                 
-                // Reorder to ABGR format
-                pixels[i] = (a << 24) | (b << 16) | (g << 8) | r;
+                // Add to the ByteBuffer in RGBA order
+                pixelBuffer.put((byte) r);
+                pixelBuffer.put((byte) g);
+                pixelBuffer.put((byte) b);
+                pixelBuffer.put((byte) a);
             }
             
-            // Put pixels into the buffer
-            pixelBuffer.asIntBuffer().put(pixels);
-            
+            // Flip the buffer to prepare for OpenGL
+            pixelBuffer.flip();
+
             // Generate mipmaps and upload texture to GPU
-            GLU.gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixelBuffer);
-            
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixelBuffer);
             return textureId;
         } catch (IOException e) {
             throw new RuntimeException("Failed to load texture: " + resourceName, e);
         }
+    }
+    
+    /**
+     * Clean up all texture resources
+     */
+    public void dispose() {
+        for (int textureId : this.textureCache.values()) {
+            glDeleteTextures(textureId);
+        }
+        this.textureCache.clear();
     }
 }

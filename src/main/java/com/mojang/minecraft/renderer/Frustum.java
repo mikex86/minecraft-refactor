@@ -84,9 +84,9 @@ public class Frustum {
         this.modelviewBuffer.clear();
         this.clipBuffer.clear();
         
-        // Get current OpenGL matrices
-        glGetFloat(GL_PROJECTION_MATRIX, this.projectionBuffer);
-        glGetFloat(GL_MODELVIEW_MATRIX, this.modelviewBuffer);
+        // Get current OpenGL matrices - update to LWJGL3 methods
+        glGetFloatv(GL_PROJECTION_MATRIX, this.projectionBuffer);
+        glGetFloatv(GL_MODELVIEW_MATRIX, this.modelviewBuffer);
         
         // Read matrices into arrays
         this.projectionBuffer.flip().limit(16);
@@ -316,6 +316,7 @@ public class Frustum {
      * @return true if AABB is at least partially inside frustum
      */
     public boolean isVisible(AABB aabb) {
+        // Use proper frustum culling for correctness
         return this.cubeInFrustum(aabb.x0, aabb.y0, aabb.z0, aabb.x1, aabb.y1, aabb.z1);
     }
 }

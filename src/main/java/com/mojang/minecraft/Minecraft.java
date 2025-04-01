@@ -9,10 +9,12 @@ import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.Frustum;
+import com.mojang.minecraft.renderer.GameWindow;
+import com.mojang.minecraft.renderer.InputHandler;
+import com.mojang.minecraft.renderer.MatrixUtils;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.Textures;
 
-import java.awt.Canvas;
 import java.io.IOException;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
@@ -20,15 +22,9 @@ import java.util.ArrayList;
 import javax.swing.JOptionPane;
 
 import org.lwjgl.BufferUtils;
-import org.lwjgl.LWJGLException;
-import org.lwjgl.input.Cursor;
-import org.lwjgl.input.Keyboard;
-import org.lwjgl.input.Mouse;
-import org.lwjgl.opengl.Display;
-import org.lwjgl.opengl.DisplayMode;
-import org.lwjgl.util.glu.GLU;
 
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.glfw.GLFW.*;
 
 /**
  * Main game class for Minecraft Classic 0.0.11a.
@@ -44,30 +40,31 @@ public class Minecraft implements Runnable {
     private int height;
     
     // Rendering resources
-    private FloatBuffer fogColor0 = BufferUtils.createFloatBuffer(4);
-    private FloatBuffer fogColor1 = BufferUtils.createFloatBuffer(4);
-    private FloatBuffer lightBuffer = BufferUtils.createFloatBuffer(16);
-    private IntBuffer viewportBuffer = BufferUtils.createIntBuffer(16);
-    private IntBuffer selectBuffer = BufferUtils.createIntBuffer(2000);
+    private final FloatBuffer fogColor0 = BufferUtils.createFloatBuffer(4);
+    private final FloatBuffer fogColor1 = BufferUtils.createFloatBuffer(4);
+    private final FloatBuffer lightBuffer = BufferUtils.createFloatBuffer(16);
+    private final IntBuffer viewportBuffer = BufferUtils.createIntBuffer(16);
+    private final IntBuffer selectBuffer = BufferUtils.createIntBuffer(2000);
     
     // Game state
-    private Timer timer = new Timer(20.0F);
+    private final Timer timer = new Timer(20.0F);
     private Level level;
     private LevelRenderer levelRenderer;
     private Player player;
     private ParticleEngine particleEngine;
-    private ArrayList<Entity> entities = new ArrayList<>();
-    private Canvas parent;
+    private final ArrayList<Entity> entities = new ArrayList<>();
+    
+    // Window and input handling
+    private GameWindow window;
+    private InputHandler inputHandler;
     
     // Game flags
-    public boolean appletMode = false;
     public volatile boolean pause = false;
     private volatile boolean running = false;
     private boolean mouseGrabbed = false;
     
     // UI and input state
     private int paintTexture = 1;
-    private Cursor emptyCursor;
     private int yMouseAxis = 1;  // Controls if mouse Y axis is inverted
     private int editMode = 0;    // 0 = destroy blocks, 1 = place blocks
     private String fpsString = "";
@@ -80,13 +77,11 @@ public class Minecraft implements Runnable {
     /**
      * Creates a new Minecraft game instance.
      *
-     * @param parent Canvas to render on, or null for standalone window
      * @param width Width of the rendering area
      * @param height Height of the rendering area
      * @param fullscreen Whether to run in fullscreen mode
      */
-    public Minecraft(Canvas parent, int width, int height, boolean fullscreen) {
-        this.parent = parent;
+    public Minecraft(int width, int height, boolean fullscreen) {
         this.width = width;
         this.height = height;
         this.fullscreen = fullscreen;
@@ -96,10 +91,9 @@ public class Minecraft implements Runnable {
     /**
      * Initializes the game, setting up the display, OpenGL, and game objects.
      * 
-     * @throws LWJGLException If LWJGL fails to initialize
      * @throws IOException If resource loading fails
      */
-    public void init() throws LWJGLException, IOException {
+    public void init() throws IOException {
         // Setup fog colors
         int skyColor = 16710650;  // Light blue
         int fogColor = 920330;    // Dark blue
@@ -125,36 +119,22 @@ public class Minecraft implements Runnable {
         });
         this.fogColor1.flip();
         
-        // Set up the display
-        if (this.parent != null) {
-            Display.setParent(this.parent);
-        } else if (this.fullscreen) {
-            Display.setFullscreen(true);
-            this.width = Display.getDisplayMode().getWidth();
-            this.height = Display.getDisplayMode().getHeight();
-        } else {
-            Display.setDisplayMode(new DisplayMode(this.width, this.height));
-        }
-
-        Display.setTitle("Minecraft " + VERSION_STRING);
-
         try {
-            Display.create();
-        } catch (LWJGLException e) {
+            // Create window and initialize input
+            window = new GameWindow(width, height, "Minecraft " + VERSION_STRING, fullscreen);
+            inputHandler = new InputHandler(window);
+            
+            // Get the updated window size (may have changed for fullscreen)
+            width = window.getWidth();
+            height = window.getHeight();
+            
+            System.out.println("Initialized window with dimensions: " + width + "x" + height);
+            
+        } catch (Exception e) {
             e.printStackTrace();
-
-            try {
-                Thread.sleep(1000L);
-            } catch (InterruptedException var9) {
-                // Ignore
-            }
-
-            Display.create();
+            JOptionPane.showMessageDialog(null, e.toString(), "Failed to create window", JOptionPane.ERROR_MESSAGE);
+            throw new IOException("Failed to create window", e);
         }
-
-        // Initialize input devices
-        Keyboard.create();
-        Mouse.create();
         
         this.checkGlError("Pre startup");
         
@@ -188,20 +168,10 @@ public class Minecraft implements Runnable {
             zombie.resetPos();
             this.entities.add(zombie);
         }
-
-        // Setup empty cursor for mouse grabbing
-        IntBuffer imgData = BufferUtils.createIntBuffer(256);
-        imgData.clear().limit(256);
-        if (this.appletMode) {
-            try {
-                this.emptyCursor = new Cursor(16, 16, 0, 0, 1, imgData, null);
-            } catch (LWJGLException e) {
-                e.printStackTrace();
-            }
-        } else {
-            this.grabMouse();
-        }
-
+        
+        // Initially grab the mouse
+        this.grabMouse();
+        
         this.checkGlError("Post startup");
     }
 
@@ -213,7 +183,17 @@ public class Minecraft implements Runnable {
     private void checkGlError(String context) {
         int errorCode = glGetError();
         if (errorCode != 0) {
-            String errorString = GLU.gluErrorString(errorCode);
+            String errorString;
+            switch (errorCode) {
+                case GL_INVALID_ENUM: errorString = "GL_INVALID_ENUM"; break;
+                case GL_INVALID_VALUE: errorString = "GL_INVALID_VALUE"; break;
+                case GL_INVALID_OPERATION: errorString = "GL_INVALID_OPERATION"; break;
+                case GL_OUT_OF_MEMORY: errorString = "GL_OUT_OF_MEMORY"; break;
+                case GL_STACK_UNDERFLOW: errorString = "GL_STACK_UNDERFLOW"; break;
+                case GL_STACK_OVERFLOW: errorString = "GL_STACK_OVERFLOW"; break;
+                default: errorString = "Unknown error code: " + errorCode;
+            }
+            
             System.out.println("########## GL ERROR ##########");
             System.out.println("@ " + context);
             System.out.println(errorCode + ": " + errorString);
@@ -227,13 +207,15 @@ public class Minecraft implements Runnable {
     public void destroy() {
         try {
             this.level.save();
+            if (window != null) {
+                window.destroy();
+            }
+            if (textures != null) {
+                textures.dispose();
+            }
         } catch (Exception e) {
-            // Ignore save errors on shutdown
+            e.printStackTrace();
         }
-
-        Mouse.destroy();
-        Keyboard.destroy();
-        Display.destroy();
     }
 
     /**
@@ -263,9 +245,12 @@ public class Minecraft implements Runnable {
                     Thread.sleep(100L);
                 } else {
                     // Check if window is closed
-                    if (this.parent == null && Display.isCloseRequested()) {
+                    if (!window.update()) {
                         this.stop();
                     }
+
+                    // Update input state
+                    inputHandler.update();
 
                     // Update timer and calculate ticks
                     this.timer.advanceTime();
@@ -314,16 +299,7 @@ public class Minecraft implements Runnable {
     public void grabMouse() {
         if (!this.mouseGrabbed) {
             this.mouseGrabbed = true;
-            if (this.appletMode) {
-                try {
-                    Mouse.setNativeCursor(this.emptyCursor);
-                    Mouse.setCursorPosition(this.width / 2, this.height / 2);
-                } catch (LWJGLException e) {
-                    e.printStackTrace();
-                }
-            } else {
-                Mouse.setGrabbed(true);
-            }
+            inputHandler.setCursorVisible(false);
         }
     }
 
@@ -333,15 +309,7 @@ public class Minecraft implements Runnable {
     public void releaseMouse() {
         if (this.mouseGrabbed) {
             this.mouseGrabbed = false;
-            if (this.appletMode) {
-                try {
-                    Mouse.setNativeCursor(null);
-                } catch (LWJGLException e) {
-                    e.printStackTrace();
-                }
-            } else {
-                Mouse.setGrabbed(false);
-            }
+            inputHandler.setCursorVisible(true);
         }
     }
 
@@ -392,79 +360,82 @@ public class Minecraft implements Runnable {
      * Processes input, updates entities, and updates the level.
      */
     public void tick() {
-        // Process all mouse events
-        while (Mouse.next()) {
-            if (!this.mouseGrabbed && Mouse.getEventButtonState()) {
+        // Process all keyboard events
+        while (inputHandler.hasNextKeyEvent()) {
+            InputHandler.KeyEvent event = inputHandler.getNextKeyEvent();
+            int key = event.getKey();
+            boolean pressed = event.isPressed();
+            
+            if (pressed) {
+                // Escape key - release mouse in windowed mode
+                if (key == InputHandler.Keys.KEY_ESCAPE && !this.fullscreen) {
+                    this.releaseMouse();
+                }
+
+                // Enter key - save level
+                if (key == InputHandler.Keys.KEY_RETURN) {
+                    this.level.save();
+                }
+
+                // Block selection keys
+                if (key == InputHandler.Keys.KEY_1) {
+                    this.paintTexture = 1;  // Stone
+                }
+                if (key == InputHandler.Keys.KEY_2) {
+                    this.paintTexture = 3;  // Dirt
+                }
+                if (key == InputHandler.Keys.KEY_3) {
+                    this.paintTexture = 4;  // Cobblestone
+                }
+                if (key == InputHandler.Keys.KEY_4) {
+                    this.paintTexture = 5;  // Wooden planks
+                }
+                if (key == InputHandler.Keys.KEY_5) {
+                    this.paintTexture = 6;  // Sapling
+                }
+            }
+        }
+
+        // Process all mouse button events
+        while (inputHandler.hasNextMouseButtonEvent()) {
+            InputHandler.MouseButtonEvent event = inputHandler.getNextMouseButtonEvent();
+            int button = event.getButton();
+            boolean pressed = event.isPressed();
+            
+            if (!this.mouseGrabbed && pressed) {
                 // Auto-grab mouse on click when not grabbed
                 this.grabMouse();
             } else {
                 // Handle left mouse button (destroy/place blocks)
-                if (Mouse.getEventButton() == 0 && Mouse.getEventButtonState()) {
+                if (button == InputHandler.MouseButtons.BUTTON_LEFT && pressed) {
                     this.handleMouseClick();
                 }
 
                 // Handle right mouse button (toggle edit mode)
-                if (Mouse.getEventButton() == 1 && Mouse.getEventButtonState()) {
+                if (button == InputHandler.MouseButtons.BUTTON_RIGHT && pressed) {
                     this.editMode = (this.editMode + 1) % 2;
                 }
             }
         }
 
-        // Process all keyboard events
-        while (Keyboard.next()) {
-            if (Keyboard.getEventKeyState()) {
-                // Escape key - release mouse in windowed/applet mode
-                if (Keyboard.getEventKey() == Keyboard.KEY_ESCAPE && (this.appletMode || !this.fullscreen)) {
-                    this.releaseMouse();
-                }
-
-                // Enter key - save level
-                if (Keyboard.getEventKey() == Keyboard.KEY_RETURN) {
-                    this.level.save();
-                }
-
-                // Block selection keys
-                if (Keyboard.getEventKey() == Keyboard.KEY_1) {
-                    this.paintTexture = 1;  // Stone
-                }
-                if (Keyboard.getEventKey() == Keyboard.KEY_2) {
-                    this.paintTexture = 3;  // Dirt
-                }
-                if (Keyboard.getEventKey() == Keyboard.KEY_3) {
-                    this.paintTexture = 4;  // Cobblestone
-                }
-                if (Keyboard.getEventKey() == Keyboard.KEY_4) {
-                    this.paintTexture = 5;  // Wooden planks
-                }
-                if (Keyboard.getEventKey() == Keyboard.KEY_5) {
-                    this.paintTexture = 6;  // Sapling
-                }
-
-                // Y key - invert mouse Y axis
-                if (Keyboard.getEventKey() == Keyboard.KEY_Y) {
-                    this.yMouseAxis *= -1;
-                }
-
-                // G key - spawn zombie
-                if (Keyboard.getEventKey() == Keyboard.KEY_G) {
-                    this.entities.add(new Zombie(this.level, this.textures, 
-                        this.player.x, this.player.y, this.player.z));
-                }
-            }
-        }
-
-        // Update the level
-        this.level.tick();
+        // Update player movement based on keyboard input
+        boolean forward = inputHandler.isKeyDown(InputHandler.Keys.KEY_W);
+        boolean back = inputHandler.isKeyDown(InputHandler.Keys.KEY_S);
+        boolean left = inputHandler.isKeyDown(InputHandler.Keys.KEY_A);
+        boolean right = inputHandler.isKeyDown(InputHandler.Keys.KEY_D);
+        boolean jump = inputHandler.isKeyDown(InputHandler.Keys.KEY_SPACE);
         
-        // Update particles
-        this.particleEngine.tick();
-
-        // Update all entities
+        this.player.setInput(forward, back, left, right, jump, inputHandler.isKeyDown(InputHandler.Keys.KEY_LSHIFT));
+        
+        // Check for fullscreen toggle (F11)
+        if (inputHandler.isKeyDown(InputHandler.Keys.KEY_F11)) {
+            // Implement fullscreen toggle if needed
+        }
+        
+        // Update all game entities
         for (int i = 0; i < this.entities.size(); ++i) {
             Entity entity = this.entities.get(i);
             entity.tick();
-            
-            // Remove entities marked for removal
             if (entity.removed) {
                 this.entities.remove(i--);
             }
@@ -472,6 +443,12 @@ public class Minecraft implements Runnable {
 
         // Update the player
         this.player.tick();
+
+        // Update particle engine
+        this.particleEngine.tick();
+        
+        // Update level
+        this.level.tick();
     }
 
     /**
@@ -527,7 +504,11 @@ public class Minecraft implements Runnable {
         // Set up perspective projection
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
-        GLU.gluPerspective(70.0F, (float) this.width / (float) this.height, 0.05F, 1000.0F);
+        
+        // Use 70 degree FOV, maintain proper aspect ratio, and reasonable near/far planes
+        float aspectRatio = (float) this.width / (float) this.height;
+
+        MatrixUtils.perspective(70.0F, aspectRatio, 0.05F, 1000.0F);
         
         // Set up camera transformation
         glMatrixMode(GL_MODELVIEW);
@@ -549,13 +530,18 @@ public class Minecraft implements Runnable {
         
         // Get current viewport dimensions
         this.viewportBuffer.clear();
-        glGetInteger(GL_VIEWPORT, this.viewportBuffer);
+        glGetIntegerv(GL_VIEWPORT, this.viewportBuffer);
         this.viewportBuffer.flip();
         this.viewportBuffer.limit(16);
+        int[] viewport = new int[4];
+        viewport[0] = this.viewportBuffer.get(0);
+        viewport[1] = this.viewportBuffer.get(1);
+        viewport[2] = this.viewportBuffer.get(2);
+        viewport[3] = this.viewportBuffer.get(3);
         
         // Create picking matrix centered at the specified point
-        GLU.gluPickMatrix((float) x, (float) y, 5.0F, 5.0F, this.viewportBuffer);
-        GLU.gluPerspective(70.0F, (float) this.width / (float) this.height, 0.05F, 1000.0F);
+        MatrixUtils.pickMatrix((float) x, (float) y, 5.0F, 5.0F, viewport);
+        MatrixUtils.perspective(70.0F, (float) this.width / (float) this.height, 0.05F, 1000.0F);
         
         // Set up camera transformation
         glMatrixMode(GL_MODELVIEW);
@@ -592,7 +578,7 @@ public class Minecraft implements Runnable {
 
         for (int i = 0; i < hits; ++i) {
             int nameCount = this.selectBuffer.get();
-            long minZ = (long) this.selectBuffer.get();
+            long minZ = this.selectBuffer.get();
             this.selectBuffer.get(); // Skip maxZ, we only care about minZ
             
             if (minZ >= closest && i != 0) {
@@ -626,31 +612,30 @@ public class Minecraft implements Runnable {
      */
     public void render(float partialTick) {
         // Release mouse if window loses focus
-        if (!Display.isActive()) {
+        if (window != null && !window.hasFocus()) {
             this.releaseMouse();
         }
-
-        // Set viewport to full window
+        
+        // Update window dimensions if they've changed
+        if (window != null) {
+            int newWidth = window.getWidth();
+            int newHeight = window.getHeight();
+            
+            if (newWidth != width || newHeight != height) {
+                width = newWidth;
+                height = newHeight;
+                System.out.println("Window resized: " + width + "x" + height);
+            }
+        }
+        
+        // Set viewport to full window size
         glViewport(0, 0, this.width, this.height);
         
         // Handle mouse look if mouse is grabbed
         if (this.mouseGrabbed) {
-            float mouseX = 0.0F;
-            float mouseY = 0.0F;
+            float mouseX = (float) inputHandler.getMouseDX();
+            float mouseY = (float) inputHandler.getMouseDY();
             
-            // Get mouse movement
-            mouseX = (float) Mouse.getDX();
-            mouseY = (float) Mouse.getDY();
-            
-            // Special handling for applet mode
-            if (this.appletMode) {
-                Display.processMessages();
-                Mouse.poll();
-                mouseX = (float) (Mouse.getX() - this.width / 2);
-                mouseY = (float) (Mouse.getY() - this.height / 2);
-                Mouse.setCursorPosition(this.width / 2, this.height / 2);
-            }
-
             // Apply mouse movement to player rotation
             this.player.turn(mouseX, mouseY * (float) this.yMouseAxis);
         }
@@ -684,8 +669,7 @@ public class Minecraft implements Runnable {
         this.checkGlError("Rendered level");
 
         // Render lit entities
-        for (int i = 0; i < this.entities.size(); ++i) {
-            Entity entity = this.entities.get(i);
+        for (Entity entity : this.entities) {
             if (entity.isLit() && frustum.isVisible(entity.bb)) {
                 entity.render(partialTick);
             }
@@ -701,8 +685,7 @@ public class Minecraft implements Runnable {
         this.levelRenderer.render(this.player, 1);
 
         // Render unlit entities
-        for (int i = 0; i < this.entities.size(); ++i) {
-            Entity entity = this.entities.get(i);
+        for (Entity entity : this.entities) {
             if (!entity.isLit() && frustum.isVisible(entity.bb)) {
                 entity.render(partialTick);
             }
@@ -727,10 +710,6 @@ public class Minecraft implements Runnable {
         
         // Render 2D GUI elements
         this.drawGui(partialTick);
-        this.checkGlError("Rendered gui");
-        
-        // Swap buffers
-        Display.update();
     }
 
     /**
@@ -743,19 +722,19 @@ public class Minecraft implements Runnable {
             // Day fog (lighter, more distant)
             glFogi(GL_FOG_MODE, GL_EXP);
             glFogf(GL_FOG_DENSITY, 0.001F);
-            glFog(GL_FOG_COLOR, this.fogColor0);
+            glFogfv(GL_FOG_COLOR, this.fogColor0);
             glDisable(GL_LIGHTING);
         } else if (mode == 1) {
             // Night fog (darker, closer)
             glFogi(GL_FOG_MODE, GL_EXP);
             glFogf(GL_FOG_DENSITY, 0.01F);
-            glFog(GL_FOG_COLOR, this.fogColor1);
+            glFogfv(GL_FOG_COLOR, this.fogColor1);
             glEnable(GL_LIGHTING);
             glEnable(GL_COLOR_MATERIAL);
             
             // Set ambient light level
             float brightness = 0.6F;
-            glLightModel(GL_LIGHT_MODEL_AMBIENT, this.getBuffer(brightness, brightness, brightness, 1.0F));
+            glLightModelfv(GL_LIGHT_MODEL_AMBIENT, this.getBuffer(brightness, brightness, brightness, 1.0F));
         }
     }
 
@@ -765,10 +744,10 @@ public class Minecraft implements Runnable {
      * @param partialTick Interpolation factor between ticks (0.0-1.0)
      */
     private void drawGui(float partialTick) {
-        // Calculate scaled screen dimensions that maintain aspect ratio
+        // Use actual screen dimensions for the GUI
         int screenWidth = this.width * 240 / this.height;
         int screenHeight = this.height * 240 / this.height;
-        
+
         // Clear depth buffer only
         glClear(GL_DEPTH_BUFFER_BIT);
         
@@ -792,7 +771,7 @@ public class Minecraft implements Runnable {
         glScalef(-1.0F, -1.0F, 1.0F);
         
         // Bind texture and render the selected block
-        int textureId = this.textures.loadTexture("/terrain.png", 9728);
+        int textureId = this.textures.loadTexture("/terrain.png", GL_NEAREST);
         glBindTexture(GL_TEXTURE_2D, textureId);
         glEnable(GL_TEXTURE_2D);
         t.init();
@@ -805,11 +784,11 @@ public class Minecraft implements Runnable {
         // Enable blending for text rendering
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        
+
         // Draw version and FPS text
         this.font.drawShadow(VERSION_STRING, 2, 2, 0xFFFFFF);
         this.font.drawShadow(this.fpsString, 2, 12, 0xFFFFFF);
-        
+
         // Disable blending after text rendering
         glDisable(GL_BLEND);
         
@@ -860,18 +839,31 @@ public class Minecraft implements Runnable {
     public static void checkError() {
         int errorCode = glGetError();
         if (errorCode != 0) {
-            throw new IllegalStateException(GLU.gluErrorString(errorCode));
+            String errorString;
+            switch (errorCode) {
+                case GL_INVALID_ENUM: errorString = "GL_INVALID_ENUM"; break;
+                case GL_INVALID_VALUE: errorString = "GL_INVALID_VALUE"; break;
+                case GL_INVALID_OPERATION: errorString = "GL_INVALID_OPERATION"; break;
+                case GL_OUT_OF_MEMORY: errorString = "GL_OUT_OF_MEMORY"; break;
+                case GL_STACK_UNDERFLOW: errorString = "GL_STACK_UNDERFLOW"; break;
+                case GL_STACK_OVERFLOW: errorString = "GL_STACK_OVERFLOW"; break;
+                default: errorString = "Unknown error code: " + errorCode;
+            }
+            throw new IllegalStateException(errorString);
         }
     }
 
     /**
-     * Main entry point for the standalone application.
-     * 
-     * @param args Command line arguments (not used)
-     * @throws LWJGLException If LWJGL fails to initialize
+     * Main entry point for standalone game.
      */
-    public static void main(String[] args) throws LWJGLException {
-        Minecraft minecraft = new Minecraft(null, 854, 480, false);
-        (new Thread(minecraft)).start();
+    public static void main(String[] args) {
+        try {
+            Minecraft minecraft = new Minecraft(854, 480, false);
+            // Run directly on the main thread instead of creating a new thread
+            minecraft.run();
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, e.toString(), "Failed to start Minecraft", JOptionPane.ERROR_MESSAGE);
+        }
     }
 }
