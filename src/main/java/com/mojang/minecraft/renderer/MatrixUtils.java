@@ -14,10 +14,10 @@ public class MatrixUtils {
     /**
      * Creates a perspective projection matrix, similar to GLU.gluPerspective
      *
-     * @param fovy Field of view in degrees
+     * @param fovy   Field of view in degrees
      * @param aspect Aspect ratio (width/height)
-     * @param zNear Near clipping plane
-     * @param zFar Far clipping plane
+     * @param zNear  Near clipping plane
+     * @param zFar   Far clipping plane
      */
     public static void perspective(float fovy, float aspect, float zNear, float zFar) {
         // Convert FOV from degrees to radians
@@ -37,12 +37,12 @@ public class MatrixUtils {
     /**
      * Creates a frustum projection matrix, similar to GLU.gluFrustum
      *
-     * @param left Left clipping plane
-     * @param right Right clipping plane
+     * @param left   Left clipping plane
+     * @param right  Right clipping plane
      * @param bottom Bottom clipping plane
-     * @param top Top clipping plane
-     * @param zNear Near clipping plane
-     * @param zFar Far clipping plane
+     * @param top    Top clipping plane
+     * @param zNear  Near clipping plane
+     * @param zFar   Far clipping plane
      */
     public static void frustum(float left, float right, float bottom, float top, float zNear, float zFar) {
         // Check for degenerate frustum
@@ -59,11 +59,11 @@ public class MatrixUtils {
 
         // Create and fill the matrix (column-major format for OpenGL)
         FloatBuffer matrix = BufferUtils.createFloatBuffer(16);
-        matrix.put(new float[] {
-            (2.0f * zNear) / (right - left), 0, 0, 0,
-            0, (2.0f * zNear) / (top - bottom), 0, 0,
-            a, b, c, -1,
-            0, 0, d, 0
+        matrix.put(new float[]{
+                (2.0f * zNear) / (right - left), 0, 0, 0,
+                0, (2.0f * zNear) / (top - bottom), 0, 0,
+                a, b, c, -1,
+                0, 0, d, 0
         });
         matrix.flip();
 
@@ -74,15 +74,15 @@ public class MatrixUtils {
     /**
      * Creates a look-at view matrix, similar to GLU.gluLookAt
      *
-     * @param eyeX Eye X position
-     * @param eyeY Eye Y position
-     * @param eyeZ Eye Z position
+     * @param eyeX    Eye X position
+     * @param eyeY    Eye Y position
+     * @param eyeZ    Eye Z position
      * @param centerX Center X position
      * @param centerY Center Y position
      * @param centerZ Center Z position
-     * @param upX Up vector X component
-     * @param upY Up vector Y component
-     * @param upZ Up vector Z component
+     * @param upX     Up vector X component
+     * @param upY     Up vector Y component
+     * @param upZ     Up vector Z component
      */
     public static void lookAt(float eyeX, float eyeY, float eyeZ,
                               float centerX, float centerY, float centerZ,
@@ -138,14 +138,14 @@ public class MatrixUtils {
 
         // Create view matrix in column-major order
         FloatBuffer matrix = BufferUtils.createFloatBuffer(16);
-        matrix.put(new float[] {
-            sideX, newUpX, -forwardX, 0,
-            sideY, newUpY, -forwardY, 0,
-            sideZ, newUpZ, -forwardZ, 0,
-            -(sideX * eyeX + sideY * eyeY + sideZ * eyeZ),
-            -(newUpX * eyeX + newUpY * eyeY + newUpZ * eyeZ),
-            forwardX * eyeX + forwardY * eyeY + forwardZ * eyeZ,
-            1
+        matrix.put(new float[]{
+                sideX, newUpX, -forwardX, 0,
+                sideY, newUpY, -forwardY, 0,
+                sideZ, newUpZ, -forwardZ, 0,
+                -(sideX * eyeX + sideY * eyeY + sideZ * eyeZ),
+                -(newUpX * eyeX + newUpY * eyeY + newUpZ * eyeZ),
+                forwardX * eyeX + forwardY * eyeY + forwardZ * eyeZ,
+                1
         });
         matrix.flip();
 
@@ -155,10 +155,10 @@ public class MatrixUtils {
     /**
      * Creates a pick matrix, similar to GLU.gluPickMatrix
      *
-     * @param x Center X coordinate
-     * @param y Center Y coordinate
-     * @param width Width of the picking region
-     * @param height Height of the picking region
+     * @param x        Center X coordinate
+     * @param y        Center Y coordinate
+     * @param width    Width of the picking region
+     * @param height   Height of the picking region
      * @param viewport Viewport coordinates (x, y, width, height)
      */
     public static void pickMatrix(float x, float y, float width, float height, int[] viewport) {
@@ -168,9 +168,9 @@ public class MatrixUtils {
 
         // Translate and scale the picking region to the viewport
         glTranslatef(
-            (viewport[2] - 2 * (x - viewport[0])) / width,
-            (viewport[3] - 2 * (y - viewport[1])) / height,
-            0
+                (viewport[2] - 2 * (x - viewport[0])) / width,
+                (viewport[3] - 2 * (y - viewport[1])) / height,
+                0
         );
         glScalef(viewport[2] / width, viewport[3] / height, 1.0f);
     }

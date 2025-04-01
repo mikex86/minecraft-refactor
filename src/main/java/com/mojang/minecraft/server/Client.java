@@ -10,16 +10,20 @@ import java.nio.ByteBuffer;
  * Handles communication between the server and a client
  */
 public class Client implements ConnectionListener {
-    /** The network connection to the client */
+    /**
+     * The network connection to the client
+     */
     public final SocketConnection serverConnection;
-    
-    /** The server this client is connected to */
+
+    /**
+     * The server this client is connected to
+     */
     private final MinecraftServer server;
 
     /**
      * Creates a new client connection
      *
-     * @param server The server instance
+     * @param server           The server instance
      * @param serverConnection The socket connection to the client
      */
     public Client(MinecraftServer server, SocketConnection serverConnection) {
@@ -31,9 +35,9 @@ public class Client implements ConnectionListener {
     /**
      * Processes a command from the client
      *
-     * @param cmd The command byte
+     * @param cmd       The command byte
      * @param remaining Remaining bytes in the buffer
-     * @param in The input buffer containing command data
+     * @param in        The input buffer containing command data
      */
     public void command(byte cmd, int remaining, ByteBuffer in) {
         // Command processing would go here

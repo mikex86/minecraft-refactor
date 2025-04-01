@@ -12,7 +12,7 @@ public class NoiseMap {
 
     /**
      * Creates a new noise map with the specified level of detail.
-     * 
+     *
      * @param levels The level of detail for the noise map
      */
     public NoiseMap(int levels) {
@@ -23,14 +23,14 @@ public class NoiseMap {
     /**
      * Generates a noise map with the specified dimensions.
      * Uses a diamond-square algorithm variant for the noise generation.
-     * 
-     * @param width The width of the noise map
+     *
+     * @param width  The width of the noise map
      * @param height The height of the noise map
      * @return An array containing the generated noise values
      */
     public int[] read(int width, int height) {
         int[] tempValues = new int[width * height];
-        
+
         // Initial grid step size based on detail level
         int step = width >> levels;
 
@@ -50,15 +50,15 @@ public class NoiseMap {
             for (int y = 0; y < height; y += step) {
                 for (int x = 0; x < width; x += step) {
                     // Get the four corner values
-                    int topLeft = tempValues[(x + 0) % width + (y + 0) % height * width];
-                    int topRight = tempValues[(x + step) % width + (y + 0) % height * width];
-                    int bottomLeft = tempValues[(x + 0) % width + (y + step) % height * width];
+                    int topLeft = tempValues[(x) % width + (y) % height * width];
+                    int topRight = tempValues[(x + step) % width + (y) % height * width];
+                    int bottomLeft = tempValues[(x) % width + (y + step) % height * width];
                     int bottomRight = tempValues[(x + step) % width + (y + step) % height * width];
-                    
+
                     // Average the corners and add random variation
-                    int center = (topLeft + topRight + bottomLeft + bottomRight) / 4 
-                              + random.nextInt(variation * 2) - variation;
-                              
+                    int center = (topLeft + topRight + bottomLeft + bottomRight) / 4
+                            + random.nextInt(variation * 2) - variation;
+
                     // Set the center value
                     tempValues[x + halfStep + (y + halfStep) * width] = center;
                 }
@@ -70,24 +70,24 @@ public class NoiseMap {
                     int center = tempValues[x + y * width];
                     int right = tempValues[(x + step) % width + y * width];
                     int bottom = tempValues[x + (y + step) % width * width];
-                    
+
                     // Compute middleUp (average of center, right, and points above)
                     int middleUp = tempValues[(x + halfStep & width - 1) + (y + halfStep - step & height - 1) * width];
-                    
+
                     // Compute middleLeft (average of center, bottom, and points to the left)
                     int middleLeft = tempValues[(x + halfStep - step & width - 1) + (y + halfStep & height - 1) * width];
-                    
+
                     // Get the center of this cell
                     int middleCenter = tempValues[(x + halfStep) % width + (y + halfStep) % height * width];
-                    
+
                     // Calculate the top edge point
-                    int top = (center + right + middleCenter + middleUp) / 4 
-                           + random.nextInt(variation * 2) - variation;
-                           
-                    // Calculate the left edge point
-                    int left = (center + bottom + middleCenter + middleLeft) / 4 
+                    int top = (center + right + middleCenter + middleUp) / 4
                             + random.nextInt(variation * 2) - variation;
-                    
+
+                    // Calculate the left edge point
+                    int left = (center + bottom + middleCenter + middleLeft) / 4
+                            + random.nextInt(variation * 2) - variation;
+
                     // Set the edge points
                     tempValues[x + halfStep + y * width] = top;
                     tempValues[x + (y + halfStep) * width] = left;

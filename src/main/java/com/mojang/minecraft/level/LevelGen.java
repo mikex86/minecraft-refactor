@@ -31,7 +31,7 @@ public class LevelGen {
         int[] heightmap2 = new NoiseMap(0).read(width, height);
         int[] blendMap = new NoiseMap(1).read(width, height);
         int[] rockMap = new NoiseMap(1).read(width, height);
-        
+
         byte[] blocks = new byte[this.width * this.height * this.depth];
 
         // Generate terrain using the heightmaps
@@ -41,7 +41,7 @@ public class LevelGen {
                     int dh1 = heightmap1[x + z * this.width];
                     int dh2 = heightmap2[x + z * this.width];
                     int blendFactor = blendMap[x + z * this.width];
-                    
+
                     // Select the appropriate heightmap based on the blend factor
                     if (blendFactor < 128) {
                         dh2 = dh1;
@@ -49,13 +49,13 @@ public class LevelGen {
 
                     // Use the higher of the two heightmaps
                     int finalHeight = Math.max(dh1, dh2);
-                    
+
                     // Scale the height to fit the world
                     finalHeight = finalHeight / 8 + depth / 3;
-                    
+
                     // Calculate rock layer height
                     int rockHeight = rockMap[x + z * this.width] / 8 + depth / 3;
-                    
+
                     // Ensure rock is below dirt
                     if (rockHeight > finalHeight - 2) {
                         rockHeight = finalHeight - 2;
@@ -63,7 +63,7 @@ public class LevelGen {
 
                     // Calculate the index in the blocks array
                     int index = (y * this.height + z) * this.width + x;
-                    
+
                     // Set the appropriate tile type based on depth
                     int tileId = 0;
                     if (y == finalHeight) {
@@ -87,10 +87,10 @@ public class LevelGen {
             float x = this.random.nextFloat() * width;
             float y = this.random.nextFloat() * depth;
             float z = this.random.nextFloat() * height;
-            
+
             // Cave properties
             int caveLength = (int) (this.random.nextFloat() + this.random.nextFloat() * 150.0F);
-            
+
             // Cave direction vectors and perturbations
             float horizAngle = (float) (this.random.nextFloat() * Math.PI * 2.0F);  // Horizontal angle
             float horizDelta = 0.0F;  // Horizontal angle change rate
@@ -103,17 +103,17 @@ public class LevelGen {
                 x += (float) (Math.sin(horizAngle) * Math.cos(vertAngle));
                 z += (float) (Math.cos(horizAngle) * Math.cos(vertAngle));
                 y += (float) Math.sin(vertAngle);
-                
+
                 // Gradually change the direction
                 horizAngle += horizDelta * 0.2F;
                 horizDelta *= 0.9F;
                 horizDelta += this.random.nextFloat() - this.random.nextFloat();
-                
+
                 vertAngle += vertDelta * 0.5F;
                 vertAngle *= 0.5F;
                 vertDelta *= 0.9F;
                 vertDelta += this.random.nextFloat() - this.random.nextFloat();
-                
+
                 // Vary the cave size with a sine wave
                 float size = (float) (Math.sin((double) segmentIndex * Math.PI / (double) caveLength) * 2.5F + 1.0F);
 
@@ -125,17 +125,17 @@ public class LevelGen {
                             float distX = dx - x;
                             float distY = dy - y;
                             float distZ = dz - z;
-                            
+
                             // Vertical distance counts double (flatter caves)
                             float distSq = distX * distX + distY * distY * 2.0F + distZ * distZ;
-                            
+
                             // If within the cave radius and within world bounds
-                            if (distSq < size * size && 
-                                dx >= 1 && dy >= 1 && dz >= 1 && 
-                                dx < this.width - 1 && dy < this.depth - 1 && dz < this.height - 1) {
-                                
+                            if (distSq < size * size &&
+                                    dx >= 1 && dy >= 1 && dz >= 1 &&
+                                    dx < this.width - 1 && dy < this.depth - 1 && dz < this.height - 1) {
+
                                 int blockIndex = (dy * this.height + dz) * this.width + dx;
-                                
+
                                 // Only carve out rock blocks
                                 if (blocks[blockIndex] == Tile.rock.id) {
                                     blocks[blockIndex] = 0;

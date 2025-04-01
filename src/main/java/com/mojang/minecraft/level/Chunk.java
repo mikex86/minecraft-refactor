@@ -39,7 +39,7 @@ public class Chunk {
     public long dirtiedTime = 0L;
 
     // Static rendering stats
-    private static Tesselator tesselator;
+    private static final Tesselator tesselator;
     public static int updates;
     private static long totalTime;
     private static int totalUpdates;
@@ -102,7 +102,7 @@ public class Chunk {
         glEndList();
         long endTime = System.nanoTime();
 
-        
+
         // Update rendering statistics
         if (renderedTiles > 0) {
             totalTime += endTime - startTime;

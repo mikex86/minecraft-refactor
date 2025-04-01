@@ -10,48 +10,84 @@ import java.util.List;
  * Handles basic physics, movement, and collision detection.
  */
 public class Entity {
-    /** The level this entity exists in */
+    /**
+     * The level this entity exists in
+     */
     protected Level level;
-    
-    /** Previous x position for interpolation */
+
+    /**
+     * Previous x position for interpolation
+     */
     public float xo;
-    /** Previous y position for interpolation */
+    /**
+     * Previous y position for interpolation
+     */
     public float yo;
-    /** Previous z position for interpolation */
+    /**
+     * Previous z position for interpolation
+     */
     public float zo;
-    
-    /** Current x position */
+
+    /**
+     * Current x position
+     */
     public float x;
-    /** Current y position */
+    /**
+     * Current y position
+     */
     public float y;
-    /** Current z position */
+    /**
+     * Current z position
+     */
     public float z;
-    
-    /** Current x velocity */
+
+    /**
+     * Current x velocity
+     */
     public float xd;
-    /** Current y velocity */
+    /**
+     * Current y velocity
+     */
     public float yd;
-    /** Current z velocity */
+    /**
+     * Current z velocity
+     */
     public float zd;
-    
-    /** Rotation around y axis (yaw) in degrees */
+
+    /**
+     * Rotation around y axis (yaw) in degrees
+     */
     public float yRot;
-    /** Rotation around x axis (pitch) in degrees */
+    /**
+     * Rotation around x axis (pitch) in degrees
+     */
     public float xRot;
-    
-    /** Collision bounding box */
+
+    /**
+     * Collision bounding box
+     */
     public AABB bb;
-    
-    /** Whether the entity is on the ground */
+
+    /**
+     * Whether the entity is on the ground
+     */
     public boolean onGround = false;
-    /** Whether the entity has been removed */
+    /**
+     * Whether the entity has been removed
+     */
     public boolean removed = false;
-    
-    /** Vertical offset for camera and rendering */
+
+    /**
+     * Vertical offset for camera and rendering
+     */
     protected float heightOffset = 0.0F;
-    /** Width of bounding box */
+    /**
+     * Width of bounding box
+     */
     protected float bbWidth = 0.6F;
-    /** Height of bounding box */
+    /**
+     * Height of bounding box
+     */
     protected float bbHeight = 1.8F;
 
     /**
@@ -84,7 +120,7 @@ public class Entity {
     /**
      * Sets the size of the entity's bounding box.
      *
-     * @param width Width of the entity
+     * @param width  Width of the entity
      * @param height Height of the entity
      */
     protected void setSize(float width, float height) {
@@ -105,20 +141,20 @@ public class Entity {
         this.z = z;
         float halfWidth = this.bbWidth / 2.0F;
         float halfHeight = this.bbHeight / 2.0F;
-        this.bb = new AABB(x - halfWidth, y - halfHeight, z - halfWidth, 
-                          x + halfWidth, y + halfHeight, z + halfWidth);
+        this.bb = new AABB(x - halfWidth, y - halfHeight, z - halfWidth,
+                x + halfWidth, y + halfHeight, z + halfWidth);
     }
 
     /**
      * Rotates the entity.
      *
-     * @param yRotation Change in y rotation (yaw)
-     * @param xRotation Change in x rotation (pitch)
+     * @param yawRotation   Change in yaw rotation
+     * @param pitchRotation Change in pitch rotation
      */
-    public void turn(float yRotation, float xRotation) {
-        this.yRot = (float)((double)this.yRot + (double)yRotation * 0.15);
-        this.xRot = (float)((double)this.xRot + (double)xRotation * 0.15);
-        
+    public void turn(float yawRotation, float pitchRotation) {
+        this.yRot = (float) ((double) this.yRot + (double) yawRotation * 0.15);
+        this.xRot = (float) ((double) this.xRot + (double) pitchRotation * 0.15);
+
         // Clamp pitch to prevent camera flipping
         if (this.xRot < -90.0F) {
             this.xRot = -90.0F;
@@ -150,7 +186,7 @@ public class Entity {
         float originalXa = xa;
         float originalYa = ya;
         float originalZa = za;
-        
+
         // Get all potential collision boxes within the movement area
         List<AABB> collisionBoxes = this.level.getCubes(this.bb.expand(xa, ya, za));
 
@@ -174,7 +210,7 @@ public class Entity {
 
         // Update onGround status (true if we hit something below us)
         this.onGround = originalYa != ya && originalYa < 0.0F;
-        
+
         // Reset velocity on collision
         if (originalXa != xa) {
             this.xd = 0.0F;
@@ -195,8 +231,8 @@ public class Entity {
     /**
      * Move the entity relative to its current rotation.
      *
-     * @param xa X movement (left/right)
-     * @param za Z movement (forward/backward)
+     * @param xa    X movement (left/right)
+     * @param za    Z movement (forward/backward)
      * @param speed Movement speed multiplier
      */
     public void moveRelative(float xa, float za, float speed) {
@@ -204,15 +240,15 @@ public class Entity {
         if (distSquared < 0.01F) {
             return; // Too small movement, ignore
         }
-        
+
         // Normalize and apply speed
-        float speedFactor = speed / (float)Math.sqrt(distSquared);
+        float speedFactor = speed / (float) Math.sqrt(distSquared);
         xa *= speedFactor;
         za *= speedFactor;
-        
+
         // Convert movement to global coordinates based on rotation
-        float sin = (float)Math.sin(this.yRot * Math.PI / 180.0F);
-        float cos = (float)Math.cos(this.yRot * Math.PI / 180.0F);
+        float sin = (float) Math.sin(this.yRot * Math.PI / 180.0F);
+        float cos = (float) Math.cos(this.yRot * Math.PI / 180.0F);
         this.xd += xa * cos - za * sin;
         this.zd += za * cos + xa * sin;
     }
@@ -223,9 +259,9 @@ public class Entity {
      * @return True if the block at the entity's position is lit
      */
     public boolean isLit() {
-        int xTile = (int)this.x;
-        int yTile = (int)this.y;
-        int zTile = (int)this.z;
+        int xTile = (int) this.x;
+        int yTile = (int) this.y;
+        int zTile = (int) this.z;
         return this.level.isLit(xTile, yTile, zTile);
     }
 

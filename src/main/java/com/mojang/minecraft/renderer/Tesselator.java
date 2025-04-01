@@ -13,8 +13,8 @@ public class Tesselator {
     private static final int MAX_FLOATS = 524288;      // MAX_MEMORY_USE / 8 (size of float)
 
     // Vertex data storage
-    private FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(MAX_FLOATS);
-    private float[] vertexData = new float[MAX_FLOATS];
+    private final FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(MAX_FLOATS);
+    private final float[] vertexData = new float[MAX_FLOATS];
 
     // State tracking
     private int vertexCount = 0;

@@ -19,7 +19,7 @@ import org.lwjgl.system.MemoryStack;
  */
 public class GameWindow {
     // Window handle
-    private long window;
+    private final long window;
 
     // Window dimensions
     private int width;
@@ -30,7 +30,7 @@ public class GameWindow {
     private MouseCallback mouseCallback;
 
     // Flag to check if window was created or is embedded
-    private boolean isStandalone;
+    private final boolean isStandalone;
 
     /**
      * Creates a new GameWindow with specified dimensions.

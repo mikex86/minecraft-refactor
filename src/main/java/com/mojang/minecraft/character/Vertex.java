@@ -36,8 +36,8 @@ public class Vertex {
      * Creates a new vertex based on an existing vertex but with different texture coordinates.
      *
      * @param vertex The source vertex to copy position from
-     * @param u U texture coordinate
-     * @param v V texture coordinate
+     * @param u      U texture coordinate
+     * @param v      V texture coordinate
      */
     public Vertex(Vertex vertex, float u, float v) {
         this.pos = vertex.pos;
@@ -49,8 +49,8 @@ public class Vertex {
      * Creates a new vertex with the given position and texture coordinates.
      *
      * @param pos 3D position vector
-     * @param u U texture coordinate
-     * @param v V texture coordinate
+     * @param u   U texture coordinate
+     * @param v   V texture coordinate
      */
     public Vertex(Vec3 pos, float u, float v) {
         this.pos = pos;

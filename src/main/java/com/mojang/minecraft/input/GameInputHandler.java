@@ -17,13 +17,13 @@ import java.util.ArrayList;
 public class GameInputHandler {
     // Reference to low-level input handler
     private final InputHandler inputHandler;
-    
+
     // Input state
     private boolean mouseGrabbed = false;
-    private int yMouseAxis = 1;  // Controls if mouse Y axis is inverted
+    private final int yMouseAxis = 1;  // Controls if mouse Y axis is inverted
     private int editMode = 0;    // 0 = destroy blocks, 1 = place blocks
     private int paintTexture = 1;  // Current block type for building
-    
+
     // Game references needed for input processing
     private final Player player;
     private final Level level;
@@ -34,12 +34,12 @@ public class GameInputHandler {
     /**
      * Creates a new GameInputHandler.
      *
-     * @param inputHandler Low-level input handler
-     * @param player The player entity
-     * @param level The game level
+     * @param inputHandler   Low-level input handler
+     * @param player         The player entity
+     * @param level          The game level
      * @param particleEngine The particle engine
-     * @param entities List of game entities
-     * @param fullscreen Whether the game is in fullscreen mode
+     * @param entities       List of game entities
+     * @param fullscreen     Whether the game is in fullscreen mode
      */
     public GameInputHandler(
             InputHandler inputHandler,
@@ -54,7 +54,7 @@ public class GameInputHandler {
         this.particleEngine = particleEngine;
         this.entities = new ArrayList<>(entities);
         this.fullscreen = fullscreen;
-        
+
         // Initially grab the mouse
         this.grabMouse();
     }
@@ -63,15 +63,14 @@ public class GameInputHandler {
      * Process all pending input events and update game state accordingly.
      *
      * @param hitResult The current hit result (block being looked at)
-     * @return true if window close was requested
      */
-    public boolean processInput(HitResult hitResult) {
+    public void processInput(HitResult hitResult) {
         // Process all keyboard events
         while (inputHandler.hasNextKeyEvent()) {
             InputHandler.KeyEvent event = inputHandler.getNextKeyEvent();
             int key = event.getKey();
             boolean pressed = event.isPressed();
-            
+
             if (pressed) {
                 // Escape key - release mouse in windowed mode
                 if (key == InputHandler.Keys.KEY_ESCAPE && !this.fullscreen) {
@@ -107,7 +106,7 @@ public class GameInputHandler {
             InputHandler.MouseButtonEvent event = inputHandler.getNextMouseButtonEvent();
             int button = event.getButton();
             boolean pressed = event.isPressed();
-            
+
             if (!this.mouseGrabbed && pressed) {
                 // Auto-grab mouse on click when not grabbed
                 this.grabMouse();
@@ -131,10 +130,9 @@ public class GameInputHandler {
         boolean right = inputHandler.isKeyDown(InputHandler.Keys.KEY_D);
         boolean jump = inputHandler.isKeyDown(InputHandler.Keys.KEY_SPACE);
         boolean sneak = inputHandler.isKeyDown(InputHandler.Keys.KEY_LSHIFT);
-        
+
         this.player.setInput(forward, back, left, right, jump, sneak);
-        
-        return true; // Return true to indicate input processing was successful
+
     }
 
     /**
@@ -157,7 +155,7 @@ public class GameInputHandler {
         if (hitResult == null) {
             return;
         }
-        
+
         if (this.editMode == 0) {
             // Destroy mode
             Tile oldTile = Tile.tiles[this.level.getTile(hitResult.x, hitResult.y, hitResult.z)];
@@ -170,7 +168,7 @@ public class GameInputHandler {
             int x = hitResult.x;
             int y = hitResult.y;
             int z = hitResult.z;
-            
+
             // Adjust coordinates based on which face was hit
             if (hitResult.face == 0) {
                 --y; // Bottom face
@@ -205,10 +203,10 @@ public class GameInputHandler {
         if (this.player.bb.intersects(aabb)) {
             return false;
         }
-        
+
         // Check for collision with any entity
         for (Object entity : this.entities) {
-            if (((com.mojang.minecraft.Entity)entity).bb.intersects(aabb)) {
+            if (((com.mojang.minecraft.Entity) entity).bb.intersects(aabb)) {
                 return false;
             }
         }
@@ -235,10 +233,10 @@ public class GameInputHandler {
             inputHandler.setCursorVisible(true);
         }
     }
-    
+
     /**
      * Handles window focus changes.
-     * 
+     *
      * @param hasFocus Whether the window has focus
      */
     public void handleFocusChange(boolean hasFocus) {
@@ -246,19 +244,19 @@ public class GameInputHandler {
             releaseMouse();
         }
     }
-    
+
     /**
      * Gets the current edit mode.
-     * 
+     *
      * @return 0 for destroy mode, 1 for build mode
      */
     public int getEditMode() {
         return editMode;
     }
-    
+
     /**
      * Gets the current block type for building.
-     * 
+     *
      * @return The block texture/type ID
      */
     public int getPaintTexture() {

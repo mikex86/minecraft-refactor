@@ -47,15 +47,15 @@ public class GameRenderer {
     /**
      * Creates a new GameRenderer.
      *
-     * @param minecraft The Minecraft instance this renderer belongs to
-     * @param levelRenderer The level renderer
+     * @param minecraft      The Minecraft instance this renderer belongs to
+     * @param levelRenderer  The level renderer
      * @param particleEngine The particle engine
-     * @param player The player
-     * @param entities The list of entities
-     * @param textures The texture manager
-     * @param font The font for rendering text
-     * @param width The initial window width
-     * @param height The initial window height
+     * @param player         The player
+     * @param entities       The list of entities
+     * @param textures       The texture manager
+     * @param font           The font for rendering text
+     * @param width          The initial window width
+     * @param height         The initial window height
      */
     public GameRenderer(Minecraft minecraft, LevelRenderer levelRenderer,
                         ParticleEngine particleEngine, Player player,
@@ -84,19 +84,19 @@ public class GameRenderer {
 
         // Set up the sky color buffer
         this.fogColor0.put(new float[]{
-            (float) (skyColor >> 16 & 255) / 255.0F,
-            (float) (skyColor >> 8 & 255) / 255.0F,
-            (float) (skyColor & 255) / 255.0F,
-            1.0F
+                (float) (skyColor >> 16 & 255) / 255.0F,
+                (float) (skyColor >> 8 & 255) / 255.0F,
+                (float) (skyColor & 255) / 255.0F,
+                1.0F
         });
         this.fogColor0.flip();
 
         // Set up the fog color buffer
         this.fogColor1.put(new float[]{
-            (float) (fogColor >> 16 & 255) / 255.0F,
-            (float) (fogColor >> 8 & 255) / 255.0F,
-            (float) (fogColor & 255) / 255.0F,
-            1.0F
+                (float) (fogColor >> 16 & 255) / 255.0F,
+                (float) (fogColor >> 8 & 255) / 255.0F,
+                (float) (fogColor & 255) / 255.0F,
+                1.0F
         });
         this.fogColor1.flip();
     }
@@ -104,7 +104,7 @@ public class GameRenderer {
     /**
      * Sets the window dimensions, used for proper viewport configuration.
      *
-     * @param width New window width
+     * @param width  New window width
      * @param height New window height
      */
     public void setDimensions(int width, int height) {
@@ -159,8 +159,8 @@ public class GameRenderer {
      * Sets up the picking camera for selection in 3D space.
      *
      * @param partialTick Interpolation factor between ticks (0.0-1.0)
-     * @param x X coordinate of pick center (usually screen center)
-     * @param y Y coordinate of pick center (usually screen center)
+     * @param x           X coordinate of pick center (usually screen center)
+     * @param y           Y coordinate of pick center (usually screen center)
      */
     private void setupPickCamera(float partialTick, int x, int y) {
         // Set up projection matrix for picking
@@ -290,11 +290,11 @@ public class GameRenderer {
     /**
      * Renders a single frame of the game.
      *
-     * @param partialTick Interpolation factor between ticks (0.0-1.0)
-     * @param hitResult The current hit result (block selection)
-     * @param editMode The current edit mode (0 = destroy, 1 = place)
+     * @param partialTick  Interpolation factor between ticks (0.0-1.0)
+     * @param hitResult    The current hit result (block selection)
+     * @param editMode     The current edit mode (0 = destroy, 1 = place)
      * @param paintTexture The current block to place
-     * @param fpsString String containing FPS information to display
+     * @param fpsString    String containing FPS information to display
      */
     public void render(float partialTick, HitResult hitResult, int editMode, int paintTexture, String fpsString) {
         // Set viewport to full window size
@@ -363,9 +363,9 @@ public class GameRenderer {
     /**
      * Draws the 2D GUI elements (HUD, crosshair, selected block).
      *
-     * @param partialTick Interpolation factor between ticks (0.0-1.0)
+     * @param partialTick  Interpolation factor between ticks (0.0-1.0)
      * @param paintTexture The current block to place
-     * @param fpsString String containing FPS information to display
+     * @param fpsString    String containing FPS information to display
      */
     private void drawGui(float partialTick, int paintTexture, String fpsString) {
         // Use actual screen dimensions for the GUI
@@ -422,13 +422,13 @@ public class GameRenderer {
 
         // Vertical line
         t.vertex(centerX + 1, centerY - 4, 0.0F);
-        t.vertex(centerX - 0, centerY - 4, 0.0F);
-        t.vertex(centerX - 0, centerY + 5, 0.0F);
+        t.vertex(centerX, centerY - 4, 0.0F);
+        t.vertex(centerX, centerY + 5, 0.0F);
         t.vertex(centerX + 1, centerY + 5, 0.0F);
 
         // Horizontal line
-        t.vertex(centerX + 5, centerY - 0, 0.0F);
-        t.vertex(centerX - 4, centerY - 0, 0.0F);
+        t.vertex(centerX + 5, centerY, 0.0F);
+        t.vertex(centerX - 4, centerY, 0.0F);
         t.vertex(centerX - 4, centerY + 1, 0.0F);
         t.vertex(centerX + 5, centerY + 1, 0.0F);
 

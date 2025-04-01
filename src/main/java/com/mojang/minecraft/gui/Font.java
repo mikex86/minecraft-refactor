@@ -86,6 +86,7 @@ public class Font {
                     int pixel = rawPixels[xPixel + yPixel] & 0xFF;
                     if (pixel > PIXEL_THRESHOLD) {
                         emptyColumn = false;
+                        break;
                     }
                 }
             }

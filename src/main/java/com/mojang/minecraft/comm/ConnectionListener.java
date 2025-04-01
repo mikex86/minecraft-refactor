@@ -18,8 +18,8 @@ public interface ConnectionListener {
      * Called when a command is received from this connection
      *
      * @param commandType The type of command
-     * @param remaining Number of bytes remaining in the buffer
-     * @param data The buffer containing command data
+     * @param remaining   Number of bytes remaining in the buffer
+     * @param data        The buffer containing command data
      */
     void command(byte commandType, int remaining, ByteBuffer data);
 }

@@ -14,7 +14,7 @@ public class InputHandler {
     // Keyboard state
     private final boolean[] keyDown = new boolean[GLFW_KEY_LAST + 1];
     private final List<KeyEvent> keyEvents = new ArrayList<>();
-    
+
     // Mouse state
     private final boolean[] mouseButtonDown = new boolean[GLFW_MOUSE_BUTTON_LAST + 1];
     private final List<MouseButtonEvent> mouseButtonEvents = new ArrayList<>();
@@ -26,18 +26,18 @@ public class InputHandler {
     private double mouseDY = 0;
     private double mouseScrollX = 0;
     private double mouseScrollY = 0;
-    
+
     // Reference to the window
     private final GameWindow window;
-    
+
     /**
      * Creates a new InputHandler for the given window.
-     * 
+     *
      * @param window The GLFW window to handle input for
      */
     public InputHandler(GameWindow window) {
         this.window = window;
-        
+
         // Set up keyboard callback
         window.setKeyboardCallback((key, scancode, action, mods) -> {
             if (key >= 0 && key <= GLFW_KEY_LAST) {
@@ -48,7 +48,7 @@ public class InputHandler {
                 }
             }
         });
-        
+
         // Set up mouse callbacks
         window.setMouseCallback(new GameWindow.MouseCallback() {
             @Override
@@ -61,7 +61,7 @@ public class InputHandler {
                 mouseDX += mouseX - lastMouseX;
                 mouseDY += mouseY - lastMouseY;
             }
-            
+
             @Override
             public void onMouseButton(int button, int action, int mods) {
                 if (button >= 0 && button <= GLFW_MOUSE_BUTTON_LAST) {
@@ -72,7 +72,7 @@ public class InputHandler {
                     }
                 }
             }
-            
+
             @Override
             public void onScroll(double xoffset, double yoffset) {
                 mouseScrollX += xoffset;
@@ -80,26 +80,26 @@ public class InputHandler {
             }
         });
     }
-    
+
     /**
      * Updates the input state. Call this once per frame before polling for input.
      */
     public void update() {
     }
-    
+
     /**
      * Checks if a key is currently pressed.
-     * 
+     *
      * @param key GLFW key code
      * @return true if the key is pressed
      */
     public boolean isKeyDown(int key) {
         return key >= 0 && key <= GLFW_KEY_LAST && keyDown[key];
     }
-    
+
     /**
      * Checks if there are any pending keyboard events.
-     * 
+     *
      * @return true if there are keyboard events to process
      */
     public boolean hasNextKeyEvent() {
@@ -107,10 +107,10 @@ public class InputHandler {
             return !keyEvents.isEmpty();
         }
     }
-    
+
     /**
      * Gets the next keyboard event in the queue.
-     * 
+     *
      * @return The next KeyEvent, or null if there are none
      */
     public KeyEvent getNextKeyEvent() {
@@ -118,20 +118,20 @@ public class InputHandler {
             return !keyEvents.isEmpty() ? keyEvents.remove(0) : null;
         }
     }
-    
+
     /**
      * Checks if a mouse button is currently pressed.
-     * 
+     *
      * @param button GLFW mouse button code
      * @return true if the button is pressed
      */
     public boolean isMouseButtonDown(int button) {
         return button >= 0 && button <= GLFW_MOUSE_BUTTON_LAST && mouseButtonDown[button];
     }
-    
+
     /**
      * Checks if there are any pending mouse button events.
-     * 
+     *
      * @return true if there are mouse button events to process
      */
     public boolean hasNextMouseButtonEvent() {
@@ -139,10 +139,10 @@ public class InputHandler {
             return !mouseButtonEvents.isEmpty();
         }
     }
-    
+
     /**
      * Gets the next mouse button event in the queue.
-     * 
+     *
      * @return The next MouseButtonEvent, or null if there are none
      */
     public MouseButtonEvent getNextMouseButtonEvent() {
@@ -150,28 +150,28 @@ public class InputHandler {
             return !mouseButtonEvents.isEmpty() ? mouseButtonEvents.remove(0) : null;
         }
     }
-    
+
     /**
      * Gets the current mouse X position.
-     * 
+     *
      * @return Mouse X position in pixels
      */
     public double getMouseX() {
         return mouseX;
     }
-    
+
     /**
      * Gets the current mouse Y position.
-     * 
+     *
      * @return Mouse Y position in pixels
      */
     public double getMouseY() {
         return mouseY;
     }
-    
+
     /**
      * Gets the mouse X movement since the last update.
-     * 
+     *
      * @return Mouse X movement in pixels
      */
     public double getMouseDX() {
@@ -179,10 +179,10 @@ public class InputHandler {
         mouseDX = 0;
         return dx;
     }
-    
+
     /**
      * Gets the mouse Y movement since the last update.
-     * 
+     *
      * @return Mouse Y movement in pixels
      */
     public double getMouseDY() {
@@ -190,99 +190,99 @@ public class InputHandler {
         mouseDY = 0;
         return dy;
     }
-    
+
     /**
      * Sets the mouse position.
-     * 
+     *
      * @param x X position in pixels
      * @param y Y position in pixels
      */
     public void setMousePosition(double x, double y) {
         glfwSetCursorPos(window.getWindowHandle(), x, y);
     }
-    
+
     /**
      * Gets the mouse scroll X movement since the last update.
-     * 
+     *
      * @return Mouse scroll X movement
      */
     public double getMouseScrollX() {
-        double scrollX =  mouseScrollX;
+        double scrollX = mouseScrollX;
         mouseScrollX = 0;
         return scrollX;
     }
-    
+
     /**
      * Gets the mouse scroll Y movement since the last update.
-     * 
+     *
      * @return Mouse scroll Y movement
      */
     public double getMouseScrollY() {
-        double scrollY =  mouseScrollY;
+        double scrollY = mouseScrollY;
         mouseScrollY = 0;
         return scrollY;
     }
-    
+
     /**
      * Makes the cursor visible or invisible.
-     * 
+     *
      * @param visible true to make the cursor visible, false to hide it
      */
     public void setCursorVisible(boolean visible) {
         window.setCursorVisible(visible);
     }
-    
+
     /**
      * Gets the associated window.
-     * 
+     *
      * @return The associated GameWindow
      */
     public GameWindow getWindow() {
         return window;
     }
-    
+
     /**
      * Keyboard event class.
      */
     public static class KeyEvent {
         private final int key;
         private final boolean pressed;
-        
+
         public KeyEvent(int key, boolean pressed) {
             this.key = key;
             this.pressed = pressed;
         }
-        
+
         public int getKey() {
             return key;
         }
-        
+
         public boolean isPressed() {
             return pressed;
         }
     }
-    
+
     /**
      * Mouse button event class.
      */
     public static class MouseButtonEvent {
         private final int button;
         private final boolean pressed;
-        
+
         public MouseButtonEvent(int button, boolean pressed) {
             this.button = button;
             this.pressed = pressed;
         }
-        
+
         public int getButton() {
             return button;
         }
-        
+
         public boolean isPressed() {
             return pressed;
         }
     }
-    
+
     /**
      * Map LWJGL 2 Keyboard constants to GLFW key codes.
      */
@@ -358,7 +358,7 @@ public class InputHandler {
         public static final int KEY_F11 = GLFW_KEY_F11;
         public static final int KEY_F12 = GLFW_KEY_F12;
     }
-    
+
     /**
      * Map LWJGL 2 Mouse constants to GLFW mouse button codes.
      */

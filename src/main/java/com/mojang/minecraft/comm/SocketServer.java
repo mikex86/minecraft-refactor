@@ -15,23 +15,31 @@ import java.util.logging.Logger;
  * Handles accepting connections and routing messages
  */
 public class SocketServer {
-    /** The server socket channel for accepting connections */
+    /**
+     * The server socket channel for accepting connections
+     */
     private final ServerSocketChannel ssc;
-    
-    /** Listener for server events */
+
+    /**
+     * Listener for server events
+     */
     private final ServerListener serverListener;
-    
-    /** List of active connections */
+
+    /**
+     * List of active connections
+     */
     private final List<SocketConnection> connections = new LinkedList<>();
-    
-    /** Logger for server events */
+
+    /**
+     * Logger for server events
+     */
     protected static final Logger logger = Logger.getLogger("SocketServer");
 
     /**
      * Creates a new socket server
      *
-     * @param ips The IP address to bind to
-     * @param port The port to listen on
+     * @param ips            The IP address to bind to
+     * @param port           The port to listen on
      * @param serverListener Listener for server events
      * @throws IOException If the server cannot be created
      */

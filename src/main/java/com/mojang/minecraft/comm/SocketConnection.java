@@ -14,52 +14,78 @@ import java.nio.channels.SocketChannel;
  * Manages reading from and writing to a socket channel
  */
 public class SocketConnection {
-    /** Default buffer size for read/write operations */
+    /**
+     * Default buffer size for read/write operations
+     */
     public static final int BUFFER_SIZE = 131068;
-    
-    /** Connection state */
+
+    /**
+     * Connection state
+     */
     private boolean connected;
-    
-    /** The underlying socket channel */
-    private SocketChannel socketChannel;
-    
-    /** Buffer for reading data from the socket */
+
+    /**
+     * The underlying socket channel
+     */
+    private final SocketChannel socketChannel;
+
+    /**
+     * Buffer for reading data from the socket
+     */
     public ByteBuffer readBuffer = ByteBuffer.allocate(BUFFER_SIZE);
-    
-    /** Buffer for writing data to the socket */
+
+    /**
+     * Buffer for writing data to the socket
+     */
     public ByteBuffer writeBuffer = ByteBuffer.allocate(BUFFER_SIZE);
-    
-    /** Timestamp of the last read operation */
+
+    /**
+     * Timestamp of the last read operation
+     */
     protected long lastRead;
-    
-    /** Listener for connection events */
+
+    /**
+     * Listener for connection events
+     */
     private ConnectionListener connectionListener;
-    
-    /** Total bytes read from this connection */
+
+    /**
+     * Total bytes read from this connection
+     */
     private int bytesRead;
-    
-    /** Total bytes written to this connection */
+
+    /**
+     * Total bytes written to this connection
+     */
     private int totalBytesWritten;
-    
-    /** Maximum number of blocks to process per iteration */
+
+    /**
+     * Maximum number of blocks to process per iteration
+     */
     private int maxBlocksPerIteration = 3;
-    
-    /** The underlying socket */
+
+    /**
+     * The underlying socket
+     */
     private Socket socket;
-    
-    /** Input stream for reading from the socket */
+
+    /**
+     * Input stream for reading from the socket
+     */
     private BufferedInputStream in;
-    
-    /** Output stream for writing to the socket */
+
+    /**
+     * Output stream for writing to the socket
+     */
     private BufferedOutputStream out;
 
     /**
      * Creates a socket connection to a remote host
      *
-     * @param ip The IP address to connect to
+     * @param ip   The IP address to connect to
      * @param port The port to connect to
      * @throws UnknownHostException If the host cannot be resolved
-     * @throws IOException If the connection cannot be established
+     * @throws IOException          If the connection cannot be established
      */
     public SocketConnection(String ip, int port) throws UnknownHostException, IOException {
         this.socketChannel = SocketChannel.open();

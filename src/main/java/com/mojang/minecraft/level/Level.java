@@ -21,11 +21,11 @@ import java.util.zip.GZIPOutputStream;
 public class Level {
     private static final int TILE_UPDATE_INTERVAL = 400;
     private static final String LEVEL_FILE_NAME = "level.dat";
-    
+
     public final int width;
     public final int height;
     public final int depth;
-    
+
     private byte[] blocks;
     private final int[] lightDepths;
     private final List<LevelListener> levelListeners = new ArrayList<>();
@@ -41,7 +41,7 @@ public class Level {
         this.depth = depth;
         this.blocks = new byte[width * height * depth];
         this.lightDepths = new int[width * height];
-        
+
         boolean mapLoaded = this.load();
         if (!mapLoaded) {
             this.blocks = new LevelGen(width, height, depth).generateMap();
@@ -52,15 +52,15 @@ public class Level {
 
     /**
      * Attempts to load the level from disk.
-     * 
+     *
      * @return true if the level was loaded successfully, false otherwise
      */
     public boolean load() {
         try {
             DataInputStream input = new DataInputStream(
-                new GZIPInputStream(
-                        Files.newInputStream(new File(LEVEL_FILE_NAME).toPath())));
-            
+                    new GZIPInputStream(
+                            Files.newInputStream(new File(LEVEL_FILE_NAME).toPath())));
+
             input.readFully(this.blocks);
             this.calcLightDepths(0, 0, this.width, this.height);
 
@@ -82,9 +82,9 @@ public class Level {
     public void save() {
         try {
             DataOutputStream output = new DataOutputStream(
-                new GZIPOutputStream(
-                        Files.newOutputStream(new File(LEVEL_FILE_NAME).toPath())));
-            
+                    new GZIPOutputStream(
+                            Files.newOutputStream(new File(LEVEL_FILE_NAME).toPath())));
+
             output.write(this.blocks);
             output.close();
         } catch (Exception e) {
@@ -106,7 +106,7 @@ public class Level {
                 }
 
                 this.lightDepths[x + z * this.width] = y;
-                
+
                 // Notify listeners if the light column changed
                 if (oldDepth != y) {
                     int minY = Math.min(oldDepth, y);
@@ -147,14 +147,14 @@ public class Level {
      */
     public ArrayList<AABB> getCubes(AABB box) {
         ArrayList<AABB> cubes = new ArrayList<>();
-        
+
         int x0 = (int) box.x0;
         int x1 = (int) (box.x1 + 1.0F);
         int y0 = (int) box.y0;
         int y1 = (int) (box.y1 + 1.0F);
         int z0 = (int) box.z0;
         int z1 = (int) (box.z1 + 1.0F);
-        
+
         // Clamp to level bounds
         x0 = Math.max(0, x0);
         y0 = Math.max(0, y0);
@@ -183,7 +183,7 @@ public class Level {
 
     /**
      * Sets a tile at the specified coordinates.
-     * 
+     *
      * @return true if the tile was changed, false if it was already the same or out of bounds
      */
     public boolean setTile(int x, int y, int z, int tileId) {
@@ -220,9 +220,9 @@ public class Level {
      * Gets the tile ID at the specified coordinates.
      */
     public int getTile(int x, int y, int z) {
-        return x >= 0 && y >= 0 && z >= 0 && x < this.width && y < this.depth && z < this.height 
-            ? this.blocks[(y * this.height + z) * this.width + x] & 0xFF 
-            : 0;
+        return x >= 0 && y >= 0 && z >= 0 && x < this.width && y < this.depth && z < this.height
+                ? this.blocks[(y * this.height + z) * this.width + x] & 0xFF
+                : 0;
     }
 
     /**
@@ -245,7 +245,7 @@ public class Level {
             int x = this.random.nextInt(this.width);
             int y = this.random.nextInt(this.depth);
             int z = this.random.nextInt(this.height);
-            
+
             Tile tile = Tile.tiles[this.getTile(x, y, z)];
             if (tile != null) {
                 tile.tick(this, x, y, z, this.random);

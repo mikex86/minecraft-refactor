@@ -11,7 +11,7 @@ public class GrassTile extends Tile {
 
     /**
      * Creates a new grass tile with the specified ID.
-     * 
+     *
      * @param id The tile ID
      */
     protected GrassTile(int id) {
@@ -22,7 +22,7 @@ public class GrassTile extends Tile {
     /**
      * Gets the texture for a specific face.
      * Overrides the parent method to provide different textures for top, bottom, and sides.
-     * 
+     *
      * @param face The face index (0-5)
      * @return The texture index
      */
@@ -41,11 +41,11 @@ public class GrassTile extends Tile {
     /**
      * Update method called each tick for this tile.
      * Handles grass spread and die-off based on lighting.
-     * 
-     * @param level The current level
-     * @param x X coordinate
-     * @param y Y coordinate
-     * @param z Z coordinate
+     *
+     * @param level  The current level
+     * @param x      X coordinate
+     * @param y      Y coordinate
+     * @param z      Z coordinate
      * @param random Random number generator
      */
     @Override
@@ -60,7 +60,7 @@ public class GrassTile extends Tile {
                 int xt = x + random.nextInt(3) - 1;
                 int yt = y + random.nextInt(5) - 3;
                 int zt = z + random.nextInt(3) - 1;
-                
+
                 // If it's dirt and lit, convert it to grass
                 if (level.getTile(xt, yt, zt) == Tile.dirt.id && level.isLit(xt, yt, zt)) {
                     level.setTile(xt, yt, zt, Tile.grass.id);

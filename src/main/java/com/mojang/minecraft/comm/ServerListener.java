@@ -16,7 +16,7 @@ public interface ServerListener {
      * Called when an exception occurs with a client connection
      *
      * @param connection The connection where the exception occurred
-     * @param e The exception that occurred
+     * @param e          The exception that occurred
      */
     void clientException(SocketConnection connection, Exception e);
 }

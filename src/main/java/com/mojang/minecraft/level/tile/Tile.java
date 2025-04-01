@@ -12,39 +12,59 @@ import java.util.Random;
  * Base class for all tile types in the game.
  */
 public class Tile {
-    /** Array of all tile types indexed by ID */
+    /**
+     * Array of all tile types indexed by ID
+     */
     public static final Tile[] tiles = new Tile[256];
-    
-    /** Represents an empty tile */
+
+    /**
+     * Represents an empty tile
+     */
     public static final Tile empty = null;
-    
-    /** Rock/stone tile */
+
+    /**
+     * Rock/stone tile
+     */
     public static final Tile rock = new Tile(1, 1);
-    
-    /** Grass tile */
+
+    /**
+     * Grass tile
+     */
     public static final Tile grass = new GrassTile(2);
-    
-    /** Dirt tile */
+
+    /**
+     * Dirt tile
+     */
     public static final Tile dirt = new DirtTile(3, 2);
-    
-    /** Stone brick tile */
+
+    /**
+     * Stone brick tile
+     */
     public static final Tile stoneBrick = new Tile(4, 16);
-    
-    /** Wooden planks tile */
+
+    /**
+     * Wooden planks tile
+     */
     public static final Tile wood = new Tile(5, 4);
-    
-    /** Bush/plant tile */
+
+    /**
+     * Bush/plant tile
+     */
     public static final Tile bush = new Bush(6);
 
-    /** Texture index for the tile */
+    /**
+     * Texture index for the tile
+     */
     public int tex;
-    
-    /** Unique ID for the tile type */
+
+    /**
+     * Unique ID for the tile type
+     */
     public final int id;
 
     /**
      * Creates a new tile with the specified ID.
-     * 
+     *
      * @param id The tile ID
      */
     protected Tile(int id) {
@@ -54,8 +74,8 @@ public class Tile {
 
     /**
      * Creates a new tile with the specified ID and texture.
-     * 
-     * @param id The tile ID
+     *
+     * @param id  The tile ID
      * @param tex The texture index
      */
     protected Tile(int id, int tex) {
@@ -65,19 +85,19 @@ public class Tile {
 
     /**
      * Renders the tile in the world.
-     * 
-     * @param t The tesselator for rendering
+     *
+     * @param t     The tesselator for rendering
      * @param level The current level
      * @param layer The render layer
-     * @param x X coordinate
-     * @param y Y coordinate
-     * @param z Z coordinate
+     * @param x     X coordinate
+     * @param y     Y coordinate
+     * @param z     Z coordinate
      */
     public void render(Tesselator t, Level level, int layer, int x, int y, int z) {
         float c1 = 1.0F;  // Top/bottom face lighting (100%)
         float c2 = 0.8F;  // North/south face lighting (80%)
         float c3 = 0.6F;  // East/west face lighting (60%)
-        
+
         // Bottom face
         if (shouldRenderFace(level, x, y - 1, z, layer)) {
             t.color(c1, c1, c1);
@@ -117,11 +137,11 @@ public class Tile {
 
     /**
      * Determines if a face should be rendered based on neighbor blocks and lighting.
-     * 
+     *
      * @param level The current level
-     * @param x X coordinate
-     * @param y Y coordinate
-     * @param z Z coordinate
+     * @param x     X coordinate
+     * @param y     Y coordinate
+     * @param z     Z coordinate
      * @param layer The render layer
      * @return True if the face should be rendered
      */
@@ -131,7 +151,7 @@ public class Tile {
 
     /**
      * Gets the texture index for a specific face.
-     * 
+     *
      * @param face The face index (0-5)
      * @return The texture index
      */
@@ -141,11 +161,11 @@ public class Tile {
 
     /**
      * Renders a single face of the tile.
-     * 
-     * @param t The tesselator for rendering
-     * @param x X coordinate
-     * @param y Y coordinate
-     * @param z Z coordinate
+     *
+     * @param t    The tesselator for rendering
+     * @param x    X coordinate
+     * @param y    Y coordinate
+     * @param z    Z coordinate
      * @param face The face to render (0-5)
      */
     public void renderFace(Tesselator t, int x, int y, int z, int face) {
@@ -154,14 +174,14 @@ public class Tile {
         float u1 = u0 + 0.0624375F;
         float v0 = (tex / 16) / 16.0F;
         float v1 = v0 + 0.0624375F;
-        
+
         float x0 = x;
         float x1 = x + 1.0F;
         float y0 = y;
         float y1 = y + 1.0F;
         float z0 = z;
         float z1 = z + 1.0F;
-        
+
         // Bottom face
         if (face == 0) {
             t.vertexUV(x0, y0, z1, u0, v1);
@@ -213,11 +233,11 @@ public class Tile {
 
     /**
      * Renders a face without applying texture coordinates.
-     * 
-     * @param t The tesselator for rendering
-     * @param x X coordinate
-     * @param y Y coordinate
-     * @param z Z coordinate
+     *
+     * @param t    The tesselator for rendering
+     * @param x    X coordinate
+     * @param y    Y coordinate
+     * @param z    Z coordinate
      * @param face The face to render (0-5)
      */
     public void renderFaceNoTexture(Tesselator t, int x, int y, int z, int face) {
@@ -227,7 +247,7 @@ public class Tile {
         float y1 = y + 1.0F;
         float z0 = z;
         float z1 = z + 1.0F;
-        
+
         // Bottom face
         if (face == 0) {
             t.vertex(x0, y0, z1);
@@ -279,7 +299,7 @@ public class Tile {
 
     /**
      * Gets the tile's bounding box with standard dimensions.
-     * 
+     *
      * @param x X coordinate
      * @param y Y coordinate
      * @param z Z coordinate
@@ -292,7 +312,7 @@ public class Tile {
     /**
      * Gets the collision box for this tile.
      * Can be overridden by subclasses to provide custom collision shapes.
-     * 
+     *
      * @param x X coordinate
      * @param y Y coordinate
      * @param z Z coordinate
@@ -318,11 +338,11 @@ public class Tile {
 
     /**
      * Update method called each tick for this tile.
-     * 
-     * @param level The current level
-     * @param x X coordinate
-     * @param y Y coordinate
-     * @param z Z coordinate
+     *
+     * @param level  The current level
+     * @param x      X coordinate
+     * @param y      Y coordinate
+     * @param z      Z coordinate
      * @param random Random number generator
      */
     public void tick(Level level, int x, int y, int z, Random random) {
@@ -332,11 +352,11 @@ public class Tile {
     /**
      * Called when this tile is destroyed.
      * Creates particles for the breaking effect.
-     * 
-     * @param level The current level
-     * @param x X coordinate
-     * @param y Y coordinate
-     * @param z Z coordinate
+     *
+     * @param level          The current level
+     * @param x              X coordinate
+     * @param y              Y coordinate
+     * @param z              Z coordinate
      * @param particleEngine The particle engine
      */
     public void destroy(Level level, int x, int y, int z, ParticleEngine particleEngine) {
@@ -348,12 +368,12 @@ public class Tile {
                     float xp = x + (xx + 0.5F) / subdivisionsPerAxis;
                     float yp = y + (yy + 0.5F) / subdivisionsPerAxis;
                     float zp = z + (zz + 0.5F) / subdivisionsPerAxis;
-                    
+
                     // Calculate velocity away from center
                     float xVel = xp - x - 0.5F;
                     float yVel = yp - y - 0.5F;
                     float zVel = zp - z - 0.5F;
-                    
+
                     particleEngine.add(new Particle(level, xp, yp, zp, xVel, yVel, zVel, tex));
                 }
             }

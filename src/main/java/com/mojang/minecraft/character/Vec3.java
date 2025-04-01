@@ -24,7 +24,7 @@ public class Vec3 {
     /**
      * Linearly interpolates between this vector and the target vector.
      *
-     * @param target The target vector to interpolate towards
+     * @param target   The target vector to interpolate towards
      * @param progress The interpolation factor (0.0 = this vector, 1.0 = target vector)
      * @return A new vector that is the interpolated result
      */

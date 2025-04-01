@@ -15,19 +15,25 @@ import java.util.Map;
  * Handles client connections and server operations
  */
 public class MinecraftServer implements Runnable, ServerListener {
-    /** Socket server handling network connections */
+    /**
+     * Socket server handling network connections
+     */
     private final SocketServer socketServer;
-    
-    /** Map of socket connections to client objects */
+
+    /**
+     * Map of socket connections to client objects
+     */
     private final Map<SocketConnection, Client> clientMap = new HashMap<>();
-    
-    /** List of active clients */
+
+    /**
+     * List of active clients
+     */
     private final List<Client> clients = new ArrayList<>();
 
     /**
      * Creates a new Minecraft server
-     * 
-     * @param ips The IP address to bind to
+     *
+     * @param ips  The IP address to bind to
      * @param port The port to listen on
      * @throws IOException If the server cannot be created
      */
@@ -44,7 +50,7 @@ public class MinecraftServer implements Runnable, ServerListener {
 
     /**
      * Disconnects a client from the server
-     * 
+     *
      * @param client The client to disconnect
      */
     public void disconnect(Client client) {
@@ -84,7 +90,7 @@ public class MinecraftServer implements Runnable, ServerListener {
 
     /**
      * Server entry point
-     * 
+     *
      * @param args Command line arguments (not used)
      * @throws IOException If the server fails to start
      */

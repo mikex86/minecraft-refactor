@@ -20,7 +20,7 @@ public class LevelRenderer implements LevelListener {
     // Constants
     public static final int MAX_REBUILDS_PER_FRAME = 8;
     public static final int CHUNK_SIZE = 16;
-    
+
     // Level data
     private final Level level;
     private final Chunk[] chunks;
@@ -36,12 +36,12 @@ public class LevelRenderer implements LevelListener {
         this.level = level;
         this.textures = textures;
         level.addListener(this);
-        
+
         // Calculate the number of chunks in each dimension
         this.xChunks = level.width / CHUNK_SIZE;
         this.yChunks = level.depth / CHUNK_SIZE;
         this.zChunks = level.height / CHUNK_SIZE;
-        
+
         // Create the chunks
         this.chunks = new Chunk[this.xChunks * this.yChunks * this.zChunks];
 
@@ -56,7 +56,7 @@ public class LevelRenderer implements LevelListener {
                     int x1 = (x + 1) * CHUNK_SIZE;
                     int y1 = (y + 1) * CHUNK_SIZE;
                     int z1 = (z + 1) * CHUNK_SIZE;
-                    
+
                     // Clamp to level bounds
                     if (x1 > level.width) {
                         x1 = level.width;
@@ -102,7 +102,7 @@ public class LevelRenderer implements LevelListener {
         glEnable(GL_TEXTURE_2D);
         int textureId = this.textures.loadTexture("/terrain.png", GL_NEAREST);
         glBindTexture(GL_TEXTURE_2D, textureId);
-        
+
         // Get the current view frustum
         Frustum frustum = Frustum.getFrustum();
 
@@ -138,18 +138,18 @@ public class LevelRenderer implements LevelListener {
      */
     public void pick(Player player, Frustum frustum) {
         Tesselator tesselator = Tesselator.instance;
-        
+
         // Define a box around the player to limit pick testing
         float pickRange = 3.0F;
         AABB pickBox = player.bb.grow(pickRange, pickRange, pickRange);
-        
+
         int x0 = (int) pickBox.x0;
         int x1 = (int) (pickBox.x1 + 1.0F);
         int y0 = (int) pickBox.y0;
         int y1 = (int) (pickBox.y1 + 1.0F);
         int z0 = (int) pickBox.z0;
         int z1 = (int) (pickBox.z1 + 1.0F);
-        
+
         // Initialize selection name stack
         glInitNames();
         glPushName(0);
@@ -197,45 +197,45 @@ public class LevelRenderer implements LevelListener {
      */
     public void renderHit(HitResult hitResult, int mode, int tileType) {
         Tesselator tesselator = Tesselator.instance;
-        
+
         // Enable blending for transparency
         glEnable(GL_BLEND);
-        
+
         // Calculate the alpha value based on time for a pulsing effect
         float pulsingAlpha = ((float) Math.sin(System.currentTimeMillis() / 100.0) * 0.2F + 0.4F) * 0.5F;
-        
+
         if (mode == 0) {
             // Destruction mode - render an outline of the block being broken
             glBlendFunc(GL_SRC_ALPHA, GL_ONE);
             glColor4f(1.0F, 1.0F, 1.0F, pulsingAlpha);
-            
+
             tesselator.init();
-            
+
             // Render all faces
             for (int face = 0; face < 6; ++face) {
                 Tile.rock.renderFaceNoTexture(tesselator, hitResult.x, hitResult.y, hitResult.z, face);
             }
-            
+
             tesselator.flush();
         } else {
             // Building mode - render a preview of the block to be placed
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            
+
             // Calculate brightness based on time
             float brightness = (float) Math.sin(System.currentTimeMillis() / 100.0) * 0.2F + 0.8F;
             float alpha = (float) Math.sin(System.currentTimeMillis() / 200.0) * 0.2F + 0.5F;
             glColor4f(brightness, brightness, brightness, alpha);
-            
+
             // Enable texturing
             glEnable(GL_TEXTURE_2D);
             int textureId = this.textures.loadTexture("/terrain.png", GL_NEAREST);
             glBindTexture(GL_TEXTURE_2D, textureId);
-            
+
             // Calculate the position to render the block preview
             int x = hitResult.x;
             int y = hitResult.y;
             int z = hitResult.z;
-            
+
             // Adjust position based on which face was hit
             if (hitResult.face == 0) --y;
             if (hitResult.face == 1) ++y;
@@ -250,7 +250,7 @@ public class LevelRenderer implements LevelListener {
             Tile.tiles[tileType].render(tesselator, this.level, 0, x, y, z);
             Tile.tiles[tileType].render(tesselator, this.level, 1, x, y, z);
             tesselator.flush();
-            
+
             glDisable(GL_TEXTURE_2D);
         }
 
@@ -268,7 +268,7 @@ public class LevelRenderer implements LevelListener {
         y1 /= CHUNK_SIZE;
         z0 /= CHUNK_SIZE;
         z1 /= CHUNK_SIZE;
-        
+
         // Clamp to valid chunk ranges
         x0 = Math.max(0, x0);
         y0 = Math.max(0, y0);

@@ -6,7 +6,7 @@ package com.mojang.minecraft.level;
 public interface LevelListener {
     /**
      * Called when a tile has changed at the specified coordinates.
-     * 
+     *
      * @param x The x-coordinate of the changed tile
      * @param y The y-coordinate of the changed tile
      * @param z The z-coordinate of the changed tile
@@ -15,9 +15,9 @@ public interface LevelListener {
 
     /**
      * Called when the light column has changed in a vertical range.
-     * 
-     * @param x The x-coordinate of the light column
-     * @param z The z-coordinate of the light column
+     *
+     * @param x    The x-coordinate of the light column
+     * @param z    The z-coordinate of the light column
      * @param oldY The old height value
      * @param newY The new height value
      */

@@ -9,7 +9,7 @@ public class Polygon {
     // Texture mapping constants
     private static final float TEX_WIDTH_SCALE = 63.999F; // Size of texture width
     private static final float TEX_HEIGHT_SCALE = 31.999F; // Size of texture height
-    
+
     public Vertex[] vertices;
     public int vertexCount;
 
@@ -28,10 +28,10 @@ public class Polygon {
      * Creates a new polygon with the given vertices and texture coordinates.
      *
      * @param vertices Array of vertices defining the polygon
-     * @param u0 First U texture coordinate
-     * @param v0 First V texture coordinate
-     * @param u1 Second U texture coordinate
-     * @param v1 Second V texture coordinate
+     * @param u0       First U texture coordinate
+     * @param v0       First V texture coordinate
+     * @param u1       Second U texture coordinate
+     * @param v1       Second V texture coordinate
      */
     public Polygon(Vertex[] vertices, int u0, int v0, int u1, int v1) {
         this(vertices);
