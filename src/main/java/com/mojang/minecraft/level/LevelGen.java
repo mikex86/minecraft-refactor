@@ -1,6 +1,7 @@
 package com.mojang.minecraft.level;
 
 import com.mojang.minecraft.level.tile.Tile;
+import com.mojang.minecraft.util.math.NoiseMap;
 
 import java.util.Random;
 

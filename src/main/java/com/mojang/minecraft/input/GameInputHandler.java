@@ -7,6 +7,7 @@ import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.InputHandler;
+import com.mojang.minecraft.util.math.CollisionUtils;
 import com.mojang.minecraft.world.HitResult;
 
 import java.util.ArrayList;
@@ -202,13 +203,13 @@ public class GameInputHandler {
      */
     private boolean isFree(AABB aabb) {
         // Check for collision with player
-        if (this.player.bb.intersects(aabb)) {
+        if (CollisionUtils.intersects(this.player.bb, aabb)) {
             return false;
         }
 
         // Check for collision with any entity
         for (Entity entity : this.entities) {
-            if (entity.bb.intersects(aabb)) {
+            if (CollisionUtils.intersects(entity.bb, aabb)) {
                 return false;
             }
         }

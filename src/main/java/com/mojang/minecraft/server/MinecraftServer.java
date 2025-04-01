@@ -4,6 +4,7 @@ import com.mojang.minecraft.comm.ServerListener;
 import com.mojang.minecraft.comm.SocketConnection;
 import com.mojang.minecraft.comm.SocketServer;
 import com.mojang.minecraft.crash.CrashReporter;
+import com.mojang.minecraft.util.logging.LoggingUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -97,7 +98,9 @@ public class MinecraftServer implements Runnable, ServerListener {
      */
     public static void main(String[] args) throws IOException {
         // Set up uncaught exception handler
-        CrashReporter.setupUncaughtExceptionHandler();
+        LoggingUtils.setupUncaughtExceptionHandler((thread, exception) -> {
+            CrashReporter.handleCrash("Uncaught exception in thread " + thread.getName(), exception);
+        });
 
         try {
             MinecraftServer server = new MinecraftServer(new byte[]{127, 0, 0, 1}, 20801);

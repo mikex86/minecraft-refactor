@@ -1,9 +1,10 @@
-package com.mojang.minecraft.level;
+package com.mojang.minecraft.util.math;
 
 import java.util.Random;
 
 /**
  * Generates procedural noise maps for terrain generation.
+ * Implements a diamond-square algorithm variant for coherent noise.
  */
 public class NoiseMap {
     private final Random random = new Random();
@@ -18,6 +19,17 @@ public class NoiseMap {
     public NoiseMap(int levels) {
         this.levels = levels;
         this.fuzz = 16;
+    }
+
+    /**
+     * Creates a new noise map with the specified level of detail and fuzz factor.
+     *
+     * @param levels The level of detail for the noise map
+     * @param fuzz   The amount of randomness to apply
+     */
+    public NoiseMap(int levels, int fuzz) {
+        this.levels = levels;
+        this.fuzz = fuzz;
     }
 
     /**
@@ -106,4 +118,13 @@ public class NoiseMap {
 
         return result;
     }
-}
+
+    /**
+     * Sets the seed for the random number generator.
+     *
+     * @param seed The seed value
+     */
+    public void setSeed(long seed) {
+        random.setSeed(seed);
+    }
+} 

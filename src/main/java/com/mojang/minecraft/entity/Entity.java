@@ -2,6 +2,7 @@ package com.mojang.minecraft.entity;
 
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.phys.AABB;
+import com.mojang.minecraft.util.math.CollisionUtils;
 
 import java.util.List;
 
@@ -192,19 +193,19 @@ public class Entity {
 
         // Handle Y-axis collisions first
         for (AABB collisionBox : collisionBoxes) {
-            ya = collisionBox.clipYCollide(this.bb, ya);
+            ya = CollisionUtils.clipYCollide(collisionBox, this.bb, ya);
         }
         this.bb.move(0.0F, ya, 0.0F);
 
         // Handle X-axis collisions
         for (AABB box : collisionBoxes) {
-            xa = box.clipXCollide(this.bb, xa);
+            xa = CollisionUtils.clipXCollide(box, this.bb, xa);
         }
         this.bb.move(xa, 0.0F, 0.0F);
 
         // Handle Z-axis collisions
         for (AABB collisionBox : collisionBoxes) {
-            za = collisionBox.clipZCollide(this.bb, za);
+            za = CollisionUtils.clipZCollide(collisionBox, this.bb, za);
         }
         this.bb.move(0.0F, 0.0F, za);
 

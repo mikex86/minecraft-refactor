@@ -8,6 +8,7 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.particle.ParticleEngine;
+import com.mojang.minecraft.util.math.MatrixUtils;
 import com.mojang.minecraft.world.HitResult;
 import org.lwjgl.BufferUtils;
 

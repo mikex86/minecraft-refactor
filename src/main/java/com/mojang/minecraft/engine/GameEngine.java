@@ -1,10 +1,10 @@
 package com.mojang.minecraft.engine;
 
-import com.mojang.minecraft.Timer;
 import com.mojang.minecraft.crash.CrashReporter;
 import com.mojang.minecraft.level.Chunk;
 import com.mojang.minecraft.renderer.GameWindow;
 import com.mojang.minecraft.renderer.InputHandler;
+import com.mojang.minecraft.util.time.Timer;
 
 import java.io.IOException;
 
@@ -152,6 +152,15 @@ public class GameEngine {
      */
     public float getPartialTick() {
         return timer.partialTick;
+    }
+
+    /**
+     * Sets the game time scale.
+     *
+     * @param scale Time scale factor (1.0 is normal speed)
+     */
+    public void setTimeScale(float scale) {
+        timer.setTimeScale(scale);
     }
 
     /**

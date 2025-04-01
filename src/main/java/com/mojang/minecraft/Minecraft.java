@@ -6,6 +6,7 @@ import com.mojang.minecraft.gui.Font;
 import com.mojang.minecraft.input.GameInputHandler;
 import com.mojang.minecraft.renderer.GameRenderer;
 import com.mojang.minecraft.renderer.Textures;
+import com.mojang.minecraft.util.logging.LoggingUtils;
 import com.mojang.minecraft.world.HitResult;
 
 import java.io.IOException;
@@ -205,32 +206,16 @@ public class Minecraft implements Runnable {
      * Sets up the crash reporting system.
      */
     private static void initializeCrashReporting() {
-        // Create crash-reports directory if it doesn't exist
-        try {
-            java.io.File crashReportsDir = new java.io.File("crash-reports");
-            if (!crashReportsDir.exists()) {
-                crashReportsDir.mkdirs();
-            }
-        } catch (Exception e) {
-            System.err.println("Failed to create crash-reports directory: " + e.getMessage());
-        }
-
-        // Configure logging
-        try {
-            java.util.logging.Logger logger = java.util.logging.Logger.getLogger("Minecraft");
-            java.util.logging.FileHandler fileHandler = new java.util.logging.FileHandler("minecraft.log", true);
-            fileHandler.setFormatter(new java.util.logging.SimpleFormatter());
-            logger.addHandler(fileHandler);
-            logger.setLevel(java.util.logging.Level.ALL);
-        } catch (Exception e) {
-            System.err.println("Failed to set up logging: " + e.getMessage());
-        }
+        // Initialize logging
+        LoggingUtils.initialize();
 
         // Set up global exception handler
-        CrashReporter.setupUncaughtExceptionHandler();
+        LoggingUtils.setupUncaughtExceptionHandler((thread, exception) -> {
+            CrashReporter.handleCrash("Uncaught exception in thread " + thread.getName(), exception);
+        });
 
         // Redirect error output to capture any missed printStackTrace() calls
-        CrashReporter.redirectErrorOutput();
+        LoggingUtils.redirectErrorOutput();
 
         System.out.println("Crash reporting system initialized");
     }
