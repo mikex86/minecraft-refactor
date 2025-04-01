@@ -189,6 +189,9 @@ public class Minecraft implements Runnable {
      * Main entry point for standalone game.
      */
     public static void main(String[] args) {
+        // Initialize the crash reporting system
+        initializeCrashReporting();
+
         try {
             Minecraft minecraft = new Minecraft(854, 480, false);
             // Run directly on the main thread instead of creating a new thread
@@ -196,5 +199,39 @@ public class Minecraft implements Runnable {
         } catch (Exception e) {
             CrashReporter.handleCrash("Failed to start Minecraft", e);
         }
+    }
+
+    /**
+     * Sets up the crash reporting system.
+     */
+    private static void initializeCrashReporting() {
+        // Create crash-reports directory if it doesn't exist
+        try {
+            java.io.File crashReportsDir = new java.io.File("crash-reports");
+            if (!crashReportsDir.exists()) {
+                crashReportsDir.mkdirs();
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to create crash-reports directory: " + e.getMessage());
+        }
+
+        // Configure logging
+        try {
+            java.util.logging.Logger logger = java.util.logging.Logger.getLogger("Minecraft");
+            java.util.logging.FileHandler fileHandler = new java.util.logging.FileHandler("minecraft.log", true);
+            fileHandler.setFormatter(new java.util.logging.SimpleFormatter());
+            logger.addHandler(fileHandler);
+            logger.setLevel(java.util.logging.Level.ALL);
+        } catch (Exception e) {
+            System.err.println("Failed to set up logging: " + e.getMessage());
+        }
+
+        // Set up global exception handler
+        CrashReporter.setupUncaughtExceptionHandler();
+
+        // Redirect error output to capture any missed printStackTrace() calls
+        CrashReporter.redirectErrorOutput();
+
+        System.out.println("Crash reporting system initialized");
     }
 }
