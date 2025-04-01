@@ -2,12 +2,11 @@ package com.mojang.minecraft;
 
 import com.mojang.minecraft.character.Zombie;
 import com.mojang.minecraft.gui.Font;
+import com.mojang.minecraft.input.GameInputHandler;
 import com.mojang.minecraft.level.Chunk;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
-import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.particle.ParticleEngine;
-import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.GameRenderer;
 import com.mojang.minecraft.renderer.GameWindow;
 import com.mojang.minecraft.renderer.InputHandler;
@@ -41,16 +40,13 @@ public class Minecraft implements Runnable {
     // Window and input handling
     private GameWindow window;
     private InputHandler inputHandler;
+    private GameInputHandler gameInputHandler;
     
     // Game flags
     public volatile boolean pause = false;
     private volatile boolean running = false;
-    private boolean mouseGrabbed = false;
     
-    // UI and input state
-    private int paintTexture = 1;
-    private int yMouseAxis = 1;  // Controls if mouse Y axis is inverted
-    private int editMode = 0;    // 0 = destroy blocks, 1 = place blocks
+    // UI state
     private String fpsString = "";
     private Font font;
     
@@ -124,8 +120,15 @@ public class Minecraft implements Runnable {
             this.entities.add(zombie);
         }
         
-        // Initially grab the mouse
-        this.grabMouse();
+        // Initialize game input handler
+        this.gameInputHandler = new GameInputHandler(
+            this.inputHandler,
+            this.player,
+            this.level,
+            this.particleEngine,
+            this.entities,
+            this.fullscreen
+        );
     }
 
     /**
@@ -178,6 +181,9 @@ public class Minecraft implements Runnable {
 
                     // Update input state
                     inputHandler.update();
+                    
+                    // Process input
+                    gameInputHandler.processInput(this.hitResult);
 
                     // Update timer and calculate ticks
                     this.timer.advanceTime();
@@ -187,15 +193,8 @@ public class Minecraft implements Runnable {
                         this.tick();
                     }
 
-                    // Handle mouse look if mouse is grabbed
-                    if (this.mouseGrabbed) {
-                        float mouseX = (float) inputHandler.getMouseDX();
-                        float mouseY = (float) inputHandler.getMouseDY();
-
-                        // Apply mouse movement to player rotation ;
-                        // This must be performed every frame, as tick() is too slow
-                        this.player.turn(mouseX, mouseY * (float) this.yMouseAxis);
-                    }
+                    // Handle mouse look
+                    gameInputHandler.processMouseLook();
 
                     // Perform picking to detect which block the player is looking at
                     this.hitResult = this.renderer.pick(this.timer.partialTick);
@@ -204,8 +203,8 @@ public class Minecraft implements Runnable {
                     this.renderer.render(
                         this.timer.partialTick,
                         this.hitResult,
-                        this.editMode,
-                        this.paintTexture,
+                        gameInputHandler.getEditMode(),
+                        gameInputHandler.getPaintTexture(),
                         this.fpsString
                     );
                     
@@ -219,6 +218,24 @@ public class Minecraft implements Runnable {
                         Chunk.updates = 0;
                         lastFpsUpdateTime += 1000L;
                         framesCounter = 0;
+                    }
+                    
+                    // Handle window focus change
+                    if (!window.hasFocus()) {
+                        gameInputHandler.handleFocusChange(false);
+                    }
+                    
+                    // Update window dimensions if they've changed
+                    if (window != null) {
+                        int newWidth = window.getWidth();
+                        int newHeight = window.getHeight();
+                        
+                        if (newWidth != width || newHeight != height) {
+                            width = newWidth;
+                            height = newHeight;
+                            renderer.setDimensions(width, height);
+                            System.out.println("Window resized: " + width + "x" + height);
+                        }
                     }
                 }
             }
@@ -238,162 +255,10 @@ public class Minecraft implements Runnable {
     }
 
     /**
-     * Grabs the mouse cursor, hiding it and enabling mouse look.
-     */
-    public void grabMouse() {
-        if (!this.mouseGrabbed) {
-            this.mouseGrabbed = true;
-            inputHandler.setCursorVisible(false);
-        }
-    }
-
-    /**
-     * Releases the mouse cursor, showing it and disabling mouse look.
-     */
-    public void releaseMouse() {
-        if (this.mouseGrabbed) {
-            this.mouseGrabbed = false;
-            inputHandler.setCursorVisible(true);
-        }
-    }
-
-    /**
-     * Handles mouse click actions in the world, either destroying or placing blocks.
-     */
-    private void handleMouseClick() {
-        if (this.editMode == 0) {
-            // Destroy mode
-            if (this.hitResult != null) {
-                Tile oldTile = Tile.tiles[this.level.getTile(this.hitResult.x, this.hitResult.y, this.hitResult.z)];
-                boolean changed = this.level.setTile(this.hitResult.x, this.hitResult.y, this.hitResult.z, 0);
-                if (oldTile != null && changed) {
-                    oldTile.destroy(this.level, this.hitResult.x, this.hitResult.y, this.hitResult.z, this.particleEngine);
-                }
-            }
-        } else if (this.hitResult != null) {
-            // Build mode
-            int x = this.hitResult.x;
-            int y = this.hitResult.y;
-            int z = this.hitResult.z;
-            
-            // Adjust coordinates based on which face was hit
-            if (this.hitResult.face == 0) {
-                --y; // Bottom face
-            } else if (this.hitResult.face == 1) {
-                ++y; // Top face
-            } else if (this.hitResult.face == 2) {
-                --z; // North face
-            } else if (this.hitResult.face == 3) {
-                ++z; // South face
-            } else if (this.hitResult.face == 4) {
-                --x; // West face
-            } else if (this.hitResult.face == 5) {
-                ++x; // East face
-            }
-
-            // Check if we can place a block here
-            AABB aabb = Tile.tiles[this.paintTexture].getAABB(x, y, z);
-            if (aabb == null || this.isFree(aabb)) {
-                this.level.setTile(x, y, z, this.paintTexture);
-            }
-        }
-    }
-
-    /**
      * Updates the game state for one tick.
-     * Processes input, updates entities, and updates the level.
+     * Updates entities and the level.
      */
     public void tick() {
-        // Process all keyboard events
-        while (inputHandler.hasNextKeyEvent()) {
-            InputHandler.KeyEvent event = inputHandler.getNextKeyEvent();
-            int key = event.getKey();
-            boolean pressed = event.isPressed();
-            
-            if (pressed) {
-                // Escape key - release mouse in windowed mode
-                if (key == InputHandler.Keys.KEY_ESCAPE && !this.fullscreen) {
-                    this.releaseMouse();
-                }
-
-                // Enter key - save level
-                if (key == InputHandler.Keys.KEY_RETURN) {
-                    this.level.save();
-                }
-
-                // Block selection keys
-                if (key == InputHandler.Keys.KEY_1) {
-                    this.paintTexture = 1;  // Stone
-                }
-                if (key == InputHandler.Keys.KEY_2) {
-                    this.paintTexture = 3;  // Dirt
-                }
-                if (key == InputHandler.Keys.KEY_3) {
-                    this.paintTexture = 4;  // Cobblestone
-                }
-                if (key == InputHandler.Keys.KEY_4) {
-                    this.paintTexture = 5;  // Wooden planks
-                }
-                if (key == InputHandler.Keys.KEY_5) {
-                    this.paintTexture = 6;  // Sapling
-                }
-            }
-        }
-
-        // Process all mouse button events
-        while (inputHandler.hasNextMouseButtonEvent()) {
-            InputHandler.MouseButtonEvent event = inputHandler.getNextMouseButtonEvent();
-            int button = event.getButton();
-            boolean pressed = event.isPressed();
-            
-            if (!this.mouseGrabbed && pressed) {
-                // Auto-grab mouse on click when not grabbed
-                this.grabMouse();
-            } else {
-                // Handle left mouse button (destroy/place blocks)
-                if (button == InputHandler.MouseButtons.BUTTON_LEFT && pressed) {
-                    this.handleMouseClick();
-                }
-
-                // Handle right mouse button (toggle edit mode)
-                if (button == InputHandler.MouseButtons.BUTTON_RIGHT && pressed) {
-                    this.editMode = (this.editMode + 1) % 2;
-                }
-            }
-        }
-
-        // Update player movement based on keyboard input
-        boolean forward = inputHandler.isKeyDown(InputHandler.Keys.KEY_W);
-        boolean back = inputHandler.isKeyDown(InputHandler.Keys.KEY_S);
-        boolean left = inputHandler.isKeyDown(InputHandler.Keys.KEY_A);
-        boolean right = inputHandler.isKeyDown(InputHandler.Keys.KEY_D);
-        boolean jump = inputHandler.isKeyDown(InputHandler.Keys.KEY_SPACE);
-        
-        this.player.setInput(forward, back, left, right, jump, inputHandler.isKeyDown(InputHandler.Keys.KEY_LSHIFT));
-        
-        // Check for fullscreen toggle (F11)
-        if (inputHandler.isKeyDown(InputHandler.Keys.KEY_F11)) {
-            // Implement fullscreen toggle if needed
-        }
-        
-        // Update window dimensions if they've changed
-        if (window != null) {
-            int newWidth = window.getWidth();
-            int newHeight = window.getHeight();
-            
-            if (newWidth != width || newHeight != height) {
-                width = newWidth;
-                height = newHeight;
-                renderer.setDimensions(width, height);
-                System.out.println("Window resized: " + width + "x" + height);
-            }
-        }
-        
-        // Release mouse if window loses focus
-        if (window != null && !window.hasFocus()) {
-            this.releaseMouse();
-        }
-        
         // Update all game entities
         for (int i = 0; i < this.entities.size(); ++i) {
             Entity entity = this.entities.get(i);
@@ -411,28 +276,6 @@ public class Minecraft implements Runnable {
         
         // Update level
         this.level.tick();
-    }
-
-    /**
-     * Checks if a bounding box is free from collisions with entities and the player.
-     *
-     * @param aabb The bounding box to check
-     * @return true if the area is free, false if there's a collision
-     */
-    private boolean isFree(AABB aabb) {
-        // Check for collision with player
-        if (this.player.bb.intersects(aabb)) {
-            return false;
-        }
-        
-        // Check for collision with any entity
-        for (Entity entity : this.entities) {
-            if (entity.bb.intersects(aabb)) {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     /**

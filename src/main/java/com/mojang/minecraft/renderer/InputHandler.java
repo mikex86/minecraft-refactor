@@ -233,6 +233,15 @@ public class InputHandler {
     }
     
     /**
+     * Gets the associated window.
+     * 
+     * @return The associated GameWindow
+     */
+    public GameWindow getWindow() {
+        return window;
+    }
+    
+    /**
      * Keyboard event class.
      */
     public static class KeyEvent {
