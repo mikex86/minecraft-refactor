@@ -1,5 +1,7 @@
 package com.mojang.minecraft.comm;
 
+import com.mojang.minecraft.crash.CrashReporter;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -171,7 +173,7 @@ public class SocketConnection {
 
             this.in = null;
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.handleError("Failed to close input stream during disconnect", e);
         }
 
         try {
@@ -181,7 +183,7 @@ public class SocketConnection {
 
             this.out = null;
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.handleError("Failed to close output stream during disconnect", e);
         }
 
         try {
@@ -191,7 +193,7 @@ public class SocketConnection {
 
             this.socket = null;
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.handleError("Failed to close socket during disconnect", e);
         }
     }
 

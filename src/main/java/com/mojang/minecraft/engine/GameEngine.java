@@ -1,11 +1,11 @@
 package com.mojang.minecraft.engine;
 
 import com.mojang.minecraft.Timer;
+import com.mojang.minecraft.crash.CrashReporter;
 import com.mojang.minecraft.level.Chunk;
 import com.mojang.minecraft.renderer.GameWindow;
 import com.mojang.minecraft.renderer.InputHandler;
 
-import javax.swing.*;
 import java.io.IOException;
 
 /**
@@ -77,8 +77,7 @@ public class GameEngine {
             framesCounter = 0;
 
         } catch (Exception e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(null, e.toString(), "Failed to create window", JOptionPane.ERROR_MESSAGE);
+            CrashReporter.handleCrash("Failed to create window", e);
             throw new IOException("Failed to create window", e);
         }
     }

@@ -1,5 +1,6 @@
 package com.mojang.minecraft;
 
+import com.mojang.minecraft.crash.CrashReporter;
 import com.mojang.minecraft.engine.GameEngine;
 import com.mojang.minecraft.gui.Font;
 import com.mojang.minecraft.input.GameInputHandler;
@@ -7,7 +8,6 @@ import com.mojang.minecraft.renderer.GameRenderer;
 import com.mojang.minecraft.renderer.Textures;
 import com.mojang.minecraft.world.HitResult;
 
-import javax.swing.*;
 import java.io.IOException;
 
 /**
@@ -86,8 +86,7 @@ public class Minecraft implements Runnable {
                     engine.isFullscreen()
             );
         } catch (Exception e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(null, e.toString(), "Failed to initialize game", JOptionPane.ERROR_MESSAGE);
+            CrashReporter.handleCrash("Failed to initialize game", e);
             throw new IOException("Failed to initialize game", e);
         }
     }
@@ -103,7 +102,7 @@ public class Minecraft implements Runnable {
             engine.shutdown();
             textures.dispose();
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.handleError("Failed to clean up resources during shutdown", e);
         }
     }
 
@@ -117,8 +116,7 @@ public class Minecraft implements Runnable {
             // Initialize the game
             this.init();
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(null, e.toString(),
-                    "Failed to start Minecraft", JOptionPane.ERROR_MESSAGE);
+            CrashReporter.handleCrash("Failed to start Minecraft", e);
             return;
         }
 
@@ -173,7 +171,7 @@ public class Minecraft implements Runnable {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.handleCrash("Uncaught exception in main game loop", e);
         } finally {
             // Clean up resources
             this.destroy();
@@ -196,8 +194,7 @@ public class Minecraft implements Runnable {
             // Run directly on the main thread instead of creating a new thread
             minecraft.run();
         } catch (Exception e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(null, e.toString(), "Failed to start Minecraft", JOptionPane.ERROR_MESSAGE);
+            CrashReporter.handleCrash("Failed to start Minecraft", e);
         }
     }
 }

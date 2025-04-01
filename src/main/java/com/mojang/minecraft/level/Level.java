@@ -1,5 +1,6 @@
 package com.mojang.minecraft.level;
 
+import com.mojang.minecraft.crash.CrashReporter;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.phys.AABB;
 
@@ -69,7 +70,7 @@ public class Level {
             input.close();
             return true;
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.handleError("Failed to load level from " + LEVEL_FILE_NAME, e);
             return false;
         }
     }
@@ -86,7 +87,7 @@ public class Level {
             output.write(this.blocks);
             output.close();
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.handleError("Failed to save level to " + LEVEL_FILE_NAME, e);
         }
     }
 
