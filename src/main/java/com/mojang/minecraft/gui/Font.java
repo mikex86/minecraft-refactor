@@ -3,10 +3,10 @@ package com.mojang.minecraft.gui;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.Textures;
 
+import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.Objects;
-import javax.imageio.ImageIO;
 
 import static org.lwjgl.opengl.GL11.*;
 

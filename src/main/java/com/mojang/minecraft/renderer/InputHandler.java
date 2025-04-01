@@ -1,9 +1,9 @@
 package com.mojang.minecraft.renderer;
 
-import static org.lwjgl.glfw.GLFW.*;
-
 import java.util.ArrayList;
 import java.util.List;
+
+import static org.lwjgl.glfw.GLFW.*;
 
 /**
  * Handles keyboard and mouse input using GLFW callbacks.

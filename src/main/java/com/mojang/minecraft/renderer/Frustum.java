@@ -1,10 +1,9 @@
 package com.mojang.minecraft.renderer;
 
 import com.mojang.minecraft.phys.AABB;
+import org.lwjgl.BufferUtils;
 
 import java.nio.FloatBuffer;
-
-import org.lwjgl.BufferUtils;
 
 import static org.lwjgl.opengl.GL11.*;
 

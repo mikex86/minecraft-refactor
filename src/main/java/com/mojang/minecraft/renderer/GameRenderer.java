@@ -8,7 +8,6 @@ import com.mojang.minecraft.gui.Font;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.particle.ParticleEngine;
-
 import org.lwjgl.BufferUtils;
 
 import java.nio.FloatBuffer;

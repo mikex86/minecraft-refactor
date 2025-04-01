@@ -1,57 +1,47 @@
 package com.mojang.minecraft;
 
 import com.mojang.minecraft.character.Zombie;
+import com.mojang.minecraft.engine.GameEngine;
 import com.mojang.minecraft.gui.Font;
 import com.mojang.minecraft.input.GameInputHandler;
-import com.mojang.minecraft.level.Chunk;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.renderer.GameRenderer;
-import com.mojang.minecraft.renderer.GameWindow;
-import com.mojang.minecraft.renderer.InputHandler;
 import com.mojang.minecraft.renderer.Textures;
 
+import javax.swing.*;
 import java.io.IOException;
 import java.util.ArrayList;
-import javax.swing.JOptionPane;
 
 /**
  * Main game class for Minecraft Classic 0.0.11a.
- * Handles initialization, game loop, and input.
+ * Handles game-specific logic and delegates engine functionality to GameEngine.
  */
 public class Minecraft implements Runnable {
     // Constants
     public static final String VERSION_STRING = "0.0.11a";
 
-    // Game configuration
-    private boolean fullscreen = false;
-    private int width;
-    private int height;
+    // Game engine
+    private final GameEngine engine;
 
     // Game state
-    private final Timer timer = new Timer(20.0F);
     public Level level;
     private LevelRenderer levelRenderer;
     private Player player;
     private ParticleEngine particleEngine;
     private final ArrayList<Entity> entities = new ArrayList<>();
 
-    // Window and input handling
-    private GameWindow window;
-    private InputHandler inputHandler;
+    // Game input
     private GameInputHandler gameInputHandler;
 
     // Game flags
     public volatile boolean pause = false;
     private volatile boolean running = false;
 
-    // UI state
-    private String fpsString = "";
-    private Font font;
-
-    // Rendering resources
+    // Game resources
     public Textures textures;
+    private Font font;
     private GameRenderer renderer;
     private HitResult hitResult = null;
 
@@ -63,9 +53,7 @@ public class Minecraft implements Runnable {
      * @param fullscreen Whether to run in fullscreen mode
      */
     public Minecraft(int width, int height, boolean fullscreen) {
-        this.width = width;
-        this.height = height;
-        this.fullscreen = fullscreen;
+        this.engine = new GameEngine(width, height, fullscreen, "Minecraft " + VERSION_STRING);
         this.textures = new Textures();
     }
 
@@ -76,59 +64,50 @@ public class Minecraft implements Runnable {
      */
     public void init() throws IOException {
         try {
-            // Create window and initialize input
-            window = new GameWindow(width, height, "Minecraft " + VERSION_STRING, fullscreen);
-            inputHandler = new InputHandler(window);
+            // Initialize the engine
+            engine.initialize();
 
-            // Get the updated window size (may have changed for fullscreen)
-            width = window.getWidth();
-            height = window.getHeight();
+            // Create game objects
+            this.level = new Level(256, 256, 64);
+            this.levelRenderer = new LevelRenderer(this.level, this.textures);
+            this.player = new Player(this.level);
+            this.particleEngine = new ParticleEngine(this.level, this.textures);
+            this.font = new Font("/default.gif", this.textures);
 
-            System.out.println("Initialized window with dimensions: " + width + "x" + height);
+            // Create renderer
+            this.renderer = new GameRenderer(
+                    this,
+                    this.levelRenderer,
+                    this.particleEngine,
+                    this.player,
+                    this.entities,
+                    this.textures,
+                    this.font,
+                    engine.getWidth(),
+                    engine.getHeight()
+            );
 
+            // Add some zombies to the level
+            for (int i = 0; i < 10; ++i) {
+                Zombie zombie = new Zombie(this.level, this.textures, 128.0F, 0.0F, 128.0F);
+                zombie.resetPos();
+                this.entities.add(zombie);
+            }
+
+            // Initialize game input handler
+            this.gameInputHandler = new GameInputHandler(
+                    engine.getInputHandler(),
+                    this.player,
+                    this.level,
+                    this.particleEngine,
+                    this.entities,
+                    engine.isFullscreen()
+            );
         } catch (Exception e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(null, e.toString(), "Failed to create window", JOptionPane.ERROR_MESSAGE);
-            throw new IOException("Failed to create window", e);
+            JOptionPane.showMessageDialog(null, e.toString(), "Failed to initialize game", JOptionPane.ERROR_MESSAGE);
+            throw new IOException("Failed to initialize game", e);
         }
-
-        // Initialize OpenGL state
-        window.initOpenGL();
-
-        // Create game objects
-        this.level = new Level(256, 256, 64);
-        this.levelRenderer = new LevelRenderer(this.level, this.textures);
-        this.player = new Player(this.level);
-        this.particleEngine = new ParticleEngine(this.level, this.textures);
-        this.font = new Font("/default.gif", this.textures);
-        this.renderer = new GameRenderer(
-                this,
-                this.levelRenderer,
-                this.particleEngine,
-                this.player,
-                this.entities,
-                this.textures,
-                this.font,
-                this.width,
-                this.height
-        );
-
-        // Add some zombies to the level
-        for (int i = 0; i < 10; ++i) {
-            Zombie zombie = new Zombie(this.level, this.textures, 128.0F, 0.0F, 128.0F);
-            zombie.resetPos();
-            this.entities.add(zombie);
-        }
-
-        // Initialize game input handler
-        this.gameInputHandler = new GameInputHandler(
-                this.inputHandler,
-                this.player,
-                this.level,
-                this.particleEngine,
-                this.entities,
-                this.fullscreen
-        );
     }
 
     /**
@@ -137,9 +116,7 @@ public class Minecraft implements Runnable {
     public void destroy() {
         try {
             this.level.save();
-            if (window != null) {
-                window.destroy();
-            }
+            engine.shutdown();
             if (textures != null) {
                 textures.dispose();
             }
@@ -149,8 +126,7 @@ public class Minecraft implements Runnable {
     }
 
     /**
-     * Main game loop. Initializes the game and handles rendering,
-     * updates, and resources.
+     * Main game loop. Initializes the game and handles game state updates.
      */
     public void run() {
         this.running = true;
@@ -164,9 +140,6 @@ public class Minecraft implements Runnable {
             return;
         }
 
-        long lastFpsUpdateTime = System.currentTimeMillis();
-        int framesCounter = 0;
-
         try {
             // Main game loop
             while (this.running) {
@@ -175,21 +148,19 @@ public class Minecraft implements Runnable {
                     Thread.sleep(100L);
                 } else {
                     // Check if window is closed
-                    if (!window.update()) {
+                    if (!engine.update()) {
                         this.stop();
                     }
-
-                    // Update input state
-                    inputHandler.update();
 
                     // Process input
                     gameInputHandler.processInput(this.hitResult);
 
-                    // Update timer and calculate ticks
-                    this.timer.advanceTime();
+                    // Get time information from engine
+                    int ticksToProcess = engine.getTicksToProcess();
+                    float partialTick = engine.getPartialTick();
 
                     // Process game ticks
-                    for (int i = 0; i < this.timer.ticks; ++i) {
+                    for (int i = 0; i < ticksToProcess; ++i) {
                         this.tick();
                     }
 
@@ -197,45 +168,27 @@ public class Minecraft implements Runnable {
                     gameInputHandler.processMouseLook();
 
                     // Perform picking to detect which block the player is looking at
-                    this.hitResult = this.renderer.pick(this.timer.partialTick);
+                    this.hitResult = this.renderer.pick(partialTick);
 
                     // Render the frame
                     this.renderer.render(
-                            this.timer.partialTick,
+                            partialTick,
                             this.hitResult,
                             gameInputHandler.getEditMode(),
                             gameInputHandler.getPaintTexture(),
-                            this.fpsString
+                            engine.getFpsString()
                     );
 
-                    // Update FPS counter
-                    ++framesCounter;
-                    long currentTime = System.currentTimeMillis();
-
-                    // Update the FPS string once per second
-                    if (currentTime >= lastFpsUpdateTime + 1000L) {
-                        this.fpsString = framesCounter + " fps, " + Chunk.updates + " chunk updates";
-                        Chunk.updates = 0;
-                        lastFpsUpdateTime += 1000L;
-                        framesCounter = 0;
+                    // Check for window size changes
+                    if (engine.hasResized()) {
+                        int newWidth = engine.getWidth();
+                        int newHeight = engine.getHeight();
+                        renderer.setDimensions(newWidth, newHeight);
                     }
 
                     // Handle window focus change
-                    if (!window.hasFocus()) {
+                    if (!engine.hasFocus()) {
                         gameInputHandler.handleFocusChange(false);
-                    }
-
-                    // Update window dimensions if they've changed
-                    if (window != null) {
-                        int newWidth = window.getWidth();
-                        int newHeight = window.getHeight();
-
-                        if (newWidth != width || newHeight != height) {
-                            width = newWidth;
-                            height = newHeight;
-                            renderer.setDimensions(width, height);
-                            System.out.println("Window resized: " + width + "x" + height);
-                        }
                     }
                 }
             }

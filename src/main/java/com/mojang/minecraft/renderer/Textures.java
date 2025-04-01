@@ -1,17 +1,16 @@
 package com.mojang.minecraft.renderer;
 
-import static org.lwjgl.opengl.GL11.*;
+import org.lwjgl.BufferUtils;
 
+import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import javax.imageio.ImageIO;
 
-import org.lwjgl.BufferUtils;
+import static org.lwjgl.opengl.GL11.*;
 
 /**
  * Manages texture loading and caching for OpenGL rendering
