@@ -200,31 +200,7 @@ public interface GraphicsAPI {
      * @param texture The texture to bind
      */
     void setTexture(Texture texture);
-    
-    /**
-     * Enables or disables texturing.
-     * 
-     * @param enabled Whether texturing is enabled
-     */
-    void setTexturingEnabled(boolean enabled);
-    
-    /**
-     * Enables or disables vertex colors.
-     * 
-     * @param enabled Whether vertex colors are enabled
-     */
-    void setVertexColorEnabled(boolean enabled);
 
-    /**
-     * Sets the current light parameters.
-     * 
-     * @param enabled      Whether lighting is enabled
-     * @param ambientR     Red component of ambient light (0.0-1.0)
-     * @param ambientG     Green component of ambient light (0.0-1.0)
-     * @param ambientB     Blue component of ambient light (0.0-1.0)
-     */
-    void setLighting(boolean enabled, float ambientR, float ambientG, float ambientB);
-    
     /**
      * Sets the current shader.
      * 

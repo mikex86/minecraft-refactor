@@ -1,7 +1,7 @@
 package com.mojang.minecraft.renderer.shader;
 
 import com.mojang.minecraft.renderer.Disposable;
-import com.mojang.minecraft.renderer.shader.impl.WorldShader;
+import com.mojang.minecraft.renderer.shader.impl.*;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -20,6 +20,10 @@ public class ShaderRegistry implements Disposable {
 
     // Core shader programs
     private WorldShader worldShader;
+    private ParticleShader particleShader;
+    private EntityShader entityShader;
+    private HudShader hudShader;
+    private HudNoTexShader hudNoTexShader;
 
     /**
      * Gets the singleton instance of the shader manager.
@@ -47,6 +51,10 @@ public class ShaderRegistry implements Disposable {
      */
     public void initialize() throws IOException {
         worldShader = new WorldShader();
+        particleShader = new ParticleShader();
+        entityShader = new EntityShader();
+        hudShader = new HudShader();
+        hudNoTexShader = new HudNoTexShader();
     }
 
     /**
@@ -56,6 +64,27 @@ public class ShaderRegistry implements Disposable {
      */
     public WorldShader getWorldShader() {
         return worldShader;
+    }
+    
+    /**
+     * Gets the particle shader.
+     *
+     * @return The particle shader
+     */
+    public ParticleShader getParticleShader() {
+        return particleShader;
+    }
+
+    public EntityShader getEntityShader() {
+        return entityShader;
+    }
+
+    public HudShader getHudShader() {
+        return hudShader;
+    }
+
+    public HudNoTexShader getHudNoTexShader() {
+        return hudNoTexShader;
     }
 
     /**
@@ -77,6 +106,15 @@ public class ShaderRegistry implements Disposable {
             shader.dispose();
         }
         shaders.clear();
+        
+        if (worldShader != null) {
+            worldShader.dispose();
+        }
+        
+        if (particleShader != null) {
+            particleShader.dispose();
+        }
+        
         instance = null;
     }
 } 

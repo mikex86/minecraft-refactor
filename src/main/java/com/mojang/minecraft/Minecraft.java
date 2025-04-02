@@ -57,7 +57,7 @@ public class Minecraft implements Runnable {
         try {
             // Initialize the engine
             engine.initialize();
-            
+
             // Initialize the shader manager
             shaderRegistry.initialize();
 
@@ -68,6 +68,7 @@ public class Minecraft implements Runnable {
             // Create renderer
             this.renderer = new GameRenderer(
                     this.textureManager,
+                    this.shaderRegistry,
                     this.gameState.getLevel(),
                     gameState.getLevelRenderer(),
                     gameState.getParticleEngine(),

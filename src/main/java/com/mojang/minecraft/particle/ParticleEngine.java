@@ -5,7 +5,10 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.Texture;
+import com.mojang.minecraft.renderer.shader.ShaderRegistry;
+import com.mojang.minecraft.renderer.shader.impl.ParticleShader;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -74,6 +77,9 @@ public class ParticleEngine {
         Texture texture = this.textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
         graphics.setTexture(texture);
 
+        // Enable additive blending for particles
+        graphics.setBlendState(true, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
+
         // Calculate view vectors based on player rotation
         float xa = -((float) Math.cos(player.yRot * DEG_TO_RAD));
         float za = -((float) Math.sin(player.yRot * DEG_TO_RAD));
@@ -96,5 +102,8 @@ public class ParticleEngine {
 
         // Finish rendering
         tesselator.flush();
+
+        // Restore default blend mode
+        graphics.setBlendState(false, GraphicsEnums.BlendFactor.ONE, GraphicsEnums.BlendFactor.ZERO);
     }
 }

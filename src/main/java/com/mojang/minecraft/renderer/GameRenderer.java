@@ -12,6 +12,8 @@ import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.Texture;
+import com.mojang.minecraft.renderer.shader.ShaderRegistry;
+import com.mojang.minecraft.renderer.shader.impl.*;
 import com.mojang.minecraft.world.HitResult;
 import org.lwjgl.BufferUtils;
 
@@ -34,6 +36,12 @@ public class GameRenderer implements Disposable {
     private final FloatBuffer fogColor0;
     private final FloatBuffer fogColor1;
 
+    private final WorldShader worldShader;
+    private final ParticleShader particleShader;
+    private final EntityShader entityShader;
+    private final HudShader hudShader;
+    private final HudNoTexShader hudNoTexShader;
+
     // Font renderer
     private Font font;
 
@@ -52,6 +60,7 @@ public class GameRenderer implements Disposable {
      * Creates a new graphics renderer.
      *
      * @param textureManager The texture manager
+     * @param shaderRegistry The shader registry
      * @param level          The level
      * @param levelRenderer  The level renderer
      * @param particleEngine The particle engine
@@ -60,7 +69,8 @@ public class GameRenderer implements Disposable {
      * @param width          The initial window width
      * @param height         The initial window height
      */
-    public GameRenderer(TextureManager textureManager, Level level, LevelRenderer levelRenderer,
+    public GameRenderer(TextureManager textureManager, ShaderRegistry shaderRegistry,
+                        Level level, LevelRenderer levelRenderer,
                         ParticleEngine particleEngine, Player player,
                         List<Entity> entities, int width, int height) {
         // Get graphics API instance
@@ -91,6 +101,12 @@ public class GameRenderer implements Disposable {
         this.fogColor1.clear();
         this.fogColor1.put(0.0F).put(0.0F).put(0.0F).put(1.0F);
         this.fogColor1.flip();
+
+        this.worldShader = shaderRegistry.getWorldShader();
+        this.particleShader = shaderRegistry.getParticleShader();
+        this.entityShader = shaderRegistry.getEntityShader();
+        this.hudShader = shaderRegistry.getHudShader();
+        this.hudNoTexShader = shaderRegistry.getHudNoTexShader();
     }
 
     /**
@@ -167,37 +183,11 @@ public class GameRenderer implements Disposable {
         graphics.setRasterizerState(GraphicsEnums.CullMode.BACK, GraphicsEnums.FillMode.SOLID);
         graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS);
 
-        // Create frustum for culling
-        Frustum frustum = Frustum.getFrustum();
-
         // Update chunks that have changed
         this.levelRenderer.updateDirtyChunks(this.player);
 
-        // Render lit parts of the level
-        this.levelRenderer.render(0);
-
-        // Render lit entities
-        for (Entity entity : this.entities) {
-            if (entity.isLit() && frustum.isVisible(entity.bb)) {
-                entity.render(this.graphics, partialTick);
-            }
-        }
-
-        // Render lit particles
-        this.particleEngine.render(this.graphics, this.player, partialTick, 0);
-
-        // Render unlit parts of the level
-        this.levelRenderer.render(1);
-
-        // Render unlit entities
-        for (Entity entity : this.entities) {
-            if (!entity.isLit() && frustum.isVisible(entity.bb)) {
-                entity.render(this.graphics, partialTick);
-            }
-        }
-
-        // Render unlit particles
-        this.particleEngine.render(this.graphics, this.player, partialTick, 1);
+        renderLayer(true, partialTick);
+        renderLayer(false, partialTick);
 
         // Render block selection highlight
         if (hitResult != null) {
@@ -205,7 +195,61 @@ public class GameRenderer implements Disposable {
         }
 
         // Render HUD elements
-        renderHud(graphics, fpsString, editMode, paintTexture);
+        {
+            renderHud(graphics, fpsString, editMode, paintTexture);
+        }
+    }
+
+    private void renderLayer(boolean lit, float partialTick) {
+        int layer = lit ? 0 : 1;
+
+        Frustum frustum = Frustum.getFrustum();
+
+        // render level
+        {
+            worldShader.use();
+            setupFog(worldShader, layer);
+            this.levelRenderer.render(layer);
+            worldShader.detach();
+        }
+
+        // render entities
+        {
+            entityShader.use();
+            setupFog(entityShader, layer);
+            for (Entity entity : this.entities) {
+                if ((entity.isLit() == lit) && frustum.isVisible(entity.bb)) {
+                    entity.render(this.graphics, partialTick);
+                }
+            }
+            entityShader.detach();
+        }
+
+        // render particles
+        {
+            particleShader.use();
+            setupFog(particleShader, layer);
+            this.particleEngine.render(this.graphics, this.player, partialTick, layer);
+            particleShader.detach();
+        }
+    }
+
+    /**
+     * Configures the fog settings for different rendering passes.
+     *
+     * @param fogShader the fog shader to configure
+     * @param mode      0 for lit areas (day), 1 for unlit areas (night)
+     */
+    private void setupFog(FogShader fogShader, int mode) {
+        if (mode == 0) {
+            fogShader.setFogUniforms(true, GraphicsAPI.FogMode.EXP, 0.001F, 0.0F, 10.0F,
+                    0.5F, 0.8F, 1.0F, 1.0F);
+
+        } else if (mode == 1) {
+            // Night fog (darker, closer)
+            fogShader.setFogUniforms(true, GraphicsAPI.FogMode.EXP, 0.01F, 0.0F, 0.0F,
+                    0.0F, 0.0F, 0.0F, 1.0F);
+        }
     }
 
     /**
@@ -226,10 +270,10 @@ public class GameRenderer implements Disposable {
      * @param paintTexture The current block to place
      */
     private void renderHud(GraphicsAPI graphics, String fpsString, int editMode, int paintTexture) {
+        hudShader.use();
+
         // disable depth test
         graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
-
-        graphics.setLighting(false, 0.0F, 0.0F, 0.0F);
 
         int screenWidth = this.width * 240 / this.height;
         int screenHeight = this.height * 240 / this.height;
@@ -251,9 +295,14 @@ public class GameRenderer implements Disposable {
         drawDebugText(graphics, fpsString);
 
         graphics.setBlendState(false, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
+        hudShader.detach();
+
+        hudNoTexShader.use();
 
         // Draw cross-hair
         drawCrosshair(graphics, screenWidth, screenHeight);
+
+        hudNoTexShader.detach();
     }
 
     private void drawDebugText(GraphicsAPI graphics, String fpsString) {

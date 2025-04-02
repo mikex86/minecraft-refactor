@@ -107,20 +107,9 @@ public class Tesselator implements Disposable {
             // Upload data
             buffer.setData(vertexBuffer, dataIndex * 4); // 4 bytes per float
 
-            // Configure rendering state
-            graphics.setTexturingEnabled(this.hasTexture);
-            graphics.setVertexColorEnabled(this.hasColor);
 
             // Draw the vertices
             graphics.drawPrimitives(buffer, PrimitiveType.QUADS, 0, this.vertexCount);
-
-            // Reset state
-            if (this.hasColor) {
-                graphics.setVertexColorEnabled(false); // default state is vertex color disabled
-            }
-            if (!this.hasTexture) {
-                graphics.setTexturingEnabled(true); // default state is texturing enabled
-            }
         }
 
         // Reset state

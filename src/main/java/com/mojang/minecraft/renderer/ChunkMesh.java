@@ -97,28 +97,8 @@ public class ChunkMesh implements Disposable {
             return;
         }
 
-        // Configure rendering state
-        // Only disable texturing if the mesh has no texture coordinates,
-        // otherwise assume texturing is enabled by default
-        if (!vertexBuffer.getFormat().hasTexCoords()) {
-            graphics.setTexturingEnabled(false);
-        }
-
-        if (vertexBuffer.getFormat().hasColors()) {
-            graphics.setVertexColorEnabled(true);
-        }
-
         // Draw the mesh
         graphics.drawPrimitives(vertexBuffer, GraphicsEnums.PrimitiveType.QUADS, 0, vertexCount);
-
-        // Reset state
-        if (!vertexBuffer.getFormat().hasTexCoords()) {
-            graphics.setTexturingEnabled(true); // Restore default state
-        }
-        
-        if (vertexBuffer.getFormat().hasColors()) {
-            graphics.setVertexColorEnabled(false);
-        }
     }
 
     /**
