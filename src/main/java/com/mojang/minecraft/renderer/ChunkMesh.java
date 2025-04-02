@@ -4,6 +4,8 @@ import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
+import com.mojang.minecraft.renderer.graphics.IndexBuffer;
+import com.mojang.minecraft.renderer.Tesselator.IndexedMesh;
 
 import java.nio.FloatBuffer;
 import java.util.Objects;
@@ -16,8 +18,7 @@ import java.util.Objects;
 public class ChunkMesh implements Disposable {
     // Graphics resources
     private final GraphicsAPI graphics;
-    private VertexBuffer vertexBuffer;
-    private int vertexCount;
+    private IndexedMesh mesh;
 
     // Tesselator for building this mesh
     private final Tesselator tesselator;
@@ -34,9 +35,8 @@ public class ChunkMesh implements Disposable {
         this.graphics = GraphicsFactory.getGraphicsAPI();
 
         // Create resources
-        this.vertexBuffer = null;
+        this.mesh = null;
         this.tesselator = Tesselator.instance;
-        this.vertexCount = 0;
     }
 
     /**
@@ -68,10 +68,17 @@ public class ChunkMesh implements Disposable {
             return;
         }
 
-        vertexCount = tesselator.getVertexCount();
+        // Clean up existing mesh if needed
+        if (mesh != null) {
+            mesh.dispose();
+            mesh = null;
+        }
 
-        if (vertexCount > 0) {
-            vertexBuffer = tesselator.createVertexBuffer(GraphicsEnums.BufferUsage.STATIC);
+        int vertexCount = tesselator.getVertexCount();
+        int indexCount = tesselator.getIndexCount();
+
+        if (vertexCount > 0 && indexCount > 0) {
+            mesh = tesselator.createIndexedMesh(GraphicsEnums.BufferUsage.STATIC);
         }
 
         dirty = false;
@@ -81,13 +88,12 @@ public class ChunkMesh implements Disposable {
      * Renders the mesh.
      */
     public void render() {
-        if (vertexCount == 0) {
+        if (mesh == null) {
             return;
         }
-        Objects.requireNonNull(vertexBuffer, "Vertex buffer is null despite that vertex count is not zero");
 
         // Draw the mesh
-        graphics.drawPrimitives(vertexBuffer, GraphicsEnums.PrimitiveType.QUADS, 0, vertexCount);
+        mesh.draw(graphics);
     }
 
     /**
@@ -95,7 +101,6 @@ public class ChunkMesh implements Disposable {
      */
     public void clear() {
         tesselator.init();
-        vertexCount = 0;
         setDirty();
     }
 
@@ -105,9 +110,10 @@ public class ChunkMesh implements Disposable {
     @Override
     public void dispose() {
         if (!disposed) {
-            if (vertexBuffer != null)
-                vertexBuffer.dispose();
-            tesselator.dispose();
+            if (mesh != null) {
+                mesh.dispose();
+                mesh = null;
+            }
             disposed = true;
         }
     }

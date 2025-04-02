@@ -324,8 +324,7 @@ public class GameRenderer implements Disposable {
         graphics.popMatrix();
     }
 
-    private VertexBuffer crosshairVBO;
-    private int crosshairVertexCount;
+    private Tesselator.IndexedMesh crosshairMesh;
 
     private void drawCrosshair(GraphicsAPI graphics, int screenWidth, int screenHeight) {
         int centerX = screenWidth / 2;
@@ -333,8 +332,8 @@ public class GameRenderer implements Disposable {
 
         graphics.updateShaderMatrices();
 
-        if (crosshairVBO == null) {
-            Tesselator t = Tesselator.instance;
+        if (crosshairMesh == null) {
+            Tesselator t = new Tesselator();
             t.init();
             t.color(1, 1, 1);
 
@@ -350,15 +349,18 @@ public class GameRenderer implements Disposable {
             t.vertex(centerX - 4, centerY + 1, 0.0F);
             t.vertex(centerX + 5, centerY + 1, 0.0F);
 
-            crosshairVBO = t.createVertexBuffer(GraphicsEnums.BufferUsage.STATIC);
-            crosshairVertexCount = t.getVertexCount();
+            crosshairMesh = t.createIndexedMesh(GraphicsEnums.BufferUsage.STATIC);
         }
 
-        graphics.drawPrimitives(crosshairVBO, GraphicsEnums.PrimitiveType.QUADS, 0, crosshairVertexCount);
+        crosshairMesh.draw(graphics);
     }
 
     @Override
     public void dispose() {
         // Dispose of any resources if needed
+        if (crosshairMesh != null) {
+            crosshairMesh.dispose();
+            crosshairMesh = null;
+        }
     }
 } 

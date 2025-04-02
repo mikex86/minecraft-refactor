@@ -5,23 +5,30 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BufferUsage;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.PrimitiveType;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
+import com.mojang.minecraft.renderer.graphics.IndexBuffer;
 import org.lwjgl.BufferUtils;
 
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 
 /**
  * Tesselator implementation that uses the GraphicsAPI.
  * This provides the same functionality as the original Tesselator, but
  * uses the abstracted graphics API instead of direct OpenGL calls.
+ * 
+ * This version uses indexed triangles instead of direct quads for modern GPU compatibility.
  */
 public class Tesselator implements Disposable {
     private static final int MAX_FLOATS = 262144;
+    private static final int MAX_INDICES = 262144;
 
     // CPU-side data storage
     private final FloatBuffer cpuVertexBuffer = BufferUtils.createFloatBuffer(MAX_FLOATS);
+    private final IntBuffer cpuIndexBuffer = BufferUtils.createIntBuffer(MAX_INDICES);
 
     // State tracking
     private int vertexCount = 0;
+    private int indexCount = 0;
     private int dataIndex = 0;
     private int vertexSize = 3; // xyz at minimum
 
@@ -39,7 +46,8 @@ public class Tesselator implements Disposable {
 
     // Graphics API and resources
     private final GraphicsAPI graphics;
-    private VertexBuffer buffer;
+    private VertexBuffer vertexBuffer;
+    private IndexBuffer indexBuffer;
     private VertexBuffer.VertexFormat format;
 
     public static Tesselator instance = new Tesselator();
@@ -49,7 +57,8 @@ public class Tesselator implements Disposable {
      */
     public Tesselator() {
         this.graphics = GraphicsFactory.getGraphicsAPI();
-        this.buffer = graphics.createVertexBuffer(BufferUsage.DYNAMIC);
+        this.vertexBuffer = graphics.createVertexBuffer(BufferUsage.DYNAMIC);
+        this.indexBuffer = graphics.createIndexBuffer(BufferUsage.DYNAMIC);
         clear();
     }
 
@@ -59,12 +68,26 @@ public class Tesselator implements Disposable {
     public FloatBuffer getBuffer() {
         return cpuVertexBuffer;
     }
+    
+    /**
+     * Gets the index buffer with accumulated index data
+     */
+    public IntBuffer getIndexBuffer() {
+        return cpuIndexBuffer;
+    }
 
     /**
      * Gets the current vertex count
      */
     public int getVertexCount() {
         return vertexCount;
+    }
+    
+    /**
+     * Gets the current index count
+     */
+    public int getIndexCount() {
+        return indexCount;
     }
 
     /**
@@ -93,7 +116,6 @@ public class Tesselator implements Disposable {
      */
     public void flush() {
         if (this.vertexCount > 0) {
-
             // Update format
             format = new VertexBuffer.VertexFormat(
                     true,                 // Always has positions
@@ -102,43 +124,46 @@ public class Tesselator implements Disposable {
                     false                 // No normals
             );
 
-            buffer.setFormat(format);
+            vertexBuffer.setFormat(format);
 
-            // Upload data
-            buffer.setData(cpuVertexBuffer, dataIndex * 4); // 4 bytes per float
-
+            // Upload data to GPU
+            vertexBuffer.setData(cpuVertexBuffer, dataIndex * 4); // 4 bytes per float
+            indexBuffer.setData(cpuIndexBuffer, indexCount * 4); // 4 bytes per int
 
             // Draw the vertices
-            graphics.drawPrimitives(buffer, PrimitiveType.QUADS, 0, this.vertexCount);
+            graphics.drawIndexedPrimitives(vertexBuffer, indexBuffer, PrimitiveType.TRIANGLES, 0, indexCount);
         }
 
         // Reset state
-        this.clear();
+        clear();
     }
-
-
+    
     /**
-     * Creates a vertex buffer from the current tesselator state
+     * Creates an indexed mesh from the current tesselator state
      *
      * @param bufferUsage The buffer usage hint
      * @return The created vertex buffer
      */
-    public VertexBuffer createVertexBuffer(BufferUsage bufferUsage) {
+    public IndexedMesh createIndexedMesh(BufferUsage bufferUsage) {
         // Set up vertex format based on tesselator state
         VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
-                true,                      // Always has positions
-                hasColor(),     // May have colors
-                hasTexture(),   // May have texture coords
-                false                      // No normals
+                true,                 // Always has positions
+                hasColor(),           // May have colors
+                hasTexture(),         // May have texture coords
+                false                 // No normals
         );
 
+        // Create buffers
         VertexBuffer vertexBuffer = graphics.createVertexBuffer(bufferUsage);
-
+        IndexBuffer indexBuffer = graphics.createIndexBuffer(bufferUsage);
+        
         vertexBuffer.setFormat(format);
 
         // Upload data
-        vertexBuffer.setData(cpuVertexBuffer, cpuVertexBuffer.remaining() * 4); // 4 bytes per float
-        return vertexBuffer;
+        vertexBuffer.setData(cpuVertexBuffer, dataIndex * 4); // 4 bytes per float
+        indexBuffer.setData(cpuIndexBuffer, indexCount * 4); // 4 bytes per int
+        
+        return new IndexedMesh(vertexBuffer, indexBuffer, indexCount);
     }
 
     /**
@@ -146,7 +171,9 @@ public class Tesselator implements Disposable {
      */
     private void clear() {
         this.vertexCount = 0;
+        this.indexCount = 0;
         this.cpuVertexBuffer.clear();
+        this.cpuIndexBuffer.clear();
         this.dataIndex = 0;
     }
 
@@ -213,6 +240,7 @@ public class Tesselator implements Disposable {
 
     /**
      * Add a vertex with current texture coordinates and color
+     * When every 4 vertices are added, they are converted into two triangles.
      *
      * @param x X coordinate
      * @param y Y coordinate
@@ -239,10 +267,26 @@ public class Tesselator implements Disposable {
 
         // Increment vertex count
         this.vertexCount++;
-
-        // Flush if buffer is almost full (on every 4 vertices as quads)
-        if (this.vertexCount % 4 == 0 && this.dataIndex >= MAX_FLOATS - this.vertexSize * 4) {
-            this.flush();
+        
+        // Add indices for triangles every 4 vertices (convert quad to 2 triangles)
+        if (this.vertexCount % 4 == 0) {
+            int baseVertex = this.vertexCount - 4;
+            
+            // First triangle (vertices 0, 1, 2)
+            this.cpuIndexBuffer.put(this.indexCount++, baseVertex);
+            this.cpuIndexBuffer.put(this.indexCount++, baseVertex + 1);
+            this.cpuIndexBuffer.put(this.indexCount++, baseVertex + 2);
+            
+            // Second triangle (vertices 0, 2, 3)
+            this.cpuIndexBuffer.put(this.indexCount++, baseVertex);
+            this.cpuIndexBuffer.put(this.indexCount++, baseVertex + 2);
+            this.cpuIndexBuffer.put(this.indexCount++, baseVertex + 3);
+            
+            // Flush if buffer is almost full
+            if (this.dataIndex >= MAX_FLOATS - this.vertexSize * 4 || 
+                this.indexCount >= MAX_INDICES - 6) {
+                this.flush();
+            }
         }
     }
 
@@ -263,9 +307,86 @@ public class Tesselator implements Disposable {
      */
     @Override
     public void dispose() {
-        if (buffer != null) {
-            buffer.dispose();
-            buffer = null;
+        if (vertexBuffer != null) {
+            vertexBuffer.dispose();
+            vertexBuffer = null;
+        }
+        
+        if (indexBuffer != null) {
+            indexBuffer.dispose();
+            indexBuffer = null;
+        }
+    }
+    
+    /**
+     * Represents an indexed mesh with a vertex buffer and an index buffer.
+     */
+    public static class IndexedMesh implements Disposable {
+        private final VertexBuffer vertexBuffer;
+        private final IndexBuffer indexBuffer;
+        private final int indexCount;
+        
+        /**
+         * Creates a new indexed mesh.
+         *
+         * @param vertexBuffer The vertex buffer
+         * @param indexBuffer The index buffer
+         * @param indexCount The number of indices
+         */
+        public IndexedMesh(VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int indexCount) {
+            this.vertexBuffer = vertexBuffer;
+            this.indexBuffer = indexBuffer;
+            this.indexCount = indexCount;
+        }
+        
+        /**
+         * Draws this mesh.
+         *
+         * @param graphics The graphics API
+         */
+        public void draw(GraphicsAPI graphics) {
+            graphics.drawIndexedPrimitives(vertexBuffer, indexBuffer, PrimitiveType.TRIANGLES, 0, indexCount);
+        }
+        
+        /**
+         * Gets the vertex buffer.
+         *
+         * @return The vertex buffer
+         */
+        public VertexBuffer getVertexBuffer() {
+            return vertexBuffer;
+        }
+        
+        /**
+         * Gets the index buffer.
+         *
+         * @return The index buffer
+         */
+        public IndexBuffer getIndexBuffer() {
+            return indexBuffer;
+        }
+        
+        /**
+         * Gets the number of indices.
+         *
+         * @return The number of indices
+         */
+        public int getIndexCount() {
+            return indexCount;
+        }
+        
+        /**
+         * Disposes of the resources held by this mesh.
+         */
+        @Override
+        public void dispose() {
+            if (vertexBuffer != null) {
+                vertexBuffer.dispose();
+            }
+            
+            if (indexBuffer != null) {
+                indexBuffer.dispose();
+            }
         }
     }
 }

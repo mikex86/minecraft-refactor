@@ -97,17 +97,9 @@ public class GameEngine {
      * @return true if the engine should continue running, false if it should stop
      */
     public boolean update() {
-        long nsPerFrame = 1000000000 / MAX_FPS;
-
-        long diff;
-        do {
-            diff = System.nanoTime() - lastFrameStart;
-            if (diff > YIELD_THRESHOLD_NS) {
-                Thread.yield();
-            }
-        } while (diff < nsPerFrame);
-
-        lastFrameStart = System.nanoTime();
+        if (MAX_FPS != -1) {
+            limitFPS();
+        }
 
         // Update window (swaps buffers and processes events)
         boolean shouldContinue = window.update();
@@ -143,6 +135,20 @@ public class GameEngine {
             resized = false;
         }
         return shouldContinue;
+    }
+
+    private void limitFPS() {
+        long nsPerFrame = 1000000000 / MAX_FPS;
+
+        long diff;
+        do {
+            diff = System.nanoTime() - lastFrameStart;
+            if (diff > YIELD_THRESHOLD_NS) {
+                Thread.yield();
+            }
+        } while (diff < nsPerFrame);
+
+        lastFrameStart = System.nanoTime();
     }
 
     /**

@@ -32,6 +32,14 @@ public interface GraphicsAPI {
     VertexBuffer createVertexBuffer(BufferUsage usage);
 
     /**
+     * Creates an index buffer.
+     *
+     * @param usage The intended usage pattern of the buffer
+     * @return A new index buffer
+     */
+    IndexBuffer createIndexBuffer(BufferUsage usage);
+
+    /**
      * Creates a texture.
      *
      * @param width  The texture width
@@ -66,59 +74,59 @@ public interface GraphicsAPI {
      *
      * @param depthTest Whether depth testing is enabled
      * @param depthMask Whether depth writing is enabled
-     * @param depthFunc The depth comparison function
+     * @param depthFunc The depth compare function
      */
     void setDepthState(boolean depthTest, boolean depthMask, CompareFunc depthFunc);
 
     /**
      * Sets the rasterizer state.
      *
-     * @param cullMode The cull mode
-     * @param fillMode The fill mode
+     * @param cullMode The face culling mode
+     * @param fillMode The polygon fill mode
      */
     void setRasterizerState(CullMode cullMode, FillMode fillMode);
 
     /**
-     * Sets the viewport dimensions.
+     * Sets the viewport.
      *
-     * @param x      The viewport x position
-     * @param y      The viewport y position
+     * @param x      The viewport left
+     * @param y      The viewport top
      * @param width  The viewport width
      * @param height The viewport height
      */
     void setViewport(int x, int y, int width, int height);
 
     /**
-     * Clears the current render target.
+     * Clears the color and/or depth buffer.
      *
      * @param clearColor Whether to clear the color buffer
      * @param clearDepth Whether to clear the depth buffer
-     * @param r          Red component of clear color (0.0-1.0)
-     * @param g          Green component of clear color (0.0-1.0)
-     * @param b          Blue component of clear color (0.0-1.0)
-     * @param a          Alpha component of clear color (0.0-1.0)
+     * @param r          The red component
+     * @param g          The green component
+     * @param b          The blue component
+     * @param a          The alpha component
      */
     void clear(boolean clearColor, boolean clearDepth, float r, float g, float b, float a);
 
     /**
      * Sets up a perspective projection matrix.
      *
-     * @param fov       Field of view angle in degrees
-     * @param aspect    Aspect ratio (width / height)
-     * @param nearPlane Distance to near clipping plane
-     * @param farPlane  Distance to far clipping plane
+     * @param fov       The field of view
+     * @param aspect    The aspect ratio
+     * @param nearPlane The near plane
+     * @param farPlane  The far plane
      */
     void setPerspectiveProjection(float fov, float aspect, float nearPlane, float farPlane);
 
     /**
      * Sets up an orthographic projection matrix.
      *
-     * @param left   Left coordinate
-     * @param right  Right coordinate
-     * @param bottom Bottom coordinate
-     * @param top    Top coordinate
-     * @param near   Near clipping plane
-     * @param far    Far clipping plane
+     * @param left   The left plane
+     * @param right  The right plane
+     * @param bottom The bottom plane
+     * @param top    The top plane
+     * @param near   The near plane
+     * @param far    The far plane
      */
     void setOrthographicProjection(float left, float right, float bottom, float top, float near, float far);
 
@@ -128,88 +136,98 @@ public interface GraphicsAPI {
     void pushMatrix();
 
     /**
-     * Pops the top matrix from the stack and makes it the current matrix.
+     * Pops the current matrix from the stack.
      */
     void popMatrix();
 
     /**
-     * Loads an identity matrix onto the current matrix stack.
+     * Loads the identity matrix.
      */
     void loadIdentity();
 
     /**
      * Translates the current matrix.
      *
-     * @param x X translation
-     * @param y Y translation
-     * @param z Z translation
+     * @param x The x translation
+     * @param y The y translation
+     * @param z The z translation
      */
     void translate(float x, float y, float z);
 
     /**
-     * Rotates the current matrix around the X axis.
+     * Rotates the current matrix around the x axis.
      *
-     * @param angle Angle in degrees
+     * @param angle The angle in degrees
      */
     void rotateX(float angle);
 
     /**
-     * Rotates the current matrix around the Y axis.
+     * Rotates the current matrix around the y axis.
      *
-     * @param angle Angle in degrees
+     * @param angle The angle in degrees
      */
     void rotateY(float angle);
 
     /**
-     * Rotates the current matrix around the Z axis.
+     * Rotates the current matrix around the z axis.
      *
-     * @param angle Angle in degrees
+     * @param angle The angle in degrees
      */
     void rotateZ(float angle);
 
     /**
      * Scales the current matrix.
      *
-     * @param x X scale factor
-     * @param y Y scale factor
-     * @param z Z scale factor
+     * @param x The x scale
+     * @param y The y scale
+     * @param z The z scale
      */
     void scale(float x, float y, float z);
 
     /**
-     * Sets the current matrix mode.
+     * Sets the matrix mode.
      *
      * @param mode The matrix mode
      */
     void setMatrixMode(MatrixMode mode);
 
     /**
-     * Renders primitives from the given vertex buffer.
-     *
+     * Draws primitives from a vertex buffer.
+     * 
      * @param buffer The vertex buffer
      * @param type   The primitive type
-     * @param start  The starting vertex
-     * @param count  The number of vertices
+     * @param start  The start index
+     * @param count  The number of vertices to draw
      */
     void drawPrimitives(VertexBuffer buffer, PrimitiveType type, int start, int count);
+    
+    /**
+     * Draws indexed primitives from a vertex buffer and an index buffer.
+     * 
+     * @param vertexBuffer The vertex buffer
+     * @param indexBuffer  The index buffer
+     * @param type   The primitive type
+     * @param start  The start index
+     * @param count  The number of indices to draw
+     */
+    void drawIndexedPrimitives(VertexBuffer vertexBuffer, IndexBuffer indexBuffer, PrimitiveType type, int start, int count);
 
     /**
-     * Sets the current texture.
+     * Sets the active texture.
      *
      * @param texture The texture to bind
      */
     void setTexture(Texture texture);
 
     /**
-     * Sets the current shader.
+     * Sets the active shader.
      *
-     * @param shader The shader to use, or null to use the fixed-function pipeline
+     * @param shader The shader to use
      */
     void setShader(Shader shader);
 
     /**
-     * Gets the matrix stack used by this graphics API.
-     * This provides direct access to the matrix operations and state.
+     * Gets the matrix stack.
      *
      * @return The matrix stack
      */

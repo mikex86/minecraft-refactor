@@ -5,6 +5,7 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums.*;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
+import com.mojang.minecraft.renderer.graphics.IndexBuffer;
 import com.mojang.minecraft.renderer.shader.Shader;
 
 import java.nio.ByteBuffer;
@@ -55,6 +56,11 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     @Override
     public VertexBuffer createVertexBuffer(BufferUsage usage) {
         return new OpenGLVertexBuffer(translateBufferUsage(usage));
+    }
+
+    @Override
+    public IndexBuffer createIndexBuffer(BufferUsage usage) {
+        return new OpenGLIndexBuffer(translateBufferUsage(usage));
     }
 
     @Override
@@ -245,6 +251,73 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
             glBuffer.unbind();
         } else {
             throw new IllegalArgumentException("Buffer must be an OpenGLVertexBuffer");
+        }
+    }
+
+    @Override
+    public void drawIndexedPrimitives(VertexBuffer vertexBuffer, IndexBuffer indexBuffer, PrimitiveType type, int start, int count) {
+        if (vertexBuffer instanceof OpenGLVertexBuffer && indexBuffer instanceof OpenGLIndexBuffer) {
+            OpenGLVertexBuffer glVertexBuffer = (OpenGLVertexBuffer) vertexBuffer;
+            OpenGLIndexBuffer glIndexBuffer = (OpenGLIndexBuffer) indexBuffer;
+            VertexBuffer.VertexFormat format = vertexBuffer.getFormat();
+
+            // Bind VBO and IBO
+            glVertexBuffer.bind();
+            glIndexBuffer.bind();
+
+            // Set up vertex attribute pointers
+            int stride = format.getStrideInBytes();
+            int offset = 0;
+
+            // Enable vertex arrays
+            glEnableClientState(GL_VERTEX_ARRAY);
+
+            // Set up texture coordinates if present
+            if (format.hasTexCoords()) {
+                glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+                glTexCoordPointer(2, GL_FLOAT, stride, offset);
+                offset += 2 * 4; // 2 floats * 4 bytes
+            }
+
+            // Set up colors if present
+            if (format.hasColors()) {
+                glEnableClientState(GL_COLOR_ARRAY);
+                glColorPointer(3, GL_FLOAT, stride, offset);
+                offset += 3 * 4; // 3 floats * 4 bytes
+            }
+
+            // Set up normals if present
+            if (format.hasNormals()) {
+                glEnableClientState(GL_NORMAL_ARRAY);
+                glNormalPointer(GL_FLOAT, stride, offset);
+                offset += 3 * 4; // 3 floats * 4 bytes
+            }
+
+            // Set up positions (must be present)
+            if (format.hasPositions()) {
+                glVertexPointer(3, GL_FLOAT, stride, offset);
+            }
+
+            // Draw the indexed primitives
+            glDrawElements(translatePrimitiveType(type), count, GL_UNSIGNED_INT, start * 4); // 4 bytes per int
+
+            // Disable vertex arrays
+            glDisableClientState(GL_VERTEX_ARRAY);
+            if (format.hasTexCoords()) {
+                glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+            }
+            if (format.hasColors()) {
+                glDisableClientState(GL_COLOR_ARRAY);
+            }
+            if (format.hasNormals()) {
+                glDisableClientState(GL_NORMAL_ARRAY);
+            }
+
+            // Unbind IBO and VBO
+            glIndexBuffer.unbind();
+            glVertexBuffer.unbind();
+        } else {
+            throw new IllegalArgumentException("Buffers must be OpenGL buffers");
         }
     }
 
