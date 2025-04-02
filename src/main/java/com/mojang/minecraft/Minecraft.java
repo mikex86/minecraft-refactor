@@ -54,7 +54,7 @@ public class Minecraft implements Runnable {
     public void init() throws IOException {
         try {
             // Initialize the engine
-            this.engine.initialize();
+            engine.initialize();
 
             // Create game state (manages level, entities, player)
             this.gameState = new GameState(this.textureManager);

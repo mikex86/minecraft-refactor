@@ -141,8 +141,6 @@ public class Font {
             color = (color & COLOR_DARKEN_MASK) >> 2;
         }
 
-        // Set up OpenGL for texture rendering
-        graphics.setTexturingEnabled(true);
         graphics.setTexture(this.fontTexture);
 
         // Initialize the tessellator for rendering

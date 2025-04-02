@@ -105,8 +105,6 @@ public class LevelRenderer implements LevelListener, Disposable {
      */
     public void render(int layer) {
         // Enable texturing and bind the terrain texture
-        graphics.setTexturingEnabled(true);
-
         Texture texture = textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
         graphics.setTexture(texture);
 
@@ -119,8 +117,6 @@ public class LevelRenderer implements LevelListener, Disposable {
                 chunk.render(layer);
             }
         }
-
-        graphics.setTexturingEnabled(false);
     }
 
     /**

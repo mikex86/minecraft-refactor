@@ -252,7 +252,6 @@ public class GameRenderer implements Disposable {
         graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
 
         graphics.setLighting(false, 0.0F, 0.0F, 0.0F);
-        graphics.setTexturingEnabled(false);
         graphics.setFog(false, GraphicsAPI.FogMode.LINEAR, 0, 0, 0, 0, 0, 0, 0);
 
         int screenWidth = this.width * 240 / this.height;
@@ -296,16 +295,15 @@ public class GameRenderer implements Disposable {
 
         Texture texture = this.textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
         graphics.setTexture(texture);
-        graphics.setTexturingEnabled(true);
         t.init();
         Tile.tiles[paintTexture].render(t, null, 0, 0, 0, 0);
         t.flush();
-        graphics.setTexturingEnabled(false);
         graphics.popMatrix();
     }
 
 
     private void drawCrosshair(GraphicsAPI graphics, int screenWidth, int screenHeight) {
+        graphics.setTexturingEnabled(false);
         int centerX = screenWidth / 2;
         int centerY = screenHeight / 2;
 
@@ -326,6 +324,7 @@ public class GameRenderer implements Disposable {
         t.vertex(centerX + 5, centerY + 1, 0.0F);
 
         t.flush();
+        graphics.setTexturingEnabled(true);
     }
 
     @Override

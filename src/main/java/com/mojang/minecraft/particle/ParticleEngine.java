@@ -57,11 +57,11 @@ public class ParticleEngine {
     }
 
     /**
-     * Renders all particles relative to the player's view.
-     *
-     * @param graphics     The graphics api
-     * @param player       The player viewing the particles
-     * @param partialTick Interpolation factor
+     * Renders all particles in the specified rendering layer.
+     * 
+     * @param graphics    The graphics API
+     * @param player      The player (for camera-relative positioning)
+     * @param partialTick Partial tick time
      * @param layer        Rendering layer (0 for unlit, 1 for lit)
      */
     public void render(GraphicsAPI graphics, Player player, float partialTick, int layer) {
@@ -70,7 +70,6 @@ public class ParticleEngine {
         }
 
         // Setup texture
-        graphics.setTexturingEnabled(true);
         Texture texture = this.textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
         graphics.setTexture(texture);
 
@@ -96,6 +95,5 @@ public class ParticleEngine {
 
         // Finish rendering
         tesselator.flush();
-        graphics.setTexturingEnabled(false);
     }
 }

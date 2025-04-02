@@ -257,15 +257,6 @@ public class GameWindow implements Disposable {
         });
     }
 
-    /**
-     * Sets the mouse cursor mode.
-     *
-     * @param mode The cursor mode (GLFW_CURSOR_NORMAL, GLFW_CURSOR_HIDDEN, or GLFW_CURSOR_DISABLED)
-     */
-    public void setCursorMode(int mode) {
-        glfwSetInputMode(window, GLFW_CURSOR, mode);
-    }
-
     @Override
     public void dispose() {
         if (keyCallback != null) {
@@ -301,6 +292,10 @@ public class GameWindow implements Disposable {
 
     public void setCursorCaptured(boolean captured) {
         glfwSetInputMode(window, GLFW_CURSOR, !captured ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+    }
+
+    public void requestFocus() {
+        glfwFocusWindow(window);
     }
 
     /**

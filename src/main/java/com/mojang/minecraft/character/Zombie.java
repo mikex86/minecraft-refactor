@@ -117,12 +117,12 @@ public class Zombie extends Entity {
      */
     @Override
     public void render(GraphicsAPI graphics, float partialTick) {
-        // Enable texturing
+        // Load texture
         Texture texture = this.textureManager.loadTexture("/char.png", Texture.FilterMode.NEAREST);
         graphics.setTexture(texture);
 
         graphics.pushMatrix();
-        graphics.setTexturingEnabled(true);
+        
         // Calculate animation time
         double time = (double) System.nanoTime() / SECONDS_TO_NANOS * ANIMATION_SPEED * this.speed + this.timeOffs;
 
@@ -147,7 +147,6 @@ public class Zombie extends Entity {
         // Render the model
         ZOMBIE_MODEL.render(graphics, (float) time);
 
-        graphics.setTexturingEnabled(false);
         graphics.popMatrix();
     }
 }

@@ -1,8 +1,10 @@
 package com.mojang.minecraft.renderer;
 
-import com.mojang.minecraft.renderer.graphics.*;
+import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BufferUsage;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.PrimitiveType;
+import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
+import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 import org.lwjgl.BufferUtils;
 
 import java.nio.FloatBuffer;
@@ -35,7 +37,7 @@ public class Tesselator implements Disposable {
     private boolean hasColor = false;
     private boolean hasTexture = false;
     private boolean disableColors = false;
-    
+
     // Graphics API and resources
     private final GraphicsAPI graphics;
     private VertexBuffer buffer;
@@ -108,29 +110,25 @@ public class Tesselator implements Disposable {
                     this.hasTexture,      // May have textures
                     false                 // No normals
             );
-            
+
             buffer.setFormat(format);
-            
+
             // Upload data
             buffer.setData(vertexBuffer, dataIndex * 4); // 4 bytes per float
-            
+
             // Configure rendering state
-            if (this.hasTexture) {
-                graphics.setTexturingEnabled(true);
-            } else {
-                graphics.setTexturingEnabled(false);
-            }
-            
+            graphics.setTexturingEnabled(this.hasTexture);
+
             if (this.hasColor) {
                 graphics.setVertexColorEnabled(true);
             }
-            
+
             // Draw the vertices
             graphics.drawPrimitives(buffer, PrimitiveType.QUADS, 0, this.vertexCount);
-            
+
             // Reset state
             if (this.hasColor) {
-                graphics.setVertexColorEnabled(false);
+                graphics.setVertexColorEnabled(true);
             }
         }
 
@@ -254,7 +252,7 @@ public class Tesselator implements Disposable {
         float b = (float) (c & 255) / 255.0F;
         this.color(r, g, b);
     }
-    
+
     /**
      * Disposes of any GPU resources held by this tesselator.
      */
