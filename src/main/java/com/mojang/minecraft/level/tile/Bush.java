@@ -47,51 +47,47 @@ public class Bush extends Tile {
      *
      * @param t     The tesselator for rendering
      * @param level The current level
-     * @param layer The render layer
      * @param x     X coordinate
      * @param y     Y coordinate
      * @param z     Z coordinate
      */
     @Override
-    public void render(Tesselator t, Level level, int layer, int x, int y, int z) {
-        // Only render if the lighting condition is appropriate for this layer
-        if (level == null || level.isLit(x, y, z) == (layer != 1)) {
-            int tex = this.getTexture(this.tex);
-            float u0 = (tex % 16) / 16.0F;
-            float u1 = u0 + 0.0624375F;
-            float v0 = (tex / 16) / 16.0F;
-            float v1 = v0 + 0.0624375F;
-            int rotations = 2; // Number of crossed planes
+    public void render(Tesselator t, Level level, int x, int y, int z) {
+        int tex = this.getTexture(this.tex);
+        float u0 = (tex % 16) / 16.0F;
+        float u1 = u0 + 0.0624375F;
+        float v0 = (tex / 16) / 16.0F;
+        float v1 = v0 + 0.0624375F;
+        int rotations = 2; // Number of crossed planes
 
-            t.color(1.0F, 1.0F, 1.0F);
+        t.color(1.0F, 1.0F, 1.0F);
 
-            // Render crossed planes
-            for (int r = 0; r < rotations; ++r) {
-                // Calculate rotation angle and offsets
-                float angle = (float) (r * Math.PI / rotations + (Math.PI / 4D));
-                float xa = (float) (Math.sin(angle) * 0.5F);
-                float za = (float) (Math.cos(angle) * 0.5F);
+        // Render crossed planes
+        for (int r = 0; r < rotations; ++r) {
+            // Calculate rotation angle and offsets
+            float angle = (float) (r * Math.PI / rotations + (Math.PI / 4D));
+            float xa = (float) (Math.sin(angle) * 0.5F);
+            float za = (float) (Math.cos(angle) * 0.5F);
 
-                // Calculate vertex positions
-                float x0 = x + 0.5F - xa;
-                float x1 = x + 0.5F + xa;
-                float y0 = y;
-                float y1 = y + 1.0F;
-                float z0 = z + 0.5F - za;
-                float z1 = z + 0.5F + za;
+            // Calculate vertex positions
+            float x0 = x + 0.5F - xa;
+            float x1 = x + 0.5F + xa;
+            float y0 = y;
+            float y1 = y + 1.0F;
+            float z0 = z + 0.5F - za;
+            float z1 = z + 0.5F + za;
 
-                // First triangle of the plane
-                t.vertexUV(x0, y1, z0, u1, v0);
-                t.vertexUV(x1, y1, z1, u0, v0);
-                t.vertexUV(x1, y0, z1, u0, v1);
-                t.vertexUV(x0, y0, z0, u1, v1);
+            // First triangle of the plane
+            t.vertexUV(x0, y1, z0, u1, v0);
+            t.vertexUV(x1, y1, z1, u0, v0);
+            t.vertexUV(x1, y0, z1, u0, v1);
+            t.vertexUV(x0, y0, z0, u1, v1);
 
-                // Second triangle (back face)
-                t.vertexUV(x1, y1, z1, u0, v0);
-                t.vertexUV(x0, y1, z0, u1, v0);
-                t.vertexUV(x0, y0, z0, u1, v1);
-                t.vertexUV(x1, y0, z1, u0, v1);
-            }
+            // Second triangle (back face)
+            t.vertexUV(x1, y1, z1, u0, v0);
+            t.vertexUV(x0, y1, z0, u1, v0);
+            t.vertexUV(x0, y0, z0, u1, v1);
+            t.vertexUV(x1, y0, z1, u0, v1);
         }
     }
 

@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
  * It provides methods to create and manage graphics resources.
  */
 public interface GraphicsAPI {
+
     /**
      * Initialize the graphics API.
      * This should be called once at the start of the application.

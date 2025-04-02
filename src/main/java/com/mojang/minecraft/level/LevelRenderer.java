@@ -108,11 +108,9 @@ public class LevelRenderer implements LevelListener, Disposable {
     }
 
     /**
-     * Renders the level for the specified layer.
-     *
-     * @param layer 0 for lit areas (day), 1 for unlit areas (night)
+     * Renders the level
      */
-    public void render(int layer) {
+    public void render() {
         // Enable texturing and bind the terrain texture
         Texture texture = textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
         graphics.setTexture(texture);
@@ -123,7 +121,7 @@ public class LevelRenderer implements LevelListener, Disposable {
         // Render all visible chunks
         for (Chunk chunk : this.chunks) {
             if (frustum.isVisible(chunk.aabb)) {
-                chunk.render(layer);
+                chunk.render();
             }
         }
     }

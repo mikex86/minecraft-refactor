@@ -12,8 +12,6 @@ import com.mojang.minecraft.renderer.Tesselator;
  * Designed to support cubic chunks in the future.
  */
 public class Chunk implements Disposable {
-    // Constants
-    private static final int LAYER_COUNT = 2;
 
     // Bounding box for this chunk
     public AABB aabb;
@@ -36,7 +34,7 @@ public class Chunk implements Disposable {
 
     // Rendering state
     private boolean dirty = true;
-    private final ChunkMesh[] meshes;
+    private final ChunkMesh chunkMesh;
     public long dirtiedTime = 0L;
 
     // Static rendering stats
@@ -69,30 +67,23 @@ public class Chunk implements Disposable {
 
         // Create bounding box and meshes
         this.aabb = new AABB((float) x0, (float) y0, (float) z0, (float) x1, (float) y1, (float) z1);
-        this.meshes = new ChunkMesh[LAYER_COUNT];
-        
-        // Initialize meshes for each layer
-        for (int i = 0; i < LAYER_COUNT; i++) {
-            this.meshes[i] = new ChunkMesh();
-        }
+        this.chunkMesh = new ChunkMesh();
     }
 
     /**
-     * Rebuilds the chunk mesh for the specified layer.
+     * Rebuilds the chunk mesh
      */
-    private void rebuild(int layer) {
-        if (!this.dirty && !this.meshes[layer].isDirty()) {
+    public void rebuild() {
+        if (!this.dirty && !chunkMesh.isDirty()) {
             return;
         }
-        
+
         ++updates;
         long startTime = System.nanoTime();
-        
-        // Get the tesselator for this layer
-        ChunkMesh mesh = this.meshes[layer];
-        Tesselator tesselator = mesh.getTesselator();
+
+        Tesselator tesselator = chunkMesh.getTesselator();
         tesselator.init();
-        
+
         int renderedTiles = 0;
 
         // Render all visible tiles in the chunk
@@ -101,16 +92,16 @@ public class Chunk implements Disposable {
                 for (int z = this.z0; z < this.z1; ++z) {
                     int tileId = this.level.getTile(x, y, z);
                     if (tileId > 0) {
-                        Tile.tiles[tileId].render(tesselator, level, layer, x, y, z);
+                        Tile.tiles[tileId].render(tesselator, level, x, y, z);
                         ++renderedTiles;
                     }
                 }
             }
         }
-        
+
         // Rebuild the mesh with the accumulated data
-        mesh.rebuild();
-        
+        chunkMesh.rebuild();
+
         long endTime = System.nanoTime();
 
         // Update rendering statistics
@@ -118,25 +109,14 @@ public class Chunk implements Disposable {
             totalTime += endTime - startTime;
             ++totalUpdates;
         }
-    }
-
-    /**
-     * Rebuilds all layer meshes of the chunk.
-     */
-    public void rebuild() {
-        for (int i = 0; i < LAYER_COUNT; i++) {
-            this.rebuild(i);
-        }
         this.dirty = false;
     }
 
     /**
-     * Renders the specified layer of the chunk.
+     * Renders the given chunk
      */
-    public void render(int layer) {
-        if (layer >= 0 && layer < LAYER_COUNT) {
-            this.meshes[layer].render();
-        }
+    public void render() {
+        this.chunkMesh.render();
     }
 
     /**
@@ -147,11 +127,7 @@ public class Chunk implements Disposable {
             this.dirtiedTime = System.currentTimeMillis();
         }
         this.dirty = true;
-        
-        // Mark all meshes as dirty
-        for (ChunkMesh mesh : this.meshes) {
-            mesh.setDirty();
-        }
+        this.chunkMesh.setDirty();
     }
 
     /**
@@ -170,17 +146,13 @@ public class Chunk implements Disposable {
         float zDistance = player.z - this.z;
         return xDistance * xDistance + yDistance * yDistance + zDistance * zDistance;
     }
-    
+
     /**
      * Disposes of this chunk's resources.
      * Should be called when the chunk is no longer needed.
      */
     @Override
     public void dispose() {
-        for (ChunkMesh mesh : this.meshes) {
-            if (mesh != null) {
-                mesh.dispose();
-            }
-        }
+        chunkMesh.dispose();
     }
 }

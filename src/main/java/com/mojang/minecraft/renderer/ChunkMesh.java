@@ -11,9 +11,7 @@ import java.nio.FloatBuffer;
 import java.util.Objects;
 
 /**
- * Handles VBO-based rendering for a single chunk section.
- * Each ChunkMesh represents one layer of rendering data for a section of a chunk.
- * This design supports moving toward cubic chunks in the future.
+ * Handles VBO-based rendering for a chunk mesh.
  */
 public class ChunkMesh implements Disposable {
     // Graphics resources

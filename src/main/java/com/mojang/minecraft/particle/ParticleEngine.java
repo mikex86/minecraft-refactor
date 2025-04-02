@@ -7,8 +7,6 @@ import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.Texture;
-import com.mojang.minecraft.renderer.shader.ShaderRegistry;
-import com.mojang.minecraft.renderer.shader.impl.ParticleShader;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -61,14 +59,13 @@ public class ParticleEngine {
     }
 
     /**
-     * Renders all particles in the specified rendering layer.
+     * Renders all particles managed by the particle engine
      *
      * @param graphics    The graphics API
      * @param player      The player (for camera-relative positioning)
      * @param partialTick Partial tick time
-     * @param layer       Rendering layer (0 for unlit, 1 for lit)
      */
-    public void render(GraphicsAPI graphics, Player player, float partialTick, int layer) {
+    public void render(GraphicsAPI graphics, Player player, float partialTick) {
         if (this.particles.isEmpty()) {
             return;
         }
@@ -94,10 +91,7 @@ public class ParticleEngine {
 
         // Render each particle
         for (Particle particle : this.particles) {
-            // Render particle if it matches the current lighting layer
-            if (particle.isLit() ^ layer == 1) {
-                particle.render(tesselator, partialTick, xa, ya, za, xa2, za2);
-            }
+            particle.render(tesselator, partialTick, xa, ya, za, xa2, za2);
         }
 
         // Finish rendering

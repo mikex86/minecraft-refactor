@@ -8,7 +8,10 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.particle.ParticleEngine;
-import com.mojang.minecraft.renderer.graphics.*;
+import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
+import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
+import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.shader.ShaderRegistry;
 import com.mojang.minecraft.renderer.shader.impl.*;
 import com.mojang.minecraft.world.HitResult;
@@ -180,8 +183,7 @@ public class GameRenderer implements Disposable {
         // Update chunks that have changed
         this.levelRenderer.updateDirtyChunks(this.player);
 
-        renderLayer(true, partialTick);
-        renderLayer(false, partialTick);
+        render(partialTick);
 
         // Render block selection highlight
         if (hitResult != null) {
@@ -194,28 +196,26 @@ public class GameRenderer implements Disposable {
         }
     }
 
-    private void renderLayer(boolean lit, float partialTick) {
-        int layer = lit ? 0 : 1;
-
+    private void render(float partialTick) {
         Frustum frustum = Frustum.getFrustum(graphics);
 
         // render level
         {
             graphics.setShader(worldShader);
             graphics.updateShaderMatrices();
-            setupFog(worldShader, layer);
+            setupFog(worldShader);
 
-            this.levelRenderer.render(layer);
+            this.levelRenderer.render();
         }
 
         // render entities
         {
             graphics.setShader(entityShader);
             // cannot set matrices "globally" because entities transform themselves
-            setupFog(entityShader, layer);
+            setupFog(entityShader);
 
             for (Entity entity : this.entities) {
-                if ((entity.isLit() == lit) && frustum.isVisible(entity.bb)) {
+                if (frustum.isVisible(entity.bb)) {
                     entity.render(this.graphics, partialTick);
                 }
             }
@@ -225,27 +225,15 @@ public class GameRenderer implements Disposable {
         {
             graphics.setShader(particleShader);
             graphics.updateShaderMatrices();
-            setupFog(particleShader, layer);
-            this.particleEngine.render(this.graphics, this.player, partialTick, layer);
+            setupFog(particleShader);
+            this.particleEngine.render(this.graphics, this.player, partialTick);
         }
     }
 
-    /**
-     * Configures the fog settings for different rendering passes.
-     *
-     * @param fogShader the fog shader to configure
-     * @param mode      0 for lit areas (day), 1 for unlit areas (night)
-     */
-    private void setupFog(FogShader fogShader, int mode) {
-        if (mode == 0) {
-            fogShader.setFogUniforms(true, GraphicsAPI.FogMode.EXP, 0.001F, 0.0F, 10.0F,
-                    0.5F, 0.8F, 1.0F, 1.0F);
+    private void setupFog(FogShader fogShader) {
+        fogShader.setFogUniforms(true, GraphicsAPI.FogMode.EXP, 0.001F, 0.0F, 10.0F,
+                0.5F, 0.8F, 1.0F, 1.0F);
 
-        } else if (mode == 1) {
-            // Night fog (darker, closer)
-            fogShader.setFogUniforms(true, GraphicsAPI.FogMode.EXP, 0.01F, 0.0F, 0.0F,
-                    0.0F, 0.0F, 0.0F, 1.0F);
-        }
     }
 
     /**
@@ -319,7 +307,7 @@ public class GameRenderer implements Disposable {
         Texture texture = this.textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
         graphics.setTexture(texture);
         t.init();
-        Tile.tiles[paintTexture].render(t, null, 0, 0, 0, 0);
+        Tile.tiles[paintTexture].render(t, null, 0, 0, 0);
         t.flush();
         graphics.popMatrix();
     }

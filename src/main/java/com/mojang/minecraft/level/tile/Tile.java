@@ -88,48 +88,47 @@ public class Tile {
      *
      * @param t     The tesselator for rendering
      * @param level The current level
-     * @param layer The render layer
      * @param x     X coordinate
      * @param y     Y coordinate
      * @param z     Z coordinate
      */
-    public void render(Tesselator t, Level level, int layer, int x, int y, int z) {
+    public void render(Tesselator t, Level level, int x, int y, int z) {
         float c1 = 1.0F;  // Top/bottom face lighting (100%)
         float c2 = 0.8F;  // North/south face lighting (80%)
         float c3 = 0.6F;  // East/west face lighting (60%)
 
         // Bottom face
-        if (shouldRenderFace(level, x, y - 1, z, layer)) {
+        if (shouldRenderFace(level, x, y - 1, z)) {
             t.color(c1, c1, c1);
             renderFace(t, x, y, z, 0);
         }
 
         // Top face
-        if (shouldRenderFace(level, x, y + 1, z, layer)) {
+        if (shouldRenderFace(level, x, y + 1, z)) {
             t.color(c1, c1, c1);
             renderFace(t, x, y, z, 1);
         }
 
         // North face
-        if (shouldRenderFace(level, x, y, z - 1, layer)) {
+        if (shouldRenderFace(level, x, y, z - 1)) {
             t.color(c2, c2, c2);
             renderFace(t, x, y, z, 2);
         }
 
         // South face
-        if (shouldRenderFace(level, x, y, z + 1, layer)) {
+        if (shouldRenderFace(level, x, y, z + 1)) {
             t.color(c2, c2, c2);
             renderFace(t, x, y, z, 3);
         }
 
         // West face
-        if (shouldRenderFace(level, x - 1, y, z, layer)) {
+        if (shouldRenderFace(level, x - 1, y, z)) {
             t.color(c3, c3, c3);
             renderFace(t, x, y, z, 4);
         }
 
         // East face
-        if (shouldRenderFace(level, x + 1, y, z, layer)) {
+        if (shouldRenderFace(level, x + 1, y, z)) {
             t.color(c3, c3, c3);
             renderFace(t, x, y, z, 5);
         }
@@ -142,14 +141,13 @@ public class Tile {
      * @param x     X coordinate
      * @param y     Y coordinate
      * @param z     Z coordinate
-     * @param layer The render layer
      * @return True if the face should be rendered
      */
-    private boolean shouldRenderFace(Level level, int x, int y, int z, int layer) {
+    private boolean shouldRenderFace(Level level, int x, int y, int z) {
         if (level == null) {
             return true;
         }
-        return !level.isSolidTile(x, y, z) && (level.isLit(x, y, z) ^ layer == 1);
+        return !level.isSolidTile(x, y, z);
     }
 
     /**
