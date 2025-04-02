@@ -7,7 +7,11 @@ import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.Texture;
+import com.mojang.minecraft.renderer.shader.ShaderRegistry;
+import com.mojang.minecraft.renderer.shader.impl.WorldShader;
+import org.lwjgl.BufferUtils;
 
+import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,6 +33,10 @@ public class LevelRenderer implements LevelListener, Disposable {
     // Graphics resources
     private final GraphicsAPI graphics;
     private final TextureManager textureManager;
+
+    // Matrix buffers for shader
+    private final FloatBuffer modelViewMatrix = BufferUtils.createFloatBuffer(16);
+    private final FloatBuffer projectionMatrix = BufferUtils.createFloatBuffer(16);
 
     /**
      * Creates a new GraphicsLevelRenderer for the specified level.
@@ -98,6 +106,30 @@ public class LevelRenderer implements LevelListener, Disposable {
         return dirtyChunks;
     }
 
+
+    /**
+     * Configures the fog settings for different rendering passes.
+     *
+     * @param mode 0 for lit areas (day), 1 for unlit areas (night)
+     */
+    private void setupFog(int mode) {
+        // Get the world shader
+        WorldShader worldShader = ShaderRegistry.getInstance().getWorldShader();
+
+        if (mode == 0) {
+            worldShader.setFogUniforms(true, GraphicsAPI.FogMode.EXP, 0.001F, 0.0F, 10.0F,
+                    0.5F, 0.8F, 1.0F, 1.0F);
+            graphics.setLighting(false, 0.0F, 0.0F, 0.0F);
+
+        } else if (mode == 1) {
+            // Night fog (darker, closer)
+            worldShader.setFogUniforms(true, GraphicsAPI.FogMode.EXP, 0.01F, 0.0F, 0.0F,
+                    0.0F, 0.0F, 0.0F, 1.0F);
+
+            graphics.setLighting(true, 0.6F, 0.6F, 0.6F);
+        }
+    }
+
     /**
      * Renders the level for the specified layer.
      *
@@ -108,6 +140,12 @@ public class LevelRenderer implements LevelListener, Disposable {
         Texture texture = textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
         graphics.setTexture(texture);
 
+        // Use the world shader for rendering
+        WorldShader worldShader = ShaderRegistry.getInstance().getWorldShader();
+
+        graphics.setShader(worldShader);
+        setupFog(layer);
+
         // Get the current view frustum
         Frustum frustum = Frustum.getFrustum();
 
@@ -117,8 +155,10 @@ public class LevelRenderer implements LevelListener, Disposable {
                 chunk.render(layer);
             }
         }
-    }
 
+        // Detach shader
+        graphics.setShader(null);
+    }
     /**
      * Updates chunks that need to be rebuilt.
      */

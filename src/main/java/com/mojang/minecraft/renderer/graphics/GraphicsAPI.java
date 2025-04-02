@@ -1,6 +1,7 @@
 package com.mojang.minecraft.renderer.graphics;
 
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.*;
+import com.mojang.minecraft.renderer.shader.Shader;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
@@ -213,22 +214,7 @@ public interface GraphicsAPI {
      * @param enabled Whether vertex colors are enabled
      */
     void setVertexColorEnabled(boolean enabled);
-    
-    /**
-     * Sets the current fog parameters.
-     * 
-     * @param enabled Whether fog is enabled
-     * @param mode    The fog mode
-     * @param density The fog density
-     * @param start   The fog start distance
-     * @param end     The fog end distance
-     * @param r       Red component of fog color (0.0-1.0)
-     * @param g       Green component of fog color (0.0-1.0)
-     * @param b       Blue component of fog color (0.0-1.0)
-     * @param a       Alpha component of fog color (0.0-1.0)
-     */
-    void setFog(boolean enabled, FogMode mode, float density, float start, float end, float r, float g, float b, float a);
-    
+
     /**
      * Sets the current light parameters.
      * 
@@ -238,6 +224,13 @@ public interface GraphicsAPI {
      * @param ambientB     Blue component of ambient light (0.0-1.0)
      */
     void setLighting(boolean enabled, float ambientR, float ambientG, float ambientB);
+    
+    /**
+     * Sets the current shader.
+     * 
+     * @param shader The shader to use, or null to use the fixed-function pipeline
+     */
+    void setShader(Shader shader);
     
     /**
      * Matrix modes for the graphics API.

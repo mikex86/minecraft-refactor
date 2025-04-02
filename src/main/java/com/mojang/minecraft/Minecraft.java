@@ -2,10 +2,10 @@ package com.mojang.minecraft;
 
 import com.mojang.minecraft.crash.CrashReporter;
 import com.mojang.minecraft.engine.GameEngine;
-import com.mojang.minecraft.gui.Font;
 import com.mojang.minecraft.input.GameInputHandler;
 import com.mojang.minecraft.renderer.GameRenderer;
 import com.mojang.minecraft.renderer.TextureManager;
+import com.mojang.minecraft.renderer.shader.ShaderRegistry;
 import com.mojang.minecraft.util.logging.LoggingUtils;
 import com.mojang.minecraft.world.HitResult;
 
@@ -21,6 +21,7 @@ public class Minecraft implements Runnable {
 
     // Core systems
     private final GameEngine engine;
+    private final ShaderRegistry shaderRegistry;
     private GameInputHandler gameInputHandler;
     private GameRenderer renderer;
 
@@ -44,6 +45,7 @@ public class Minecraft implements Runnable {
     public Minecraft(int width, int height, boolean fullscreen) {
         this.engine = new GameEngine(width, height, fullscreen, "Minecraft " + VERSION_STRING);
         this.textureManager = new TextureManager();
+        this.shaderRegistry = ShaderRegistry.getInstance();
     }
 
     /**
@@ -55,6 +57,9 @@ public class Minecraft implements Runnable {
         try {
             // Initialize the engine
             engine.initialize();
+            
+            // Initialize the shader manager
+            shaderRegistry.initialize();
 
             // Create game state (manages level, entities, player)
             this.gameState = new GameState(this.textureManager);
@@ -98,6 +103,7 @@ public class Minecraft implements Runnable {
             }
             engine.shutdown();
             textureManager.dispose();
+            shaderRegistry.dispose();
         } catch (Exception e) {
             CrashReporter.handleError("Failed to clean up resources during shutdown", e);
         }

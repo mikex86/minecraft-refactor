@@ -146,26 +146,6 @@ public class GameRenderer implements Disposable {
     }
 
     /**
-     * Configures the fog settings for different rendering passes.
-     *
-     * @param mode 0 for lit areas (day), 1 for unlit areas (night)
-     */
-    private void setupFog(int mode) {
-        if (mode == 0) {
-            // Day fog (lighter, more distant)
-            graphics.setFog(true, GraphicsAPI.FogMode.EXP, 0.001F, 0.0F, 0.0F,
-                    0.5F, 0.8F, 1.0F, 1.0F);
-            graphics.setLighting(false, 0.0F, 0.0F, 0.0F);
-
-        } else if (mode == 1) {
-            // Night fog (darker, closer)
-            graphics.setFog(true, GraphicsAPI.FogMode.EXP, 0.01F, 0.0F, 0.0F,
-                    0.0F, 0.0F, 0.0F, 1.0F);
-            graphics.setLighting(true, 0.6F, 0.6F, 0.6F);
-        }
-    }
-
-    /**
      * Renders a single frame of the game.
      *
      * @param partialTick  Interpolation factor between ticks (0.0-1.0)
@@ -194,7 +174,6 @@ public class GameRenderer implements Disposable {
         this.levelRenderer.updateDirtyChunks(this.player);
 
         // Render lit parts of the level
-        this.setupFog(0);
         this.levelRenderer.render(0);
 
         // Render lit entities
@@ -208,7 +187,6 @@ public class GameRenderer implements Disposable {
         this.particleEngine.render(this.graphics, this.player, partialTick, 0);
 
         // Render unlit parts of the level
-        this.setupFog(1);
         this.levelRenderer.render(1);
 
         // Render unlit entities
@@ -252,7 +230,6 @@ public class GameRenderer implements Disposable {
         graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
 
         graphics.setLighting(false, 0.0F, 0.0F, 0.0F);
-        graphics.setFog(false, GraphicsAPI.FogMode.LINEAR, 0, 0, 0, 0, 0, 0, 0);
 
         int screenWidth = this.width * 240 / this.height;
         int screenHeight = this.height * 240 / this.height;

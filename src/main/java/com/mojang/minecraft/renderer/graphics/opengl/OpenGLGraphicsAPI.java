@@ -2,6 +2,9 @@ package com.mojang.minecraft.renderer.graphics.opengl;
 
 import com.mojang.minecraft.renderer.graphics.*;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.*;
+import com.mojang.minecraft.renderer.graphics.Texture;
+import com.mojang.minecraft.renderer.graphics.VertexBuffer;
+import com.mojang.minecraft.renderer.shader.Shader;
 import org.lwjgl.BufferUtils;
 
 import java.nio.ByteBuffer;
@@ -9,6 +12,7 @@ import java.nio.FloatBuffer;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
+import static org.lwjgl.opengl.GL20.*;
 
 /**
  * OpenGL implementation of the GraphicsAPI interface.
@@ -19,6 +23,13 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     // OpenGL-specific resources
     private final FloatBuffer matrixBuffer;
     private final FloatBuffer colorBuffer;
+    
+    // Current shader
+    private Shader currentShader = null;
+    
+    // Matrix buffers
+    private final FloatBuffer modelViewBuffer = BufferUtils.createFloatBuffer(16);
+    private final FloatBuffer projectionBuffer = BufferUtils.createFloatBuffer(16);
     
     /**
      * Creates a new OpenGL graphics API implementation.
@@ -315,32 +326,17 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
             glDisable(GL_COLOR_MATERIAL);
         }
     }
-    
+
     @Override
-    public void setFog(boolean enabled, FogMode mode, float density, float start, float end, float r, float g, float b, float a) {
-        if (enabled) {
-            glEnable(GL_FOG);
-            glFogi(GL_FOG_MODE, translateFogMode(mode));
-            
-            switch (mode) {
-                case LINEAR:
-                    glFogf(GL_FOG_START, start);
-                    glFogf(GL_FOG_END, end);
-                    break;
-                case EXP:
-                case EXP2:
-                    glFogf(GL_FOG_DENSITY, density);
-                    break;
-            }
-            
-            // Set fog color
-            colorBuffer.clear();
-            colorBuffer.put(r).put(g).put(b).put(a);
-            colorBuffer.flip();
-            glFogfv(GL_FOG_COLOR, colorBuffer);
-            
+    public void setShader(Shader shader) {
+        if (shader != null) {
+            shader.use();
+            currentShader = shader;
         } else {
-            glDisable(GL_FOG);
+            if (currentShader != null) {
+                currentShader.detach();
+                currentShader = null;
+            }
         }
     }
     

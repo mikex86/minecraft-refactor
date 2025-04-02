@@ -4,7 +4,6 @@ import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.TextureFormat;
 
 import java.nio.ByteBuffer;
-import org.lwjgl.BufferUtils;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.*;
