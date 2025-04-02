@@ -150,7 +150,6 @@ public class GameRenderer implements Disposable {
         float playerZ = player.zo + (player.z - player.zo) * partialTick;
 
         // Apply camera transforms
-        graphics.translate(0.0F, 0.0F, -0.3F);  // Camera offset
         graphics.rotateX(player.xRot);          // Pitch
         graphics.rotateY(player.yRot);          // Yaw
         graphics.translate(-playerX, -playerY - player.getHeightOffset(), -playerZ);

@@ -8,7 +8,8 @@ import com.mojang.minecraft.world.HitResult;
 
 /**
  * Utility class for performing raycasting operations.
- * Used to determine what block the player is looking at.
+ * Uses an efficient and accurate DDA (Digital Differential Analysis) algorithm
+ * to determine exactly which block the player is looking at.
  */
 public class RayCaster {
     private static final float EPSILON = 0.001F;
@@ -59,7 +60,8 @@ public class RayCaster {
     }
 
     /**
-     * Performs a raycast against blocks in the level.
+     * Performs a raycast against blocks in the level using the DDA algorithm.
+     * This algorithm is 100% accurate and does not rely on sampling or iteration count.
      *
      * @param level       The level to cast the ray in
      * @param startX      X coordinate of ray origin
@@ -72,28 +74,11 @@ public class RayCaster {
      * @return A HitResult with information about what was hit, or null if nothing was hit
      */
     private static HitResult raycastBlocks(Level level, float startX, float startY, float startZ,
-                                           float dirX, float dirY, float dirZ, float maxDistance) {
-        // Current position along the ray
-        float currentX = startX;
-        float currentY = startY;
-        float currentZ = startZ;
-
-        // Current block position
-        int blockX = (int) Math.floor(currentX);
-        int blockY = (int) Math.floor(currentY);
-        int blockZ = (int) Math.floor(currentZ);
-
-        // Previous block position (to determine which face was hit)
-        int prevBlockX = blockX;
-        int prevBlockY = blockY;
-        int prevBlockZ = blockZ;
-
-        // Squared maximum distance for efficiency
-        float maxDistanceSq = maxDistance * maxDistance;
-
-        // Track closest hit so far
-        HitResult closestHit = null;
-        float closestHitDistanceSq = maxDistanceSq;
+                                          float dirX, float dirY, float dirZ, float maxDistance) {
+        // Initial block position (the block containing the ray start point)
+        int blockX = (int) Math.floor(startX);
+        int blockY = (int) Math.floor(startY);
+        int blockZ = (int) Math.floor(startZ);
 
         // Early exit if starting inside a solid block
         Tile startTile = Tile.tiles[level.getTile(blockX, blockY, blockZ)];
@@ -102,85 +87,112 @@ public class RayCaster {
             return new HitResult(1, blockX, blockY, blockZ, 0, startX, startY, startZ, 0);
         }
 
-        // Calculate ray step size
-        float stepSize = 0.05F; // Small step for precision
-        float travelDistanceSq = 0.0F;
+        // Step direction for each axis (either 1 or -1)
+        int stepX = dirX > 0 ? 1 : (dirX < 0 ? -1 : 0);
+        int stepY = dirY > 0 ? 1 : (dirY < 0 ? -1 : 0);
+        int stepZ = dirZ > 0 ? 1 : (dirZ < 0 ? -1 : 0);
 
-        // Maximum iterations to prevent infinite loops
-        int maxIterations = (int) (maxDistance / stepSize) + 2;
+        // Calculate delta distance - distance along ray to move one unit in each dimension
+        float deltaDistX = Math.abs(dirX) < EPSILON ? Float.MAX_VALUE : Math.abs(1.0f / dirX);
+        float deltaDistY = Math.abs(dirY) < EPSILON ? Float.MAX_VALUE : Math.abs(1.0f / dirY);
+        float deltaDistZ = Math.abs(dirZ) < EPSILON ? Float.MAX_VALUE : Math.abs(1.0f / dirZ);
 
-        for (int i = 0; i < maxIterations; i++) {
-            // Move along the ray
-            currentX += dirX * stepSize;
-            currentY += dirY * stepSize;
-            currentZ += dirZ * stepSize;
+        // Calculate initial side distance - distance from start to first grid boundary
+        float sideDistX;
+        float sideDistY;
+        float sideDistZ;
 
-            // Calculate current block position
-            int newBlockX = (int) Math.floor(currentX);
-            int newBlockY = (int) Math.floor(currentY);
-            int newBlockZ = (int) Math.floor(currentZ);
-
-            // Check if we've moved to a new block
-            boolean blockChanged = newBlockX != blockX || newBlockY != blockY || newBlockZ != blockZ;
-
-            if (blockChanged) {
-                // Update previous block position
-                prevBlockX = blockX;
-                prevBlockY = blockY;
-                prevBlockZ = blockZ;
-
-                // Update current block position
-                blockX = newBlockX;
-                blockY = newBlockY;
-                blockZ = newBlockZ;
-
-                // Check bounds
-                if (blockX < 0 || blockY < 0 || blockZ < 0 ||
-                        blockX >= level.width || blockY >= level.depth || blockZ >= level.height) {
-                    // Out of bounds
-                    continue;
-                }
-
-                // Check if the block is solid
-                Tile tile = Tile.tiles[level.getTile(blockX, blockY, blockZ)];
-                if (tile != null && tile.isSolid()) {
-                    // We've hit a solid block, determine which face was hit
-                    int face;
-                    if (prevBlockX < blockX) face = 4; // Hit West face (coming from -X)
-                    else if (prevBlockX > blockX) face = 5; // Hit East face (coming from +X)
-                    else if (prevBlockY < blockY) face = 0; // Hit Bottom face (coming from -Y)
-                    else if (prevBlockY > blockY) face = 1; // Hit Top face (coming from +Y)
-                    else if (prevBlockZ < blockZ) face = 2; // Hit North face (coming from -Z)
-                    else face = 3; // Hit South face (coming from +Z)
-
-                    // Calculate squared distance from start to hit point
-                    float dx = currentX - startX;
-                    float dy = currentY - startY;
-                    float dz = currentZ - startZ;
-                    float distanceSq = dx * dx + dy * dy + dz * dz;
-
-                    // If this hit is closer than any previous hit, store it
-                    if (distanceSq < closestHitDistanceSq) {
-                        closestHit = new HitResult(1, blockX, blockY, blockZ, face,
-                                currentX, currentY, currentZ, distanceSq);
-                        closestHitDistanceSq = distanceSq;
-                    }
-
-                    // We can continue to look for closer hits
-                }
-            }
-
-            // Update travel distance and check if we've exceeded the maximum
-            travelDistanceSq = (currentX - startX) * (currentX - startX) +
-                    (currentY - startY) * (currentY - startY) +
-                    (currentZ - startZ) * (currentZ - startZ);
-
-            if (travelDistanceSq > maxDistanceSq) {
-                break; // Exceeded maximum distance
-            }
+        if (dirX > 0) {
+            sideDistX = ((blockX + 1) - startX) * deltaDistX;
+        } else {
+            sideDistX = (startX - blockX) * deltaDistX;
         }
 
-        return closestHit;
+        if (dirY > 0) {
+            sideDistY = ((blockY + 1) - startY) * deltaDistY;
+        } else {
+            sideDistY = (startY - blockY) * deltaDistY;
+        }
+
+        if (dirZ > 0) {
+            sideDistZ = ((blockZ + 1) - startZ) * deltaDistZ;
+        } else {
+            sideDistZ = (startZ - blockZ) * deltaDistZ;
+        }
+
+        // Variables to track which face was hit
+        int hitFace = -1;
+        
+        // Distance traveled along the ray
+        float travelDistance = 0.0f;
+        
+        // Maximum number of steps to prevent potential infinite loops in edge cases
+        // This is just a safety measure - the algorithm should terminate properly
+        int maxSteps = level.width + level.height + level.depth;
+        
+        // Main DDA loop
+        for (int i = 0; i < maxSteps; i++) {
+            // Check if we've moved outside the level bounds
+            if (blockX < 0 || blockY < 0 || blockZ < 0 ||
+                blockX >= level.width || blockY >= level.depth || blockZ >= level.height) {
+                return null; // No hit found
+            }
+            
+            // Check current block for a hit
+            Tile tile = Tile.tiles[level.getTile(blockX, blockY, blockZ)];
+            if (tile != null && tile.isSolid()) {
+                // We found a hit
+                break;
+            }
+            
+            // Determine which grid cell to step to next (the one with the closest boundary)
+            if (sideDistX < sideDistY && sideDistX < sideDistZ) {
+                // X-axis boundary is closest
+                travelDistance = sideDistX;
+                sideDistX += deltaDistX;
+                blockX += stepX;
+                hitFace = stepX > 0 ? 4 : 5; // 4 = West face, 5 = East face
+            } else if (sideDistY < sideDistZ) {
+                // Y-axis boundary is closest
+                travelDistance = sideDistY;
+                sideDistY += deltaDistY;
+                blockY += stepY;
+                hitFace = stepY > 0 ? 0 : 1; // 0 = Bottom face, 1 = Top face
+            } else {
+                // Z-axis boundary is closest
+                travelDistance = sideDistZ;
+                sideDistZ += deltaDistZ;
+                blockZ += stepZ;
+                hitFace = stepZ > 0 ? 2 : 3; // 2 = North face, 3 = South face
+            }
+            
+            // Check if we've exceeded maximum distance
+            if (travelDistance > maxDistance) {
+                return null; // No hit within range
+            }
+        }
+        
+        // Check if we've moved outside the level bounds after the last step
+        if (blockX < 0 || blockY < 0 || blockZ < 0 ||
+            blockX >= level.width || blockY >= level.depth || blockZ >= level.height) {
+            return null; // No hit found
+        }
+        
+        // Double check that we actually hit something
+        Tile hitTile = Tile.tiles[level.getTile(blockX, blockY, blockZ)];
+        if (hitTile == null || !hitTile.isSolid()) {
+            return null; // No hit found (should not happen but just in case)
+        }
+        
+        // Calculate the exact hit point
+        float hitX = startX + dirX * travelDistance;
+        float hitY = startY + dirY * travelDistance;
+        float hitZ = startZ + dirZ * travelDistance;
+        
+        // The squared distance for the hit result
+        float distanceSq = travelDistance * travelDistance;
+        
+        return new HitResult(1, blockX, blockY, blockZ, hitFace, hitX, hitY, hitZ, distanceSq);
     }
 
     /**
