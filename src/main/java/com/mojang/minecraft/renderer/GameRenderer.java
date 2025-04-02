@@ -206,7 +206,7 @@ public class GameRenderer implements Disposable {
         // render level
         {
             graphics.setShader(worldShader);
-            graphics.updateShaderMatrices(worldShader);
+            graphics.updateShaderMatrices();
             setupFog(worldShader, layer);
 
             this.levelRenderer.render(layer);
@@ -228,7 +228,7 @@ public class GameRenderer implements Disposable {
         // render particles
         {
             graphics.setShader(particleShader);
-            graphics.updateShaderMatrices(particleShader);
+            graphics.updateShaderMatrices();
             setupFog(particleShader, layer);
             this.particleEngine.render(this.graphics, this.player, partialTick, layer);
         }
@@ -296,14 +296,14 @@ public class GameRenderer implements Disposable {
         graphics.setBlendState(false, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
 
         graphics.setShader(hudNoTexShader);
-        graphics.updateShaderMatrices(hudNoTexShader);
+        graphics.updateShaderMatrices();
 
         // Draw cross-hair
         drawCrosshair(graphics, screenWidth, screenHeight);
     }
 
     private void drawDebugText(GraphicsAPI graphics, String fpsString) {
-        graphics.updateShaderMatrices(hudShader);
+        graphics.updateShaderMatrices();
 
         this.font.drawShadow(graphics, Minecraft.VERSION_STRING, 2, 2, 0xFFFFFF);
         this.font.drawShadow(graphics, fpsString, 2, 12, 0xFFFFFF);
@@ -318,7 +318,7 @@ public class GameRenderer implements Disposable {
         graphics.rotateY(45.0F);
         graphics.scale(-1.0F, -1.0F, 1.0F);
 
-        graphics.updateShaderMatrices(hudShader);
+        graphics.updateShaderMatrices();
 
         Texture texture = this.textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
         graphics.setTexture(texture);
@@ -333,7 +333,7 @@ public class GameRenderer implements Disposable {
         int centerX = screenWidth / 2;
         int centerY = screenHeight / 2;
 
-        graphics.updateShaderMatrices(hudNoTexShader);
+        graphics.updateShaderMatrices();
 
         Tesselator t = Tesselator.instance;
         t.init();

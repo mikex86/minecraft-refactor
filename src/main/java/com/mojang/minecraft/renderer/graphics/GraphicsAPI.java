@@ -217,10 +217,8 @@ public interface GraphicsAPI {
 
     /**
      * Called to update modelview and projection matrices in the shader.
-     *
-     * @param shader The shader to update
      */
-    void updateShaderMatrices(Shader shader);
+    void updateShaderMatrices();
 
     /**
      * Matrix modes for the graphics API.
