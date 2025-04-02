@@ -97,39 +97,82 @@ public class Tile {
         float c2 = 0.8F;  // North/south face lighting (80%)
         float c3 = 0.6F;  // East/west face lighting (60%)
 
+        float topColor = c1;
+        float bottomColor = c2;
+        float northColor = c2;
+        float southColor = c2;
+        float westColor = c3;
+        float eastColor = c3;
+
+        boolean isTopLit = true;
+        boolean isBottomLit = true;
+        boolean isNorthLit = true;
+        boolean isSouthLit = true;
+        boolean isWestLit = true;
+        boolean isEastLit = true;
+
+        if (level != null) {
+            isTopLit = level.isLit(x, y + 1, z);
+            isBottomLit = level.isLit(x, y - 1, z);
+            isNorthLit = level.isLit(x, y, z - 1);
+            isSouthLit = level.isLit(x, y, z + 1);
+            isWestLit = level.isLit(x - 1, y, z);
+            isEastLit = level.isLit(x + 1, y, z);
+        }
+
+        float darkFactor = 0.5F;
+        if (!isTopLit) {
+            topColor *= darkFactor;
+        }
+        if (!isBottomLit) {
+            bottomColor *= darkFactor;
+        }
+        if (!isNorthLit) {
+            northColor *= darkFactor;
+        }
+        if (!isSouthLit) {
+            southColor *= darkFactor;
+        }
+        if (!isWestLit) {
+            westColor *= darkFactor;
+        }
+        if (!isEastLit) {
+            eastColor *= darkFactor;
+        }
+
         // Bottom face
         if (shouldRenderFace(level, x, y - 1, z)) {
-            t.color(c1, c1, c1);
+            t.color(bottomColor, bottomColor, bottomColor);
             renderFace(t, x, y, z, 0);
         }
 
         // Top face
         if (shouldRenderFace(level, x, y + 1, z)) {
-            t.color(c1, c1, c1);
+            t.color(topColor, topColor, topColor);
             renderFace(t, x, y, z, 1);
         }
 
         // North face
         if (shouldRenderFace(level, x, y, z - 1)) {
-            t.color(c2, c2, c2);
+            t.color(northColor, northColor, northColor);
             renderFace(t, x, y, z, 2);
         }
 
         // South face
         if (shouldRenderFace(level, x, y, z + 1)) {
-            t.color(c2, c2, c2);
+            t.color(southColor, southColor, southColor);
             renderFace(t, x, y, z, 3);
         }
 
         // West face
         if (shouldRenderFace(level, x - 1, y, z)) {
-            t.color(c3, c3, c3);
+            t.color(westColor, westColor, westColor);
             renderFace(t, x, y, z, 4);
         }
 
         // East face
         if (shouldRenderFace(level, x + 1, y, z)) {
-            t.color(c3, c3, c3);
+            t.color(eastColor, eastColor, eastColor);
             renderFace(t, x, y, z, 5);
         }
     }
