@@ -303,7 +303,6 @@ public class GameRenderer implements Disposable {
 
 
     private void drawCrosshair(GraphicsAPI graphics, int screenWidth, int screenHeight) {
-        graphics.setTexturingEnabled(false);
         int centerX = screenWidth / 2;
         int centerY = screenHeight / 2;
 
@@ -324,7 +323,6 @@ public class GameRenderer implements Disposable {
         t.vertex(centerX + 5, centerY + 1, 0.0F);
 
         t.flush();
-        graphics.setTexturingEnabled(true);
     }
 
     @Override

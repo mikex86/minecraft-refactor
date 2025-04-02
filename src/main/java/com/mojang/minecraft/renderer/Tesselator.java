@@ -118,17 +118,17 @@ public class Tesselator implements Disposable {
 
             // Configure rendering state
             graphics.setTexturingEnabled(this.hasTexture);
-
-            if (this.hasColor) {
-                graphics.setVertexColorEnabled(true);
-            }
+            graphics.setVertexColorEnabled(this.hasColor);
 
             // Draw the vertices
             graphics.drawPrimitives(buffer, PrimitiveType.QUADS, 0, this.vertexCount);
 
             // Reset state
             if (this.hasColor) {
-                graphics.setVertexColorEnabled(true);
+                graphics.setVertexColorEnabled(false); // default state is vertex color disabled
+            }
+            if (!this.hasTexture) {
+                graphics.setTexturingEnabled(true); // default state is texturing enabled
             }
         }
 
