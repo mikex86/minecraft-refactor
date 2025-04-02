@@ -34,22 +34,12 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
 
     @Override
     public void initialize() {
-        // Enable texture mapping
-        glEnable(GL_TEXTURE_2D);
-
         // Set up blending
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         // Set up depth testing
         glClearDepth(1.0f);
         glDepthFunc(GL_LEQUAL);
-
-        // Enable alpha testing
-        glEnable(GL_ALPHA_TEST);
-        glAlphaFunc(GL_GREATER, 0.0f);
-
-        // Set up smooth shading
-        glShadeModel(GL_SMOOTH);
 
         setMatrixMode(MatrixMode.PROJECTION);
         loadIdentity();
