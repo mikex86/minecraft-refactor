@@ -184,9 +184,9 @@ public class Cube {
 
         graphics.pushMatrix();
         graphics.translate(this.x, this.y, this.z);
-        graphics.rotateX(this.zRot * RADIANS_TO_DEGREES);
+        graphics.rotateZ(this.zRot * RADIANS_TO_DEGREES);
         graphics.rotateY(this.yRot * RADIANS_TO_DEGREES);
-        graphics.rotateZ(this.xRot * RADIANS_TO_DEGREES);
+        graphics.rotateX(this.xRot * RADIANS_TO_DEGREES);
 
         // Render the mesh
         this.mesh.render();

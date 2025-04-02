@@ -16,7 +16,7 @@ import java.util.List;
  */
 public class LevelRenderer implements LevelListener, Disposable {
     // Constants
-    public static final int MAX_REBUILDS_PER_FRAME = 8;
+    public static final int MAX_REBUILDS_PER_FRAME = 128;
     public static final int CHUNK_SIZE = 16;
 
     // Level data

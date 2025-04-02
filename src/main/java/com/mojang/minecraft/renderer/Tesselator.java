@@ -15,11 +15,10 @@ import java.nio.FloatBuffer;
  * uses the abstracted graphics API instead of direct OpenGL calls.
  */
 public class Tesselator implements Disposable {
-    private static final int MAX_FLOATS = 524288; // MAX_MEMORY_USE / 8 (size of float)
+    private static final int MAX_FLOATS = 262144;
 
     // Vertex data storage
     private final FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(MAX_FLOATS);
-    private final float[] vertexData = new float[MAX_FLOATS];
 
     // State tracking
     private int vertexCount = 0;
@@ -43,7 +42,6 @@ public class Tesselator implements Disposable {
     private VertexBuffer buffer;
     private VertexBuffer.VertexFormat format;
 
-    // Legacy singleton instance for backward compatibility
     public static Tesselator instance = new Tesselator();
 
     /**
@@ -59,9 +57,6 @@ public class Tesselator implements Disposable {
      * Gets the vertex buffer with accumulated vertex data
      */
     public FloatBuffer getBuffer() {
-        vertexBuffer.clear();
-        vertexBuffer.put(vertexData, 0, dataIndex);
-        vertexBuffer.flip();
         return vertexBuffer;
     }
 
@@ -98,10 +93,6 @@ public class Tesselator implements Disposable {
      */
     public void flush() {
         if (this.vertexCount > 0) {
-            // Prepare buffer
-            this.vertexBuffer.clear();
-            this.vertexBuffer.put(this.vertexData, 0, this.dataIndex);
-            this.vertexBuffer.flip();
 
             // Update format
             format = new VertexBuffer.VertexFormat(
@@ -216,21 +207,21 @@ public class Tesselator implements Disposable {
     public void vertex(float x, float y, float z) {
         // Add texture coordinates if set
         if (this.hasTexture) {
-            this.vertexData[this.dataIndex++] = this.textureU;
-            this.vertexData[this.dataIndex++] = this.textureV;
+            this.vertexBuffer.put(this.dataIndex++, this.textureU);
+            this.vertexBuffer.put(this.dataIndex++, this.textureV);
         }
 
         // Add color if set
         if (this.hasColor) {
-            this.vertexData[this.dataIndex++] = this.colorR;
-            this.vertexData[this.dataIndex++] = this.colorG;
-            this.vertexData[this.dataIndex++] = this.colorB;
+            this.vertexBuffer.put(this.dataIndex++, this.colorR);
+            this.vertexBuffer.put(this.dataIndex++, this.colorG);
+            this.vertexBuffer.put(this.dataIndex++, this.colorB);
         }
 
         // Add vertex position
-        this.vertexData[this.dataIndex++] = x;
-        this.vertexData[this.dataIndex++] = y;
-        this.vertexData[this.dataIndex++] = z;
+        this.vertexBuffer.put(this.dataIndex++, x);
+        this.vertexBuffer.put(this.dataIndex++, y);
+        this.vertexBuffer.put(this.dataIndex++, z);
 
         // Increment vertex count
         this.vertexCount++;

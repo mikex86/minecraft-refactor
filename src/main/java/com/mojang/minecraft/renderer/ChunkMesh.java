@@ -34,7 +34,7 @@ public class ChunkMesh implements Disposable {
 
         // Create resources
         this.vertexBuffer = graphics.createVertexBuffer(GraphicsEnums.BufferUsage.STATIC);
-        this.tesselator = new Tesselator();
+        this.tesselator = Tesselator.instance;
         this.vertexCount = 0;
     }
 
