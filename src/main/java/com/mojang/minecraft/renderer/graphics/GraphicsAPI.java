@@ -124,12 +124,12 @@ public interface GraphicsAPI {
     void setOrthographicProjection(float left, float right, float bottom, float top, float near, float far);
     
     /**
-     * Pushes the current matrix stack.
+     * Pushes the current matrix onto the stack.
      */
     void pushMatrix();
     
     /**
-     * Pops the current matrix stack.
+     * Pops the top matrix from the stack and makes it the current matrix.
      */
     void popMatrix();
     
@@ -209,12 +209,19 @@ public interface GraphicsAPI {
     void setShader(Shader shader);
     
     /**
+     * Gets the matrix stack used by this graphics API.
+     * This provides direct access to the matrix operations and state.
+     * 
+     * @return The matrix stack
+     */
+    MatrixStack getMatrixStack();
+    
+    /**
      * Matrix modes for the graphics API.
      */
     enum MatrixMode {
         MODELVIEW,
-        PROJECTION,
-        TEXTURE
+        PROJECTION
     }
     
     /**

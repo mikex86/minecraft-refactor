@@ -1,5 +1,10 @@
 #version 120
 
+// Matrix uniforms
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+uniform mat4 modelViewProjectionMatrix;
+
 // Fog uniforms
 uniform bool fogEnabled;
 uniform int fogMode;      // 0 = LINEAR, 1 = EXP, 2 = EXP2
@@ -14,8 +19,8 @@ varying vec2 texCoord;
 varying float fogFactor;
 
 void main() {
-    // Pass vertex position through the current modelview-projection matrix
-    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
+    // Pass vertex position through our custom MVP matrix
+    gl_Position = modelViewProjectionMatrix * gl_Vertex;
 
     // Pass texture coordinates to fragment shader
     texCoord = gl_MultiTexCoord0.xy;
@@ -27,7 +32,8 @@ void main() {
     fogFactor = 1.0; // Default to no fog
 
     if (fogEnabled) {
-        float eyeDistance = length(gl_ModelViewMatrix * gl_Vertex);
+        // Use our custom modelViewMatrix instead of gl_ModelViewMatrix
+        float eyeDistance = length(modelViewMatrix * gl_Vertex);
 
         if (fogMode == 0) {
             // LINEAR fog

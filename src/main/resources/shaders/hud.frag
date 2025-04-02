@@ -6,7 +6,6 @@ uniform sampler2D texture;
 // Input from vertex shader
 varying vec4 vertexColor;
 varying vec2 texCoord;
-varying float fogFactor;
 
 void main() {
     // Sample the texture

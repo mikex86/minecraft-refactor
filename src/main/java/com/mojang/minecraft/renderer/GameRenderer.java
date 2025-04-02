@@ -133,8 +133,6 @@ public class GameRenderer implements Disposable {
         graphics.setViewport(0, 0, this.width, this.height);
 
         // Set up projection matrix
-        graphics.setMatrixMode(GraphicsAPI.MatrixMode.PROJECTION);
-        graphics.loadIdentity();
         graphics.setPerspectiveProjection(70.0F, aspectRatio, 0.05F, 1000.0F);
 
         // Set up camera transformation
@@ -207,30 +205,27 @@ public class GameRenderer implements Disposable {
 
         // render level
         {
-            worldShader.use();
+            graphics.setShader(worldShader);
             setupFog(worldShader, layer);
             this.levelRenderer.render(layer);
-            worldShader.detach();
         }
 
         // render entities
         {
-            entityShader.use();
+            graphics.setShader(entityShader);
             setupFog(entityShader, layer);
             for (Entity entity : this.entities) {
                 if ((entity.isLit() == lit) && frustum.isVisible(entity.bb)) {
                     entity.render(this.graphics, partialTick);
                 }
             }
-            entityShader.detach();
         }
 
         // render particles
         {
-            particleShader.use();
+            graphics.setShader(particleShader);
             setupFog(particleShader, layer);
             this.particleEngine.render(this.graphics, this.player, partialTick, layer);
-            particleShader.detach();
         }
     }
 
@@ -270,7 +265,7 @@ public class GameRenderer implements Disposable {
      * @param paintTexture The current block to place
      */
     private void renderHud(GraphicsAPI graphics, String fpsString, int editMode, int paintTexture) {
-        hudShader.use();
+        graphics.setShader(hudShader);
 
         // disable depth test
         graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
@@ -279,8 +274,7 @@ public class GameRenderer implements Disposable {
         int screenHeight = this.height * 240 / this.height;
 
         graphics.clear(false, true, 0.0F, 0.0F, 0.0F, 0.0F);
-        graphics.setMatrixMode(GraphicsAPI.MatrixMode.PROJECTION);
-        graphics.loadIdentity();
+
         graphics.setOrthographicProjection(0.0F, screenWidth, screenHeight, 0.0F, 100.0F, 300.0F);
         graphics.setMatrixMode(GraphicsAPI.MatrixMode.MODELVIEW);
         graphics.loadIdentity();
@@ -295,14 +289,11 @@ public class GameRenderer implements Disposable {
         drawDebugText(graphics, fpsString);
 
         graphics.setBlendState(false, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
-        hudShader.detach();
 
-        hudNoTexShader.use();
+        graphics.setShader(hudNoTexShader);
 
         // Draw cross-hair
         drawCrosshair(graphics, screenWidth, screenHeight);
-
-        hudNoTexShader.detach();
     }
 
     private void drawDebugText(GraphicsAPI graphics, String fpsString) {
