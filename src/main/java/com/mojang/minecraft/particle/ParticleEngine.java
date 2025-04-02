@@ -40,6 +40,7 @@ public class ParticleEngine {
      */
     public void add(Particle particle) {
         this.particles.add(particle);
+        particle.tick(); // tick once to minimize initial jitter
     }
 
     /**
@@ -58,11 +59,11 @@ public class ParticleEngine {
 
     /**
      * Renders all particles in the specified rendering layer.
-     * 
+     *
      * @param graphics    The graphics API
      * @param player      The player (for camera-relative positioning)
      * @param partialTick Partial tick time
-     * @param layer        Rendering layer (0 for unlit, 1 for lit)
+     * @param layer       Rendering layer (0 for unlit, 1 for lit)
      */
     public void render(GraphicsAPI graphics, Player player, float partialTick, int layer) {
         if (this.particles.isEmpty()) {
