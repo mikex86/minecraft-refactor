@@ -130,12 +130,19 @@ public class LevelRenderer implements LevelListener, Disposable {
         List<Chunk> dirtyChunks = this.getAllDirtyChunks();
         if (dirtyChunks != null && !dirtyChunks.isEmpty()) {
             // Sort chunks by visibility, age, and distance to player (future implementation)
-            // TODO: Implement a sorter based on player position and frustum
 
             // Rebuild at most MAX_REBUILDS_PER_FRAME chunks per frame
             int rebuildCount = Math.min(MAX_REBUILDS_PER_FRAME, dirtyChunks.size());
-            for (int i = 0; i < rebuildCount; ++i) {
-                dirtyChunks.get(i).rebuild();
+            int numRebuilt = 0;
+            for (Chunk dirtyChunk : dirtyChunks) {
+                if (!Frustum.getFrustum().isVisible(dirtyChunk.aabb)) {
+                    continue;
+                }
+                dirtyChunk.rebuild();
+                numRebuilt++;
+                if (numRebuilt >= rebuildCount) {
+                    break;
+                }
             }
         }
     }

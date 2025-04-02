@@ -98,11 +98,7 @@ public class ChunkMesh implements Disposable {
         }
 
         // Configure rendering state
-        if (vertexBuffer.getFormat().hasTexCoords()) {
-            graphics.setTexturingEnabled(true);
-        } else {
-            graphics.setTexturingEnabled(false);
-        }
+        graphics.setTexturingEnabled(vertexBuffer.getFormat().hasTexCoords());
 
         if (vertexBuffer.getFormat().hasColors()) {
             graphics.setVertexColorEnabled(true);
