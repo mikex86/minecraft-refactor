@@ -18,7 +18,6 @@ varying vec2 texCoord;
 varying float fogFactor;
 
 void main() {
-    // Pass vertex position through our custom MVP matrix
     gl_Position = (projectionMatrix * modelViewMatrix) * gl_Vertex;
 
     // Pass texture coordinates to fragment shader
@@ -31,7 +30,6 @@ void main() {
     fogFactor = 1.0; // Default to no fog
 
     if (fogEnabled) {
-        // Use our custom modelViewMatrix instead of gl_ModelViewMatrix
         float eyeDistance = length(modelViewMatrix * gl_Vertex);
 
         if (fogMode == 0) {

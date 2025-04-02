@@ -8,7 +8,6 @@ import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 import com.mojang.minecraft.renderer.shader.Shader;
 
 import java.nio.ByteBuffer;
-import java.util.Objects;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
@@ -196,8 +195,6 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
 
     @Override
     public void drawPrimitives(VertexBuffer buffer, PrimitiveType type, int start, int count) {
-        Objects.requireNonNull(currentShader, "Current shader must be set before drawing primitives");
-        updateShaderMatrices(currentShader);
         if (buffer instanceof OpenGLVertexBuffer) {
             OpenGLVertexBuffer glBuffer = (OpenGLVertexBuffer) buffer;
             VertexBuffer.VertexFormat format = buffer.getFormat();
@@ -283,21 +280,22 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
             }
         }
     }
-    
+
     /**
      * Updates the shader uniforms with the current matrices.
      * This is used to provide the matrices to the shader program.
-     * 
+     *
      * @param shader The shader to update
      */
-    private void updateShaderMatrices(Shader shader) {
+    @Override
+    public void updateShaderMatrices(Shader shader) {
         // Set modelview matrix uniform if the shader supports it
         try {
             shader.setUniformMatrix4fv("modelViewMatrix", matrixStack.getModelViewBuffer());
         } catch (IllegalArgumentException e) {
             // Ignore if uniform doesn't exist
         }
-        
+
         // Set projection matrix uniform if the shader supports it
         try {
             shader.setUniformMatrix4fv("projectionMatrix", matrixStack.getProjectionBuffer());
@@ -305,7 +303,7 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
             // Ignore if uniform doesn't exist
         }
     }
-    
+
     @Override
     public MatrixStack getMatrixStack() {
         return matrixStack;

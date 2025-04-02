@@ -206,14 +206,18 @@ public class GameRenderer implements Disposable {
         // render level
         {
             graphics.setShader(worldShader);
+            graphics.updateShaderMatrices(worldShader);
             setupFog(worldShader, layer);
+
             this.levelRenderer.render(layer);
         }
 
         // render entities
         {
             graphics.setShader(entityShader);
+            // cannot set matrices "globally" because entities transform themselves
             setupFog(entityShader, layer);
+
             for (Entity entity : this.entities) {
                 if ((entity.isLit() == lit) && frustum.isVisible(entity.bb)) {
                     entity.render(this.graphics, partialTick);
@@ -224,6 +228,7 @@ public class GameRenderer implements Disposable {
         // render particles
         {
             graphics.setShader(particleShader);
+            graphics.updateShaderMatrices(particleShader);
             setupFog(particleShader, layer);
             this.particleEngine.render(this.graphics, this.player, partialTick, layer);
         }
@@ -291,12 +296,15 @@ public class GameRenderer implements Disposable {
         graphics.setBlendState(false, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
 
         graphics.setShader(hudNoTexShader);
+        graphics.updateShaderMatrices(hudNoTexShader);
 
         // Draw cross-hair
         drawCrosshair(graphics, screenWidth, screenHeight);
     }
 
     private void drawDebugText(GraphicsAPI graphics, String fpsString) {
+        graphics.updateShaderMatrices(hudShader);
+
         this.font.drawShadow(graphics, Minecraft.VERSION_STRING, 2, 2, 0xFFFFFF);
         this.font.drawShadow(graphics, fpsString, 2, 12, 0xFFFFFF);
     }
@@ -310,6 +318,8 @@ public class GameRenderer implements Disposable {
         graphics.rotateY(45.0F);
         graphics.scale(-1.0F, -1.0F, 1.0F);
 
+        graphics.updateShaderMatrices(hudShader);
+
         Texture texture = this.textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
         graphics.setTexture(texture);
         t.init();
@@ -322,6 +332,8 @@ public class GameRenderer implements Disposable {
     private void drawCrosshair(GraphicsAPI graphics, int screenWidth, int screenHeight) {
         int centerX = screenWidth / 2;
         int centerY = screenHeight / 2;
+
+        graphics.updateShaderMatrices(hudNoTexShader);
 
         Tesselator t = Tesselator.instance;
         t.init();
