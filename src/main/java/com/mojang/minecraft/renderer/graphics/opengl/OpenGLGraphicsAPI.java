@@ -304,13 +304,6 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
         } catch (IllegalArgumentException e) {
             // Ignore if uniform doesn't exist
         }
-        
-        // Set modelview-projection matrix uniform if the shader supports it
-        try {
-            shader.setUniformMatrix4fv("modelViewProjectionMatrix", matrixStack.getModelViewProjectionBuffer());
-        } catch (IllegalArgumentException e) {
-            // Ignore if uniform doesn't exist
-        }
     }
     
     @Override

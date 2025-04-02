@@ -201,7 +201,7 @@ public class GameRenderer implements Disposable {
     private void renderLayer(boolean lit, float partialTick) {
         int layer = lit ? 0 : 1;
 
-        Frustum frustum = Frustum.getFrustum();
+        Frustum frustum = Frustum.getFrustum(graphics);
 
         // render level
         {

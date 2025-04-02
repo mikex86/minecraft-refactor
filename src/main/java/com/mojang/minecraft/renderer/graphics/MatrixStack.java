@@ -204,18 +204,7 @@ public class MatrixStack {
     public Matrix4f getCurrentMatrix() {
         return currentMatrix;
     }
-    
-    /**
-     * Gets the model-view-projection matrix (modelView * projection).
-     * 
-     * @return The model-view-projection matrix
-     */
-    public Matrix4f getModelViewProjectionMatrix() {
-        Matrix4f mvp = new Matrix4f(currentProjection);
-        mvp.multiply(currentModelView);
-        return mvp;
-    }
-    
+
     /**
      * Gets the current model-view matrix as a FloatBuffer, ready for use with OpenGL.
      * 
@@ -232,14 +221,5 @@ public class MatrixStack {
      */
     public FloatBuffer getProjectionBuffer() {
         return currentProjection.getBuffer();
-    }
-    
-    /**
-     * Gets the model-view-projection matrix as a FloatBuffer, ready for use with OpenGL.
-     * 
-     * @return A FloatBuffer containing the model-view-projection matrix data
-     */
-    public FloatBuffer getModelViewProjectionBuffer() {
-        return getModelViewProjectionMatrix().getBuffer();
     }
 } 

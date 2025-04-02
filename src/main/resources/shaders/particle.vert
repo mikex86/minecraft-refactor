@@ -3,7 +3,6 @@
 // Matrix uniforms
 uniform mat4 modelViewMatrix;
 uniform mat4 projectionMatrix;
-uniform mat4 modelViewProjectionMatrix;
 
 // Fog uniforms
 uniform bool fogEnabled;
@@ -20,7 +19,7 @@ varying float fogFactor;
 
 void main() {
     // Pass vertex position through our custom MVP matrix
-    gl_Position = modelViewProjectionMatrix * gl_Vertex;
+    gl_Position = (projectionMatrix * modelViewMatrix) * gl_Vertex;
 
     // Pass texture coordinates to fragment shader
     texCoord = gl_MultiTexCoord0.xy;

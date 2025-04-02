@@ -118,7 +118,7 @@ public class LevelRenderer implements LevelListener, Disposable {
         graphics.setTexture(texture);
 
         // Get the current view frustum
-        Frustum frustum = Frustum.getFrustum();
+        Frustum frustum = Frustum.getFrustum(graphics);
 
         // Render all visible chunks
         for (Chunk chunk : this.chunks) {
@@ -134,13 +134,13 @@ public class LevelRenderer implements LevelListener, Disposable {
     public void updateDirtyChunks(Player player) {
         List<Chunk> dirtyChunks = this.getAllDirtyChunks();
         if (dirtyChunks != null && !dirtyChunks.isEmpty()) {
-            dirtyChunks.sort(new DirtyChunkSorter(player, Frustum.getFrustum()));
+            dirtyChunks.sort(new DirtyChunkSorter(player, Frustum.getFrustum(graphics)));
 
             // Rebuild at most MAX_REBUILDS_PER_FRAME chunks per frame
             int rebuildCount = Math.min(MAX_REBUILDS_PER_FRAME, dirtyChunks.size());
             int numRebuilt = 0;
             for (Chunk dirtyChunk : dirtyChunks) {
-                if (!Frustum.getFrustum().isVisible(dirtyChunk.aabb)) {
+                if (!Frustum.getFrustum(graphics).isVisible(dirtyChunk.aabb)) {
                     continue;
                 }
                 dirtyChunk.rebuild();
