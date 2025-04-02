@@ -72,11 +72,17 @@ public class GameEngine {
             // Initialize timing
             lastFpsUpdateTime = System.currentTimeMillis();
             framesCounter = 0;
-
         } catch (Exception e) {
             CrashReporter.handleCrash("Failed to create window", e);
             throw new IOException("Failed to create window", e);
         }
+    }
+
+    /**
+     * Called after the initialization of the main game.
+     */
+    public void postInit() {
+        window.show();
     }
 
     /**

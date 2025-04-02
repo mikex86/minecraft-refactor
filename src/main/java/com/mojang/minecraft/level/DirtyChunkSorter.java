@@ -10,7 +10,7 @@ import java.util.Comparator;
  * This prioritizes visible chunks that have been dirty for longer and are closer to the player.
  */
 public class DirtyChunkSorter implements Comparator<Chunk> {
-    // Time in milliseconds for age bucketing
+
     private static final long AGE_BUCKET_SIZE = 2000L;
 
     private final Player player;

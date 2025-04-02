@@ -67,6 +67,7 @@ public class GameWindow implements Disposable {
         glfwDefaultWindowHints();
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+        glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_TRUE);
 
         // Create the window
         if (fullscreen) {
@@ -128,9 +129,6 @@ public class GameWindow implements Disposable {
         // Disable v-sync
         glfwSwapInterval(0);
 
-        // Show the window
-        glfwShowWindow(window);
-
         // Initialize OpenGL capabilities (needed for LWJGL to work with OpenGL)
         GL.createCapabilities();
 
@@ -139,6 +137,10 @@ public class GameWindow implements Disposable {
 
         // Initialize the graphics API
         graphics.initialize();
+    }
+
+    public void show() {
+        glfwShowWindow(window);
     }
 
     /**

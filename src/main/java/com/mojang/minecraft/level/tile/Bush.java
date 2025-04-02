@@ -55,7 +55,7 @@ public class Bush extends Tile {
     @Override
     public void render(Tesselator t, Level level, int layer, int x, int y, int z) {
         // Only render if the lighting condition is appropriate for this layer
-        if (level.isLit(x, y, z) == (layer != 1)) {
+        if (level == null || level.isLit(x, y, z) == (layer != 1)) {
             int tex = this.getTexture(this.tex);
             float u0 = (tex % 16) / 16.0F;
             float u1 = u0 + 0.0624375F;

@@ -230,10 +230,10 @@ public class InputHandler {
      * When the cursor is captured, it is hidden and its position is reset to the center of the window.
      * This is useful for first-person camera controls.
      *
-     * @param visible true to capture the cursor, false to release it
+     * @param captured true to capture the cursor, false to release it
      */
-    public void setCursorCaptured(boolean visible) {
-        window.setCursorCaptured(visible);
+    public void setCursorCaptured(boolean captured) {
+        window.setCursorCaptured(captured);
     }
 
     /**

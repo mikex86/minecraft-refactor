@@ -54,7 +54,7 @@ public class Minecraft implements Runnable {
     public void init() throws IOException {
         try {
             // Initialize the engine
-            engine.initialize();
+            this.engine.initialize();
 
             // Create game state (manages level, entities, player)
             this.gameState = new GameState(this.textureManager);
@@ -81,6 +81,7 @@ public class Minecraft implements Runnable {
                     gameState.getEntities(),
                     engine.isFullscreen()
             );
+            this.engine.postInit();
         } catch (Exception e) {
             CrashReporter.handleCrash("Failed to initialize game", e);
             throw new IOException("Failed to initialize game", e);
