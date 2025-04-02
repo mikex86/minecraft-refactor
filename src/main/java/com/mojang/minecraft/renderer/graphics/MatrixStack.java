@@ -1,41 +1,61 @@
 package com.mojang.minecraft.renderer.graphics;
 
 import java.nio.FloatBuffer;
-import java.util.ArrayDeque;
-import java.util.Deque;
 
 /**
  * Implementation of a matrix stack that emulates OpenGL's matrix stack functionality.
  * This class is used to replace the fixed function pipeline matrix operations.
- * Each matrix mode (MODELVIEW, PROJECTION, TEXTURE) has its own stack.
+ * Each matrix mode (MODELVIEW, PROJECTION) has its own stack with pre-allocated matrices.
  */
 public class MatrixStack {
 
     /**
-     * Constant for the maximum stack depth (as per OpenGL specs)
+     * Constant for the stack depth
      */
-    private static final int MAX_STACK_DEPTH = 32;
+    private static final int STACK_DEPTH = 16;
     
-    private final Deque<Matrix4f> modelViewStack = new ArrayDeque<>();
-    private final Deque<Matrix4f> projectionStack = new ArrayDeque<>();
-    private final Deque<Matrix4f> textureStack = new ArrayDeque<>();
+    // Pre-allocated matrix arrays for each stack
+    private final Matrix4f[] modelViewMatrices;
+    private final Matrix4f[] projectionMatrices;
     
+    // Stack pointers (indices to current position in each stack)
+    private int modelViewStackPointer;
+    private int projectionStackPointer;
+    
+    // Current matrices (references to the top of each stack)
     private Matrix4f currentModelView;
     private Matrix4f currentProjection;
     
-    private Deque<Matrix4f> currentStack;
+    // Current stack state
+    private Matrix4f[] currentStack;
+    private int currentStackPointer;
     private Matrix4f currentMatrix;
     
     /**
-     * Creates a new matrix stack with identity matrices for all modes.
+     * Creates a new matrix stack with pre-allocated identity matrices for all modes.
      */
     public MatrixStack() {
-        // Initialize all stacks with identity matrices
-        currentModelView = new Matrix4f();
-        currentProjection = new Matrix4f();
+        // Initialize model view stack
+        modelViewMatrices = new Matrix4f[STACK_DEPTH];
+        for (int i = 0; i < STACK_DEPTH; i++) {
+            modelViewMatrices[i] = new Matrix4f();
+        }
+        modelViewStackPointer = 0;
+        
+        // Initialize projection stack
+        projectionMatrices = new Matrix4f[STACK_DEPTH];
+        for (int i = 0; i < STACK_DEPTH; i++) {
+            projectionMatrices[i] = new Matrix4f();
+        }
+        projectionStackPointer = 0;
+        
+        // Set current pointers
+        currentModelView = modelViewMatrices[0];
+        currentProjection = projectionMatrices[0];
         
         // Set current stack to model view by default (OpenGL default)
-        currentStack = modelViewStack;
+        currentStack = modelViewMatrices;
+        currentStackPointer = modelViewStackPointer;
         currentMatrix = currentModelView;
     }
     
@@ -47,11 +67,13 @@ public class MatrixStack {
     public void setMatrixMode(GraphicsAPI.MatrixMode mode) {
         switch (mode) {
             case MODELVIEW:
-                currentStack = modelViewStack;
+                currentStack = modelViewMatrices;
+                currentStackPointer = modelViewStackPointer;
                 currentMatrix = currentModelView;
                 break;
             case PROJECTION:
-                currentStack = projectionStack;
+                currentStack = projectionMatrices;
+                currentStackPointer = projectionStackPointer;
                 currentMatrix = currentProjection;
                 break;
             default:
@@ -60,39 +82,55 @@ public class MatrixStack {
     }
     
     /**
-     * Pushes the current matrix onto the stack.
+     * Pushes the current matrix onto the stack by copying its values to the next matrix in the stack.
      * 
      * @throws IllegalStateException if the stack is full
      */
     public void pushMatrix() {
-        if (currentStack.size() >= MAX_STACK_DEPTH) {
+        if (currentStackPointer >= STACK_DEPTH - 1) {
             throw new IllegalStateException("Matrix stack overflow");
         }
         
-        // Push a copy of the current matrix onto the stack
-        Matrix4f copy = new Matrix4f(currentMatrix);
-        currentStack.push(copy);
+        // Copy the current matrix to the next position in the stack
+        Matrix4f source = currentStack[currentStackPointer];
+        Matrix4f target = currentStack[currentStackPointer + 1];
+        target.set(source);
+        
+        // Increment stack pointer
+        currentStackPointer++;
+        
+        // Update current matrix and stack pointers
+        updateCurrentMatrixReferences();
     }
     
     /**
-     * Pops the top matrix from the stack and makes it the current matrix.
+     * Pops the top matrix from the stack.
      * 
      * @throws IllegalStateException if the stack is empty
      */
     public void popMatrix() {
-        if (currentStack.isEmpty()) {
+        if (currentStackPointer <= 0) {
             throw new IllegalStateException("Matrix stack underflow");
         }
         
-        // Pop the top matrix from the stack
-        Matrix4f popped = currentStack.pop();
+        // Decrement stack pointer
+        currentStackPointer--;
         
-        // Update the correct current matrix depending on the current mode
-        if (currentStack == modelViewStack) {
-            currentModelView = popped;
+        // Update current matrix and stack pointers
+        updateCurrentMatrixReferences();
+    }
+    
+    /**
+     * Updates the current matrix references based on the current stack pointers.
+     */
+    private void updateCurrentMatrixReferences() {
+        if (currentStack == modelViewMatrices) {
+            modelViewStackPointer = currentStackPointer;
+            currentModelView = modelViewMatrices[modelViewStackPointer];
             currentMatrix = currentModelView;
-        } else if (currentStack == projectionStack) {
-            currentProjection = popped;
+        } else if (currentStack == projectionMatrices) {
+            projectionStackPointer = currentStackPointer;
+            currentProjection = projectionMatrices[projectionStackPointer];
             currentMatrix = currentProjection;
         }
     }
@@ -196,6 +234,7 @@ public class MatrixStack {
     public Matrix4f getProjectionMatrix() {
         return currentProjection;
     }
+    
     /**
      * Gets the current matrix (depends on the current matrix mode).
      * 

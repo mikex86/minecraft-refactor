@@ -8,10 +8,7 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.particle.ParticleEngine;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
-import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
-import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
-import com.mojang.minecraft.renderer.graphics.Texture;
+import com.mojang.minecraft.renderer.graphics.*;
 import com.mojang.minecraft.renderer.shader.ShaderRegistry;
 import com.mojang.minecraft.renderer.shader.impl.*;
 import com.mojang.minecraft.world.HitResult;
@@ -328,6 +325,8 @@ public class GameRenderer implements Disposable {
         graphics.popMatrix();
     }
 
+    private VertexBuffer crosshairVBO;
+    private int crosshairVertexCount;
 
     private void drawCrosshair(GraphicsAPI graphics, int screenWidth, int screenHeight) {
         int centerX = screenWidth / 2;
@@ -335,23 +334,28 @@ public class GameRenderer implements Disposable {
 
         graphics.updateShaderMatrices();
 
-        Tesselator t = Tesselator.instance;
-        t.init();
-        t.color(1, 1, 1);
+        if (crosshairVBO == null) {
+            Tesselator t = Tesselator.instance;
+            t.init();
+            t.color(1, 1, 1);
 
-        // Vertical line
-        t.vertex(centerX + 1, centerY - 4, 0.0F);
-        t.vertex(centerX, centerY - 4, 0.0F);
-        t.vertex(centerX, centerY + 5, 0.0F);
-        t.vertex(centerX + 1, centerY + 5, 0.0F);
+            // Vertical line
+            t.vertex(centerX + 1, centerY - 4, 0.0F);
+            t.vertex(centerX, centerY - 4, 0.0F);
+            t.vertex(centerX, centerY + 5, 0.0F);
+            t.vertex(centerX + 1, centerY + 5, 0.0F);
 
-        // Horizontal line
-        t.vertex(centerX + 5, centerY, 0.0F);
-        t.vertex(centerX - 4, centerY, 0.0F);
-        t.vertex(centerX - 4, centerY + 1, 0.0F);
-        t.vertex(centerX + 5, centerY + 1, 0.0F);
+            // Horizontal line
+            t.vertex(centerX + 5, centerY, 0.0F);
+            t.vertex(centerX - 4, centerY, 0.0F);
+            t.vertex(centerX - 4, centerY + 1, 0.0F);
+            t.vertex(centerX + 5, centerY + 1, 0.0F);
 
-        t.flush();
+            crosshairVBO = t.createVertexBuffer(GraphicsEnums.BufferUsage.STATIC);
+            crosshairVertexCount = t.getVertexCount();
+        }
+
+        graphics.drawPrimitives(crosshairVBO, GraphicsEnums.PrimitiveType.QUADS, 0, crosshairVertexCount);
     }
 
     @Override

@@ -17,8 +17,8 @@ import java.nio.FloatBuffer;
 public class Tesselator implements Disposable {
     private static final int MAX_FLOATS = 262144;
 
-    // Vertex data storage
-    private final FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(MAX_FLOATS);
+    // CPU-side data storage
+    private final FloatBuffer cpuVertexBuffer = BufferUtils.createFloatBuffer(MAX_FLOATS);
 
     // State tracking
     private int vertexCount = 0;
@@ -57,7 +57,7 @@ public class Tesselator implements Disposable {
      * Gets the vertex buffer with accumulated vertex data
      */
     public FloatBuffer getBuffer() {
-        return vertexBuffer;
+        return cpuVertexBuffer;
     }
 
     /**
@@ -105,7 +105,7 @@ public class Tesselator implements Disposable {
             buffer.setFormat(format);
 
             // Upload data
-            buffer.setData(vertexBuffer, dataIndex * 4); // 4 bytes per float
+            buffer.setData(cpuVertexBuffer, dataIndex * 4); // 4 bytes per float
 
 
             // Draw the vertices
@@ -116,12 +116,37 @@ public class Tesselator implements Disposable {
         this.clear();
     }
 
+
+    /**
+     * Creates a vertex buffer from the current tesselator state
+     *
+     * @param bufferUsage The buffer usage hint
+     * @return The created vertex buffer
+     */
+    public VertexBuffer createVertexBuffer(BufferUsage bufferUsage) {
+        // Set up vertex format based on tesselator state
+        VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
+                true,                      // Always has positions
+                hasColor(),     // May have colors
+                hasTexture(),   // May have texture coords
+                false                      // No normals
+        );
+
+        VertexBuffer vertexBuffer = graphics.createVertexBuffer(bufferUsage);
+
+        vertexBuffer.setFormat(format);
+
+        // Upload data
+        vertexBuffer.setData(cpuVertexBuffer, cpuVertexBuffer.remaining() * 4); // 4 bytes per float
+        return vertexBuffer;
+    }
+
     /**
      * Resets the tesselator state
      */
     private void clear() {
         this.vertexCount = 0;
-        this.vertexBuffer.clear();
+        this.cpuVertexBuffer.clear();
         this.dataIndex = 0;
     }
 
@@ -196,21 +221,21 @@ public class Tesselator implements Disposable {
     public void vertex(float x, float y, float z) {
         // Add texture coordinates if set
         if (this.hasTexture) {
-            this.vertexBuffer.put(this.dataIndex++, this.textureU);
-            this.vertexBuffer.put(this.dataIndex++, this.textureV);
+            this.cpuVertexBuffer.put(this.dataIndex++, this.textureU);
+            this.cpuVertexBuffer.put(this.dataIndex++, this.textureV);
         }
 
         // Add color if set
         if (this.hasColor) {
-            this.vertexBuffer.put(this.dataIndex++, this.colorR);
-            this.vertexBuffer.put(this.dataIndex++, this.colorG);
-            this.vertexBuffer.put(this.dataIndex++, this.colorB);
+            this.cpuVertexBuffer.put(this.dataIndex++, this.colorR);
+            this.cpuVertexBuffer.put(this.dataIndex++, this.colorG);
+            this.cpuVertexBuffer.put(this.dataIndex++, this.colorB);
         }
 
         // Add vertex position
-        this.vertexBuffer.put(this.dataIndex++, x);
-        this.vertexBuffer.put(this.dataIndex++, y);
-        this.vertexBuffer.put(this.dataIndex++, z);
+        this.cpuVertexBuffer.put(this.dataIndex++, x);
+        this.cpuVertexBuffer.put(this.dataIndex++, y);
+        this.cpuVertexBuffer.put(this.dataIndex++, z);
 
         // Increment vertex count
         this.vertexCount++;
@@ -243,4 +268,4 @@ public class Tesselator implements Disposable {
             buffer = null;
         }
     }
-} 
+}
