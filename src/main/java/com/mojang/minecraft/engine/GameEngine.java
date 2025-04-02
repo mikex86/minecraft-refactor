@@ -35,6 +35,9 @@ public class GameEngine {
     private long lastFpsUpdateTime = 0;
     private int framesCounter = 0;
 
+    private static final int MAX_FPS = 360;
+    private static final int YIELD_THRESHOLD_NS = 1000;
+
     /**
      * Creates a new GameEngine with the specified configuration.
      *
@@ -85,6 +88,8 @@ public class GameEngine {
         window.show();
     }
 
+    private long lastFrameStart = 0;
+
     /**
      * Updates the engine state for one frame.
      * This handles window events, input updates, and timing.
@@ -92,6 +97,18 @@ public class GameEngine {
      * @return true if the engine should continue running, false if it should stop
      */
     public boolean update() {
+        long nsPerFrame = 1000000000 / MAX_FPS;
+
+        long diff;
+        do {
+            diff = System.nanoTime() - lastFrameStart;
+            if (diff > YIELD_THRESHOLD_NS) {
+                Thread.yield();
+            }
+        } while (diff < nsPerFrame);
+
+        lastFrameStart = System.nanoTime();
+
         // Update window (swaps buffers and processes events)
         boolean shouldContinue = window.update();
 
@@ -125,7 +142,6 @@ public class GameEngine {
         } else {
             resized = false;
         }
-
         return shouldContinue;
     }
 
