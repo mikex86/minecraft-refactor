@@ -133,8 +133,6 @@ public class GameRenderer implements Disposable {
         graphics.setViewport(0, 0, this.width, this.height);
 
         // Set up projection matrix
-        graphics.setMatrixMode(GraphicsAPI.MatrixMode.PROJECTION);
-        graphics.loadIdentity();
         graphics.setPerspectiveProjection(70.0F, aspectRatio, 0.05F, 1000.0F);
 
         // Set up camera transformation
@@ -203,34 +201,36 @@ public class GameRenderer implements Disposable {
     private void renderLayer(boolean lit, float partialTick) {
         int layer = lit ? 0 : 1;
 
-        Frustum frustum = Frustum.getFrustum();
+        Frustum frustum = Frustum.getFrustum(graphics);
 
         // render level
         {
-            worldShader.use();
+            graphics.setShader(worldShader);
+            graphics.updateShaderMatrices();
             setupFog(worldShader, layer);
+
             this.levelRenderer.render(layer);
-            worldShader.detach();
         }
 
         // render entities
         {
-            entityShader.use();
+            graphics.setShader(entityShader);
+            // cannot set matrices "globally" because entities transform themselves
             setupFog(entityShader, layer);
+
             for (Entity entity : this.entities) {
                 if ((entity.isLit() == lit) && frustum.isVisible(entity.bb)) {
                     entity.render(this.graphics, partialTick);
                 }
             }
-            entityShader.detach();
         }
 
         // render particles
         {
-            particleShader.use();
+            graphics.setShader(particleShader);
+            graphics.updateShaderMatrices();
             setupFog(particleShader, layer);
             this.particleEngine.render(this.graphics, this.player, partialTick, layer);
-            particleShader.detach();
         }
     }
 
@@ -270,7 +270,7 @@ public class GameRenderer implements Disposable {
      * @param paintTexture The current block to place
      */
     private void renderHud(GraphicsAPI graphics, String fpsString, int editMode, int paintTexture) {
-        hudShader.use();
+        graphics.setShader(hudShader);
 
         // disable depth test
         graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
@@ -279,8 +279,7 @@ public class GameRenderer implements Disposable {
         int screenHeight = this.height * 240 / this.height;
 
         graphics.clear(false, true, 0.0F, 0.0F, 0.0F, 0.0F);
-        graphics.setMatrixMode(GraphicsAPI.MatrixMode.PROJECTION);
-        graphics.loadIdentity();
+
         graphics.setOrthographicProjection(0.0F, screenWidth, screenHeight, 0.0F, 100.0F, 300.0F);
         graphics.setMatrixMode(GraphicsAPI.MatrixMode.MODELVIEW);
         graphics.loadIdentity();
@@ -295,17 +294,17 @@ public class GameRenderer implements Disposable {
         drawDebugText(graphics, fpsString);
 
         graphics.setBlendState(false, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
-        hudShader.detach();
 
-        hudNoTexShader.use();
+        graphics.setShader(hudNoTexShader);
+        graphics.updateShaderMatrices();
 
         // Draw cross-hair
         drawCrosshair(graphics, screenWidth, screenHeight);
-
-        hudNoTexShader.detach();
     }
 
     private void drawDebugText(GraphicsAPI graphics, String fpsString) {
+        graphics.updateShaderMatrices();
+
         this.font.drawShadow(graphics, Minecraft.VERSION_STRING, 2, 2, 0xFFFFFF);
         this.font.drawShadow(graphics, fpsString, 2, 12, 0xFFFFFF);
     }
@@ -319,6 +318,8 @@ public class GameRenderer implements Disposable {
         graphics.rotateY(45.0F);
         graphics.scale(-1.0F, -1.0F, 1.0F);
 
+        graphics.updateShaderMatrices();
+
         Texture texture = this.textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
         graphics.setTexture(texture);
         t.init();
@@ -331,6 +332,8 @@ public class GameRenderer implements Disposable {
     private void drawCrosshair(GraphicsAPI graphics, int screenWidth, int screenHeight) {
         int centerX = screenWidth / 2;
         int centerY = screenHeight / 2;
+
+        graphics.updateShaderMatrices();
 
         Tesselator t = Tesselator.instance;
         t.init();

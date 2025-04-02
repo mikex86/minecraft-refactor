@@ -2,7 +2,6 @@
 
 // Input from vertex shader
 varying vec4 vertexColor;
-varying float fogFactor;
 
 void main() {
     // Apply vertex color

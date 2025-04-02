@@ -3,7 +3,6 @@ package com.mojang.minecraft.gui;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
-import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.Texture;
 
 import javax.imageio.ImageIO;

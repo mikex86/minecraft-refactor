@@ -2,13 +2,13 @@ package com.mojang.minecraft.renderer.graphics.opengl;
 
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.*;
+import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 import com.mojang.minecraft.renderer.shader.Shader;
-import org.lwjgl.BufferUtils;
 
 import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
+import java.util.Objects;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
@@ -19,8 +19,8 @@ import static org.lwjgl.opengl.GL15.*;
  */
 public class OpenGLGraphicsAPI implements GraphicsAPI {
 
-    // OpenGL-specific resources
-    private final FloatBuffer matrixBuffer;
+    // Matrix stack for emulating OpenGL's matrix functionality
+    private final MatrixStack matrixStack;
 
     // Current shader
     private Shader currentShader = null;
@@ -29,7 +29,7 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
      * Creates a new OpenGL graphics API implementation.
      */
     public OpenGLGraphicsAPI() {
-        this.matrixBuffer = BufferUtils.createFloatBuffer(16);
+        this.matrixStack = new MatrixStack();
     }
 
     @Override
@@ -51,11 +51,10 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
         // Set up smooth shading
         glShadeModel(GL_SMOOTH);
 
-        // Initialize matrix stacks
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
+        setMatrixMode(MatrixMode.PROJECTION);
+        loadIdentity();
+        setMatrixMode(MatrixMode.MODELVIEW);
+        loadIdentity();
     }
 
     @Override
@@ -138,93 +137,61 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
 
     @Override
     public void setPerspectiveProjection(float fov, float aspect, float nearPlane, float farPlane) {
-        // Calculate perspective matrix parameters
-        float yScale = (float) (1.0 / Math.tan(Math.toRadians(fov / 2.0)));
-        float xScale = yScale / aspect;
-        float frustumLength = farPlane - nearPlane;
-
-        // Set up the projection matrix
-        matrixBuffer.clear();
-        matrixBuffer.put(xScale).put(0).put(0).put(0);
-        matrixBuffer.put(0).put(yScale).put(0).put(0);
-        matrixBuffer.put(0).put(0).put(-((farPlane + nearPlane) / frustumLength)).put(-1);
-        matrixBuffer.put(0).put(0).put(-((2 * nearPlane * farPlane) / frustumLength)).put(0);
-        matrixBuffer.flip();
-
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glLoadMatrixf(matrixBuffer);
-        glMatrixMode(GL_MODELVIEW);
+        matrixStack.setMatrixMode(MatrixMode.PROJECTION);
+        matrixStack.loadIdentity();
+        matrixStack.setPerspective(fov, aspect, nearPlane, farPlane);
     }
 
     @Override
     public void setOrthographicProjection(float left, float right, float bottom, float top, float near, float far) {
-        matrixBuffer.clear();
-        matrixBuffer.put(2 / (right - left)).put(0).put(0).put(0);
-        matrixBuffer.put(0).put(2 / (top - bottom)).put(0).put(0);
-        matrixBuffer.put(0).put(0).put(-2 / (far - near)).put(0);
-        matrixBuffer.put(-(right + left) / (right - left)).put(-(top + bottom) / (top - bottom)).put(-(far + near) / (far - near)).put(1);
-        matrixBuffer.flip();
-
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glLoadMatrixf(matrixBuffer);
-        glMatrixMode(GL_MODELVIEW);
+        matrixStack.setMatrixMode(MatrixMode.PROJECTION);
+        matrixStack.loadIdentity();
+        matrixStack.setOrthographic(left, right, bottom, top, near, far);
     }
 
     @Override
     public void pushMatrix() {
-        glPushMatrix();
+        matrixStack.pushMatrix();
     }
 
     @Override
     public void popMatrix() {
-        glPopMatrix();
+        matrixStack.popMatrix();
     }
 
     @Override
     public void loadIdentity() {
-        glLoadIdentity();
+        matrixStack.loadIdentity();
     }
 
     @Override
     public void translate(float x, float y, float z) {
-        glTranslatef(x, y, z);
+        matrixStack.translate(x, y, z);
     }
 
     @Override
     public void rotateX(float angle) {
-        glRotatef(angle, 1.0f, 0.0f, 0.0f);
+        matrixStack.rotateX(angle);
     }
 
     @Override
     public void rotateY(float angle) {
-        glRotatef(angle, 0.0f, 1.0f, 0.0f);
+        matrixStack.rotateY(angle);
     }
 
     @Override
     public void rotateZ(float angle) {
-        glRotatef(angle, 0.0f, 0.0f, 1.0f);
+        matrixStack.rotateZ(angle);
     }
 
     @Override
     public void scale(float x, float y, float z) {
-        glScalef(x, y, z);
+        matrixStack.scale(x, y, z);
     }
 
     @Override
     public void setMatrixMode(MatrixMode mode) {
-        switch (mode) {
-            case MODELVIEW:
-                glMatrixMode(GL_MODELVIEW);
-                break;
-            case PROJECTION:
-                glMatrixMode(GL_PROJECTION);
-                break;
-            case TEXTURE:
-                glMatrixMode(GL_TEXTURE);
-                break;
-        }
+        matrixStack.setMatrixMode(mode);
     }
 
     @Override
@@ -313,6 +280,34 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
                 currentShader = null;
             }
         }
+    }
+
+    /**
+     * Updates the shader uniforms with the current matrices.
+     * This is used to provide the matrices to the shader program.
+     */
+    @Override
+    public void updateShaderMatrices() {
+        Objects.requireNonNull(currentShader, "No shader set");
+
+        // Set modelview matrix uniform if the shader supports it
+        try {
+            currentShader.setUniformMatrix4fv("modelViewMatrix", matrixStack.getModelViewBuffer());
+        } catch (IllegalArgumentException e) {
+            // Ignore if uniform doesn't exist
+        }
+
+        // Set projection matrix uniform if the shader supports it
+        try {
+            currentShader.setUniformMatrix4fv("projectionMatrix", matrixStack.getProjectionBuffer());
+        } catch (IllegalArgumentException e) {
+            // Ignore if uniform doesn't exist
+        }
+    }
+
+    @Override
+    public MatrixStack getMatrixStack() {
+        return matrixStack;
     }
 
     //--------------------------------------------------
@@ -437,16 +432,4 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
         }
     }
 
-    private int translateFogMode(FogMode mode) {
-        switch (mode) {
-            case LINEAR:
-                return GL_LINEAR;
-            case EXP:
-                return GL_EXP;
-            case EXP2:
-                return GL_EXP2;
-            default:
-                return GL_EXP;
-        }
-    }
-} 
+}

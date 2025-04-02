@@ -189,6 +189,7 @@ public class Cube {
         graphics.rotateX(this.xRot * RADIANS_TO_DEGREES);
 
         // Render the mesh
+        graphics.updateShaderMatrices();
         this.mesh.render();
 
         graphics.popMatrix();

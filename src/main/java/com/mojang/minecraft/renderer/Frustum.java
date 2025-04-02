@@ -1,11 +1,9 @@
 package com.mojang.minecraft.renderer;
 
 import com.mojang.minecraft.phys.AABB;
-import org.lwjgl.BufferUtils;
+import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 
 import java.nio.FloatBuffer;
-
-import static org.lwjgl.opengl.GL11.*;
 
 /**
  * Handles view frustum calculations for 3D rendering
@@ -31,11 +29,6 @@ public class Frustum {
     // Singleton instance
     private static final Frustum instance = new Frustum();
 
-    // Buffers for OpenGL matrices
-    private final FloatBuffer projectionBuffer = BufferUtils.createFloatBuffer(16);
-    private final FloatBuffer modelviewBuffer = BufferUtils.createFloatBuffer(16);
-    private final FloatBuffer clipBuffer = BufferUtils.createFloatBuffer(16);
-
     // Arrays to hold matrix data
     private final float[] projection = new float[16];
     private final float[] modelview = new float[16];
@@ -52,8 +45,8 @@ public class Frustum {
      *
      * @return Updated frustum instance
      */
-    public static Frustum getFrustum() {
-        instance.calculateFrustum();
+    public static Frustum getFrustum(GraphicsAPI graphics) {
+        instance.calculateFrustum(graphics);
         return instance;
     }
 
@@ -79,21 +72,13 @@ public class Frustum {
     /**
      * Calculate the frustum planes from current OpenGL matrices
      */
-    private void calculateFrustum() {
-        // Clear buffers
-        this.projectionBuffer.clear();
-        this.modelviewBuffer.clear();
-        this.clipBuffer.clear();
-
-        // Get current OpenGL matrices - update to LWJGL3 methods
-        glGetFloatv(GL_PROJECTION_MATRIX, this.projectionBuffer);
-        glGetFloatv(GL_MODELVIEW_MATRIX, this.modelviewBuffer);
-
+    private void calculateFrustum(GraphicsAPI graphics) {
         // Read matrices into arrays
-        this.projectionBuffer.flip().limit(16);
-        this.projectionBuffer.get(this.projection);
-        this.modelviewBuffer.flip().limit(16);
-        this.modelviewBuffer.get(this.modelview);
+        FloatBuffer projectionBuffer = graphics.getMatrixStack().getProjectionBuffer();
+        FloatBuffer modelViewBuffer = graphics.getMatrixStack().getModelViewBuffer();
+
+        projectionBuffer.get(this.projection);
+        modelViewBuffer.get(this.modelview);
 
         // Calculate the clip matrix (projection * modelview)
         // Row 1
