@@ -5,13 +5,19 @@ import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.ChunkMesh;
 import com.mojang.minecraft.renderer.Disposable;
+import com.mojang.minecraft.renderer.Frustum;
 import com.mojang.minecraft.renderer.Tesselator;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Represents a chunk of the world that can be rendered independently.
- * Designed to support cubic chunks in the future.
+ * Uses cubic sections (16x16x16) for more efficient rendering.
  */
 public class Chunk implements Disposable {
+    // Section size constants
+    public static final int SECTION_SIZE = 16;
 
     // Bounding box for this chunk
     public AABB aabb;
@@ -32,9 +38,11 @@ public class Chunk implements Disposable {
     public final float y;
     public final float z;
 
-    // Rendering state
+    // Chunk sections
+    private final List<ChunkSection> sections = new ArrayList<>();
+
+    // Status tracking
     private boolean dirty = true;
-    private final ChunkMesh chunkMesh;
     public long dirtiedTime = 0L;
 
     // Static rendering stats
@@ -65,42 +73,67 @@ public class Chunk implements Disposable {
         this.y = (float) (y0 + y1) / 2.0F;
         this.z = (float) (z0 + z1) / 2.0F;
 
-        // Create bounding box and meshes
+        // Create bounding box
         this.aabb = new AABB((float) x0, (float) y0, (float) z0, (float) x1, (float) y1, (float) z1);
-        this.chunkMesh = new ChunkMesh();
+
+        // Initialize sections
+        initSections();
+    }
+
+    /**
+     * Initializes the chunk sections based on chunk dimensions.
+     */
+    private void initSections() {
+        int xSections = (int) Math.ceil((x1 - x0) / (float) SECTION_SIZE);
+        int ySections = (int) Math.ceil((y1 - y0) / (float) SECTION_SIZE);
+        int zSections = (int) Math.ceil((z1 - z0) / (float) SECTION_SIZE);
+
+        for (int sx = 0; sx < xSections; sx++) {
+            for (int sy = 0; sy < ySections; sy++) {
+                for (int sz = 0; sz < zSections; sz++) {
+                    int sectionX0 = x0 + sx * SECTION_SIZE;
+                    int sectionY0 = y0 + sy * SECTION_SIZE;
+                    int sectionZ0 = z0 + sz * SECTION_SIZE;
+                    int sectionX1 = Math.min(sectionX0 + SECTION_SIZE, x1);
+                    int sectionY1 = Math.min(sectionY0 + SECTION_SIZE, y1);
+                    int sectionZ1 = Math.min(sectionZ0 + SECTION_SIZE, z1);
+
+                    sections.add(new ChunkSection(sectionX0, sectionY0, sectionZ0, sectionX1, sectionY1, sectionZ1));
+                }
+            }
+        }
     }
 
     /**
      * Rebuilds the chunk mesh
      */
     public void rebuild() {
-        if (!this.dirty && !chunkMesh.isDirty()) {
-            return;
+        if (!this.dirty) {
+            boolean anySectionDirty = false;
+            for (ChunkSection section : sections) {
+                if (section.isDirty()) {
+                    anySectionDirty = true;
+                    break;
+                }
+            }
+
+            if (!anySectionDirty) {
+                return;
+            }
         }
 
         ++updates;
         long startTime = System.nanoTime();
 
-        Tesselator tesselator = chunkMesh.getTesselator();
-        tesselator.init();
-
         int renderedTiles = 0;
 
-        // Render all visible tiles in the chunk
-        for (int x = this.x0; x < this.x1; ++x) {
-            for (int y = this.y0; y < this.y1; ++y) {
-                for (int z = this.z0; z < this.z1; ++z) {
-                    int tileId = this.level.getTile(x, y, z);
-                    if (tileId > 0) {
-                        Tile.tiles[tileId].render(tesselator, level, x, y, z);
-                        ++renderedTiles;
-                    }
-                }
+        // Rebuild all dirty sections
+        for (ChunkSection section : sections) {
+            if (this.dirty || section.isDirty()) {
+                section.rebuild(level);
+                renderedTiles += section.getRenderedTiles();
             }
         }
-
-        // Rebuild the mesh with the accumulated data
-        chunkMesh.rebuild();
 
         long endTime = System.nanoTime();
 
@@ -115,19 +148,44 @@ public class Chunk implements Disposable {
     /**
      * Renders the given chunk
      */
-    public void render() {
-        this.chunkMesh.render();
+    public void render(Frustum frustum) {
+        for (ChunkSection section : sections) {
+            if (section.hasMesh() && frustum.isVisible(section.getAABB())) {
+                section.render();
+            }
+        }
     }
 
     /**
-     * Marks the chunk as dirty, requiring a rebuild.
+     * Marks the entire chunk as dirty, requiring a rebuild.
      */
-    public void setDirty() {
+    public void setFullChunkDirty() {
         if (!this.dirty) {
             this.dirtiedTime = System.currentTimeMillis();
         }
         this.dirty = true;
-        this.chunkMesh.setDirty();
+
+        // Mark all sections as dirty
+        for (ChunkSection section : sections) {
+            section.setDirty();
+        }
+    }
+
+    /**
+     * Marks a specific block position as dirty.
+     * Only affects the section containing the block.
+     */
+    public void setDirtyBlock(int x, int y, int z) {
+        for (ChunkSection section : sections) {
+            if (section.containsOrAdjacent(x, y, z)) {
+                section.setDirty();
+                if (!this.dirty) {
+                    this.dirtiedTime = System.currentTimeMillis();
+                    this.dirty = true;
+                }
+                return;
+            }
+        }
     }
 
     /**
@@ -153,6 +211,145 @@ public class Chunk implements Disposable {
      */
     @Override
     public void dispose() {
-        chunkMesh.dispose();
+        for (ChunkSection section : sections) {
+            section.dispose();
+        }
+        sections.clear();
+    }
+
+    /**
+     * Represents a 16x16x16 section of a chunk that can be rendered independently.
+     */
+    private static class ChunkSection implements Disposable {
+        // Section boundaries
+        private final int x0, y0, z0;
+        private final int x1, y1, z1;
+
+        // Section bounding box for frustum culling
+        private final AABB aabb;
+
+        // Rendering state
+        private boolean dirty = true;
+        private final ChunkMesh chunkMesh;
+        private int renderedTiles = 0;
+        private boolean empty = true;
+
+        /**
+         * Creates a new chunk section with the specified boundaries.
+         */
+        public ChunkSection(int x0, int y0, int z0, int x1, int y1, int z1) {
+            this.x0 = x0;
+            this.y0 = y0;
+            this.z0 = z0;
+            this.x1 = x1;
+            this.y1 = y1;
+            this.z1 = z1;
+
+            // Create bounding box for frustum culling
+            this.aabb = new AABB((float) x0, (float) y0, (float) z0, (float) x1, (float) y1, (float) z1);
+
+            this.chunkMesh = new ChunkMesh();
+        }
+
+        /**
+         * Checks if this section contains the specified block coordinates or is adjacent to them.
+         */
+        public boolean containsOrAdjacent(int x, int y, int z) {
+            return (x >= x0 && x < x1 &&
+                    y >= y0 && y < y1 &&
+                    z >= z0 && z < z1) ||
+                    (x == x0 - 1 || x == x1) ||
+                    (y == y0 - 1 || y == y1) ||
+                    (z == z0 - 1 || z == z1);
+        }
+
+        /**
+         * Gets the section's axis-aligned bounding box.
+         */
+        public AABB getAABB() {
+            return aabb;
+        }
+
+        /**
+         * Rebuilds the section mesh
+         */
+        public void rebuild(Level level) {
+            if (!this.dirty) {
+                return;
+            }
+
+            Tesselator tesselator = chunkMesh.getTesselator();
+            tesselator.init();
+
+            renderedTiles = 0;
+            empty = true;
+
+            // Render all visible tiles in the section
+            for (int x = this.x0; x < this.x1; ++x) {
+                for (int y = this.y0; y < this.y1; ++y) {
+                    for (int z = this.z0; z < this.z1; ++z) {
+                        int tileId = level.getTile(x, y, z);
+                        if (tileId > 0) {
+                            Tile.tiles[tileId].render(tesselator, level, x, y, z);
+                            ++renderedTiles;
+                            empty = false;
+                        }
+                    }
+                }
+            }
+
+            // Only rebuild the mesh if there are actual tiles in this section
+            if (!empty) {
+                chunkMesh.rebuild();
+            }
+
+            this.dirty = false;
+        }
+
+        /**
+         * Renders this section
+         */
+        public void render() {
+            if (!empty) {
+                chunkMesh.render();
+            }
+        }
+
+        /**
+         * Returns whether this section needs to be rebuilt.
+         */
+        public boolean isDirty() {
+            return this.dirty || chunkMesh.isDirty();
+        }
+
+        /**
+         * Marks this section as dirty, requiring a rebuild.
+         */
+        public void setDirty() {
+            this.dirty = true;
+            this.chunkMesh.setDirty();
+        }
+
+        /**
+         * Returns the number of tiles rendered in this section.
+         */
+        public int getRenderedTiles() {
+            return renderedTiles;
+        }
+
+        /**
+         * Returns whether this section has a mesh (is not empty).
+         */
+        public boolean hasMesh() {
+            return !empty;
+        }
+
+        /**
+         * Disposes of this section's resources.
+         */
+        @Override
+        public void dispose() {
+            chunkMesh.dispose();
+        }
     }
 }

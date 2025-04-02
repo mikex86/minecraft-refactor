@@ -32,7 +32,7 @@ public class Level {
     private final int[] lightDepths;
     private final List<LevelListener> levelListeners = new ArrayList<>();
     private final Random random = new Random();
-    int unprocessed = 0;
+    private int unprocessed = 0;
 
     /**
      * Creates a new level with the specified dimensions.
@@ -147,7 +147,7 @@ public class Level {
     /**
      * Gets all the AABBs inside the specified AABB.
      */
-    public ArrayList<AABB> getCubes(AABB box) {
+    public List<AABB> getCubes(AABB box) {
         ArrayList<AABB> cubes = new ArrayList<>();
 
         int x0 = (int) box.x0;

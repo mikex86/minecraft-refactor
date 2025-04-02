@@ -7,12 +7,7 @@ import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.Texture;
-import com.mojang.minecraft.renderer.shader.ShaderRegistry;
-import com.mojang.minecraft.renderer.shader.impl.FogShader;
-import com.mojang.minecraft.renderer.shader.impl.WorldShader;
-import org.lwjgl.BufferUtils;
 
-import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,10 +29,6 @@ public class LevelRenderer implements LevelListener, Disposable {
     // Graphics resources
     private final GraphicsAPI graphics;
     private final TextureManager textureManager;
-
-    // Matrix buffers for shader
-    private final FloatBuffer modelViewMatrix = BufferUtils.createFloatBuffer(16);
-    private final FloatBuffer projectionMatrix = BufferUtils.createFloatBuffer(16);
 
     /**
      * Creates a new GraphicsLevelRenderer for the specified level.
@@ -121,7 +112,7 @@ public class LevelRenderer implements LevelListener, Disposable {
         // Render all visible chunks
         for (Chunk chunk : this.chunks) {
             if (frustum.isVisible(chunk.aabb)) {
-                chunk.render();
+                chunk.render(frustum);
             }
         }
     }
@@ -132,13 +123,14 @@ public class LevelRenderer implements LevelListener, Disposable {
     public void updateDirtyChunks(Player player) {
         List<Chunk> dirtyChunks = this.getAllDirtyChunks();
         if (dirtyChunks != null && !dirtyChunks.isEmpty()) {
-            dirtyChunks.sort(new DirtyChunkSorter(player, Frustum.getFrustum(graphics)));
+            Frustum frustum = Frustum.getFrustum(graphics);
+            dirtyChunks.sort(new DirtyChunkSorter(player, frustum));
 
             // Rebuild at most MAX_REBUILDS_PER_FRAME chunks per frame
             int rebuildCount = Math.min(MAX_REBUILDS_PER_FRAME, dirtyChunks.size());
             int numRebuilt = 0;
             for (Chunk dirtyChunk : dirtyChunks) {
-                if (!Frustum.getFrustum(graphics).isVisible(dirtyChunk.aabb)) {
+                if (!frustum.isVisible(dirtyChunk.aabb)) {
                     continue;
                 }
                 dirtyChunk.rebuild();
@@ -151,31 +143,33 @@ public class LevelRenderer implements LevelListener, Disposable {
     }
 
     /**
-     * Marks a region of chunks as dirty, needing to be rebuilt.
+     * A block position as dirty and triggers all chunks that contain/border it to be rebuilt.
      */
-    public void setDirty(int x0, int y0, int z0, int x1, int y1, int z1) {
-        // Convert block coordinates to chunk coordinates
-        x0 /= CHUNK_SIZE;
-        x1 /= CHUNK_SIZE;
-        y0 /= CHUNK_SIZE;
-        y1 /= CHUNK_SIZE;
-        z0 /= CHUNK_SIZE;
-        z1 /= CHUNK_SIZE;
+    public void setDirty(int x, int y, int z) {
+        // Calculate the chunk coordinates
+        int cx = x / CHUNK_SIZE;
+        int cy = y / CHUNK_SIZE;
+        int cz = z / CHUNK_SIZE;
 
-        // Clamp to valid chunk ranges
-        x0 = Math.max(0, x0);
-        y0 = Math.max(0, y0);
-        z0 = Math.max(0, z0);
-        x1 = Math.min(x1, this.xChunks - 1);
-        y1 = Math.min(y1, this.yChunks - 1);
-        z1 = Math.min(z1, this.zChunks - 1);
+        // Mark the chunk as dirty
+        if (cx >= 0 && cy >= 0 && cz >= 0 && cx < this.xChunks && cy < this.yChunks && cz < this.zChunks) {
+            int chunkIndex = (cx + cy * this.xChunks) * this.zChunks + cz;
+            Chunk chunk = this.chunks[chunkIndex];
+            chunk.setDirtyBlock(x, y, z);
+        }
 
-        // Mark all chunks in the region as dirty
-        for (int x = x0; x <= x1; ++x) {
-            for (int y = y0; y <= y1; ++y) {
-                for (int z = z0; z <= z1; ++z) {
-                    int chunkIndex = (x + y * this.xChunks) * this.zChunks + z;
-                    this.chunks[chunkIndex].setDirty();
+        // Mark all adjacent chunks as dirty
+        for (int xx = -1; xx <= 1; ++xx) {
+            for (int yy = -1; yy <= 1; ++yy) {
+                for (int zz = -1; zz <= 1; ++zz) {
+                    int ax = cx + xx;
+                    int ay = cy + yy;
+                    int az = cz + zz;
+                    if (ax >= 0 && ay >= 0 && az >= 0 && ax < this.xChunks && ay < this.yChunks && az < this.zChunks) {
+                        int chunkIndex = (ax + ay * this.xChunks) * this.zChunks + az;
+                        Chunk chunk = this.chunks[chunkIndex];
+                        chunk.setDirtyBlock(x, y , z);
+                    }
                 }
             }
         }
@@ -187,7 +181,7 @@ public class LevelRenderer implements LevelListener, Disposable {
     @Override
     public void tileChanged(int x, int y, int z) {
         // Mark a region around the changed tile as dirty
-        this.setDirty(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1);
+        this.setDirty(x, y, z);
     }
 
     /**
@@ -195,8 +189,7 @@ public class LevelRenderer implements LevelListener, Disposable {
      */
     @Override
     public void lightColumnChanged(int x, int z, int y0, int y1) {
-        // Mark a region around the changed light column as dirty
-        this.setDirty(x - 1, y0 - 1, z - 1, x + 1, y1 + 1, z + 1);
+        this.setDirty(x, y0, z);
     }
 
     /**
@@ -206,7 +199,7 @@ public class LevelRenderer implements LevelListener, Disposable {
     public void allChanged() {
         // Mark all chunks as dirty
         for (Chunk chunk : this.chunks) {
-            chunk.setDirty();
+            chunk.setFullChunkDirty();
         }
     }
 
