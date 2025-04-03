@@ -143,17 +143,7 @@ public class Chunk implements Disposable {
      */
     public void rebuild() {
         if (!this.dirty) {
-            boolean anySectionDirty = false;
-            for (ChunkSection section : sections) {
-                if (section.isDirty()) {
-                    anySectionDirty = true;
-                    break;
-                }
-            }
-
-            if (!anySectionDirty) {
-                return;
-            }
+            return;
         }
 
         ++updates;
@@ -163,7 +153,7 @@ public class Chunk implements Disposable {
 
         // Rebuild all dirty sections
         for (ChunkSection section : sections) {
-            if (this.dirty || section.isDirty()) {
+            if (section.isDirty()) {
                 section.rebuild(level);
                 renderedTiles += section.getRenderedTiles();
             }
@@ -363,7 +353,7 @@ public class Chunk implements Disposable {
          * Returns whether this section needs to be rebuilt.
          */
         public boolean isDirty() {
-            return this.dirty || chunkMesh.isDirty();
+            return this.dirty;
         }
 
         /**
@@ -371,7 +361,6 @@ public class Chunk implements Disposable {
          */
         public void setDirty() {
             this.dirty = true;
-            this.chunkMesh.setDirty();
         }
 
         /**

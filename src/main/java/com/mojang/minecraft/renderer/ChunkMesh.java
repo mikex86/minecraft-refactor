@@ -15,7 +15,6 @@ public class ChunkMesh implements Disposable {
     private final Tesselator tesselator;
 
     // State tracking
-    private boolean dirty = true;
     private boolean disposed = false;
 
     /**
@@ -35,27 +34,9 @@ public class ChunkMesh implements Disposable {
     }
 
     /**
-     * Marks this mesh as dirty, requiring a rebuild.
-     */
-    public void setDirty() {
-        dirty = true;
-    }
-
-    /**
-     * Returns whether the mesh needs to be rebuilt.
-     */
-    public boolean isDirty() {
-        return dirty;
-    }
-
-    /**
      * Rebuilds the mesh with the latest vertex data.
      */
     public void rebuild() {
-        if (!dirty) {
-            return;
-        }
-
         // Clean up existing mesh if needed
         if (mesh != null) {
             mesh.dispose();
@@ -68,8 +49,6 @@ public class ChunkMesh implements Disposable {
         if (vertexCount > 0 && indexCount > 0) {
             mesh = tesselator.createIndexedMesh(GraphicsEnums.BufferUsage.STATIC);
         }
-
-        dirty = false;
     }
 
     /**
@@ -88,7 +67,6 @@ public class ChunkMesh implements Disposable {
      */
     public void clear() {
         tesselator.init();
-        setDirty();
     }
 
     /**
