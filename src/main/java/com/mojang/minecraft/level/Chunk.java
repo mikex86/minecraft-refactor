@@ -17,7 +17,9 @@ import java.util.List;
  * Uses cubic sections (16x16x16) for more efficient rendering.
  */
 public class Chunk implements Disposable {
-    // Section size constants
+
+    public static final int CHUNK_SIZE = 16;
+    public static final int CHUNK_HEIGHT = 128;
     public static final int SECTION_SIZE = 16;
 
     // Bounding box for this chunk
@@ -33,6 +35,8 @@ public class Chunk implements Disposable {
     public final int x1;
     public final int y1;
     public final int z1;
+
+    private final byte[] blocks;
 
     // Chunk center coordinates
     public final float x;
@@ -60,14 +64,14 @@ public class Chunk implements Disposable {
     /**
      * Creates a new chunk with the specified boundaries.
      */
-    public Chunk(Level level, int x0, int y0, int z0, int x1, int y1, int z1) {
+    public Chunk(Level level, int chunkX, int chunkZ) {
         this.level = level;
-        this.x0 = x0;
-        this.y0 = y0;
-        this.z0 = z0;
-        this.x1 = x1;
-        this.y1 = y1;
-        this.z1 = z1;
+        this.x0 = chunkX * CHUNK_SIZE;
+        this.y0 = 0;
+        this.z0 = chunkZ * CHUNK_SIZE;
+        this.x1 = this.x0 + CHUNK_SIZE;
+        this.y1 = CHUNK_HEIGHT;
+        this.z1 = this.z0 + CHUNK_SIZE;
 
         // Calculate center coordinates
         this.x = (float) (x0 + x1) / 2.0F;
@@ -77,6 +81,9 @@ public class Chunk implements Disposable {
         // Create bounding box
         this.aabb = new AABB((float) x0, (float) y0, (float) z0, (float) x1, (float) y1, (float) z1);
 
+        // Initialize blocks array
+        this.blocks = new byte[CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_HEIGHT];
+
         // Initialize sections
         initSections();
     }
@@ -85,9 +92,9 @@ public class Chunk implements Disposable {
      * Initializes the chunk sections based on chunk dimensions.
      */
     private void initSections() {
-        int xSections = (int) Math.ceil((x1 - x0) / (float) SECTION_SIZE);
-        int ySections = (int) Math.ceil((y1 - y0) / (float) SECTION_SIZE);
-        int zSections = (int) Math.ceil((z1 - z0) / (float) SECTION_SIZE);
+        int xSections = (int) Math.ceil(CHUNK_SIZE / (float) SECTION_SIZE);
+        int ySections = (int) Math.ceil(CHUNK_HEIGHT / (float) SECTION_SIZE);
+        int zSections = (int) Math.ceil(CHUNK_SIZE / (float) SECTION_SIZE);
 
         for (int sx = 0; sx < xSections; sx++) {
             for (int sy = 0; sy < ySections; sy++) {
@@ -103,6 +110,31 @@ public class Chunk implements Disposable {
                 }
             }
         }
+    }
+
+    public int getTile(int localX, int localY, int localZ) {
+        // check if in bounds
+        if (localX < 0 || localY < 0 || localZ < 0 || localX >= CHUNK_SIZE || localY >= CHUNK_HEIGHT || localZ >= CHUNK_SIZE) {
+            return 0;
+        }
+        // calculate the index in the blocks array
+        int index = (localX * CHUNK_HEIGHT + localY) * CHUNK_SIZE + localZ;
+        return blocks[index];
+    }
+
+    public boolean setTile(int localX, int localY, int localZ, int tileId) {
+        // check if in bounds
+        if (localX < 0 || localY < 0 || localZ < 0 || localX >= CHUNK_SIZE || localY >= CHUNK_HEIGHT || localZ >= CHUNK_SIZE) {
+            return false;
+        }
+        // calculate the index in the blocks array
+        int index = (localX * CHUNK_HEIGHT + localY) * CHUNK_SIZE + localZ;
+        if (blocks[index] == tileId) {
+            return false; // no change
+        }
+
+        blocks[index] = (byte) tileId;
+        return true;
     }
 
     /**
@@ -309,6 +341,7 @@ public class Chunk implements Disposable {
 
         /**
          * Renders this section
+         *
          * @param graphics the graphics API
          */
         public void render(GraphicsAPI graphics) {

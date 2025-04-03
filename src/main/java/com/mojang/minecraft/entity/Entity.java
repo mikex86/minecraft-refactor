@@ -99,17 +99,6 @@ public class Entity {
      */
     public Entity(Level level) {
         this.level = level;
-        this.resetPos();
-    }
-
-    /**
-     * Resets the entity's position to a random location in the level.
-     */
-    public void resetPos() {
-        float x = (float) Math.random() * (float) this.level.width;
-        float y = (float) (this.level.depth + 10);
-        float z = (float) Math.random() * (float) this.level.height;
-        this.setPos(x, y, z);
     }
 
     /**
@@ -146,7 +135,7 @@ public class Entity {
      * @param y New y position
      * @param z New z position
      */
-    protected void setPos(float x, float y, float z) {
+    public void setPos(float x, float y, float z) {
         this.x = x;
         this.y = y;
         this.z = z;

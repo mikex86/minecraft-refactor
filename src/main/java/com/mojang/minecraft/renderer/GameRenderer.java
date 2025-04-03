@@ -288,6 +288,7 @@ public class GameRenderer implements Disposable {
 
         this.font.drawShadow(graphics, Minecraft.VERSION_STRING, 2, 2, 0xFFFFFF);
         this.font.drawShadow(graphics, fpsString, 2, 12, 0xFFFFFF);
+        this.font.drawShadow(graphics, "x: " + player.x + ", y: " + player.y + ", z: " + player.z, 2, 22, 0xFFFFFF);
     }
 
     private void drawBlockPreview(GraphicsAPI graphics, int screenWidth, int screenHeight, int paintTexture) {

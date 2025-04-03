@@ -59,6 +59,6 @@ public class DirtyChunkSorter implements Comparator<Chunk> {
         // Third priority: distance to player
         float distance1 = chunk1.distanceToSqr(this.player);
         float distance2 = chunk2.distanceToSqr(this.player);
-        return distance1 < distance2 ? -1 : 1;
+        return Float.compare(distance1, distance2);
     }
 }

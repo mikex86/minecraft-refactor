@@ -7,6 +7,9 @@ import com.mojang.minecraft.level.Level;
  * Handles player movement, input, and interaction with the world.
  */
 public class Player extends Entity {
+
+    private static final int CHUNK_LOAD_RADIUS = 8;
+
     // Input state
     private boolean forward = false;
     private boolean back = false;
@@ -98,6 +101,31 @@ public class Player extends Entity {
         if (this.onGround) {
             this.xd *= 0.7F;
             this.zd *= 0.7F;
+        }
+
+        generateChunksAroundPlayer();
+    }
+
+    private void generateChunksAroundPlayer() {
+        int chunkX = (int) this.x >> 4;
+        int chunkZ = (int) this.z >> 4;
+
+        // Load chunks around the player
+        for (int x = -CHUNK_LOAD_RADIUS; x <= CHUNK_LOAD_RADIUS; ++x) {
+            for (int z = -CHUNK_LOAD_RADIUS; z <= CHUNK_LOAD_RADIUS; ++z) {
+                int cx = chunkX + x;
+                int cz = chunkZ + z;
+
+                // check if distance is within the load radius
+                if (Math.hypot(x, z) > CHUNK_LOAD_RADIUS) {
+                    continue;
+                }
+
+                // Load the chunk if it's not already loaded
+                if (!this.level.isChunkLoaded(cx, cz)) {
+                    this.level.loadChunk(cx, cz);
+                }
+            }
         }
     }
 } 

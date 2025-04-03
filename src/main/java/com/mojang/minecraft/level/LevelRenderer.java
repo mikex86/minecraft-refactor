@@ -11,20 +11,17 @@ import com.mojang.minecraft.renderer.graphics.Texture;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.mojang.minecraft.level.Chunk.CHUNK_SIZE;
+
 /**
  * Handles rendering of the Minecraft level.
  */
 public class LevelRenderer implements LevelListener, Disposable {
     // Constants
     public static final int MAX_REBUILDS_PER_FRAME = 128;
-    public static final int CHUNK_SIZE = 16;
 
     // Level data
     private final Level level;
-    private final Chunk[] chunks;
-    private final int xChunks;
-    private final int yChunks;
-    private final int zChunks;
 
     // Graphics resources
     private final GraphicsAPI graphics;
@@ -40,44 +37,6 @@ public class LevelRenderer implements LevelListener, Disposable {
 
         // Register as a level listener
         level.addListener(this);
-
-        // Calculate the number of chunks in each dimension
-        this.xChunks = level.width / CHUNK_SIZE;
-        this.yChunks = level.depth / CHUNK_SIZE;
-        this.zChunks = level.height / CHUNK_SIZE;
-
-        // Create the chunks
-        this.chunks = new Chunk[this.xChunks * this.yChunks * this.zChunks];
-
-        // Initialize all chunks
-        for (int x = 0; x < this.xChunks; ++x) {
-            for (int y = 0; y < this.yChunks; ++y) {
-                for (int z = 0; z < this.zChunks; ++z) {
-                    // Calculate chunk boundaries
-                    int x0 = x * CHUNK_SIZE;
-                    int y0 = y * CHUNK_SIZE;
-                    int z0 = z * CHUNK_SIZE;
-                    int x1 = (x + 1) * CHUNK_SIZE;
-                    int y1 = (y + 1) * CHUNK_SIZE;
-                    int z1 = (z + 1) * CHUNK_SIZE;
-
-                    // Clamp to level bounds
-                    if (x1 > level.width) {
-                        x1 = level.width;
-                    }
-                    if (y1 > level.depth) {
-                        y1 = level.depth;
-                    }
-                    if (z1 > level.height) {
-                        z1 = level.height;
-                    }
-
-                    // Create and store the chunk
-                    int chunkIndex = (x + y * this.xChunks) * this.zChunks + z;
-                    this.chunks[chunkIndex] = new Chunk(level, x0, y0, z0, x1, y1, z1);
-                }
-            }
-        }
     }
 
     /**
@@ -86,7 +45,7 @@ public class LevelRenderer implements LevelListener, Disposable {
     public List<Chunk> getAllDirtyChunks() {
         ArrayList<Chunk> dirtyChunks = null;
 
-        for (Chunk chunk : this.chunks) {
+        for (Chunk chunk : this.level.getLoadedChunks()) {
             if (chunk.isDirty()) {
                 if (dirtyChunks == null) {
                     dirtyChunks = new ArrayList<>();
@@ -110,7 +69,7 @@ public class LevelRenderer implements LevelListener, Disposable {
         Frustum frustum = Frustum.getFrustum(graphics);
 
         // Render all visible chunks
-        for (Chunk chunk : this.chunks) {
+        for (Chunk chunk : this.level.getLoadedChunks()) {
             if (frustum.isVisible(chunk.aabb)) {
                 chunk.render(graphics, frustum);
             }
@@ -152,23 +111,25 @@ public class LevelRenderer implements LevelListener, Disposable {
         int cz = z / CHUNK_SIZE;
 
         // Mark the chunk as dirty
-        if (cx >= 0 && cy >= 0 && cz >= 0 && cx < this.xChunks && cy < this.yChunks && cz < this.zChunks) {
-            int chunkIndex = (cx + cy * this.xChunks) * this.zChunks + cz;
-            Chunk chunk = this.chunks[chunkIndex];
-            chunk.setDirtyBlock(x, y, z);
-        }
+        Chunk chunk = this.level.getChunk(cx, cz);
+        chunk.setDirtyBlock(x, y, z);
 
         // Mark all adjacent chunks as dirty
         for (int xx = -1; xx <= 1; ++xx) {
             for (int yy = -1; yy <= 1; ++yy) {
                 for (int zz = -1; zz <= 1; ++zz) {
+                    // Skip the center chunk
+                    if (xx == 0 && yy == 0 && zz == 0) {
+                        continue;
+                    }
+
                     int ax = cx + xx;
                     int ay = cy + yy;
                     int az = cz + zz;
-                    if (ax >= 0 && ay >= 0 && az >= 0 && ax < this.xChunks && ay < this.yChunks && az < this.zChunks) {
-                        int chunkIndex = (ax + ay * this.xChunks) * this.zChunks + az;
-                        Chunk chunk = this.chunks[chunkIndex];
-                        chunk.setDirtyBlock(x, y , z);
+
+                    Chunk adjacentChunk = this.level.getChunk(ax, az);
+                    if (adjacentChunk != null && adjacentChunk != chunk) {
+                        adjacentChunk.setDirtyBlock(x + xx * CHUNK_SIZE, y + yy * CHUNK_SIZE, z + zz * CHUNK_SIZE);
                     }
                 }
             }
@@ -198,7 +159,7 @@ public class LevelRenderer implements LevelListener, Disposable {
     @Override
     public void allChanged() {
         // Mark all chunks as dirty
-        for (Chunk chunk : this.chunks) {
+        for (Chunk chunk : this.level.getLoadedChunks()) {
             chunk.setFullChunkDirty();
         }
     }
@@ -209,7 +170,7 @@ public class LevelRenderer implements LevelListener, Disposable {
      */
     @Override
     public void dispose() {
-        for (Chunk chunk : this.chunks) {
+        for (Chunk chunk : this.level.getLoadedChunks()) {
             if (chunk != null) {
                 chunk.dispose();
             }

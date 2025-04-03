@@ -48,21 +48,23 @@ public class GameState {
      */
     public void initialize() {
         // Create level and renderer
-        this.level = new Level(256, 256, 64);
+        this.level = new Level();
         this.levelRenderer = new LevelRenderer(this.level, this.textureManager);
 
         // Create player
         this.player = new Player(this.level);
+        this.player.setPos(0.0F, 64.0F, 0.0F);
 
         // Create particle engine
         this.particleEngine = new ParticleEngine(this.level, this.textureManager);
 
         // Add initial entities (zombies)
-        for (int i = 0; i < 10; ++i) {
+        // TODO
+        /*for (int i = 0; i < 10; ++i) {
             Zombie zombie = new Zombie(this.level, this.textureManager, 128.0F, 0.0F, 128.0F);
             zombie.resetPos();
             this.entities.add(zombie);
-        }
+        }*/
     }
 
     /**

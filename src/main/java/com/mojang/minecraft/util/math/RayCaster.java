@@ -18,6 +18,7 @@ public class RayCaster {
      * Maximum reach distance for player interaction
      */
     private static final float MAX_REACH_DISTANCE = 5.0F;
+    private static final int MAX_STEPS = 128;
 
     /**
      * Casts a ray from the entity's position in the direction they are looking.
@@ -126,18 +127,8 @@ public class RayCaster {
         // Distance traveled along the ray
         float travelDistance = 0.0f;
         
-        // Maximum number of steps to prevent potential infinite loops in edge cases
-        // This is just a safety measure - the algorithm should terminate properly
-        int maxSteps = level.width + level.height + level.depth;
-        
         // Main DDA loop
-        for (int i = 0; i < maxSteps; i++) {
-            // Check if we've moved outside the level bounds
-            if (blockX < 0 || blockY < 0 || blockZ < 0 ||
-                blockX >= level.width || blockY >= level.depth || blockZ >= level.height) {
-                return null; // No hit found
-            }
-            
+        for (int i = 0; i < MAX_STEPS; i++) {
             // Check current block for a hit
             Tile tile = Tile.tiles[level.getTile(blockX, blockY, blockZ)];
             if (tile != null && tile.isSolid()) {
@@ -170,12 +161,6 @@ public class RayCaster {
             if (travelDistance > maxDistance) {
                 return null; // No hit within range
             }
-        }
-        
-        // Check if we've moved outside the level bounds after the last step
-        if (blockX < 0 || blockY < 0 || blockZ < 0 ||
-            blockX >= level.width || blockY >= level.depth || blockZ >= level.height) {
-            return null; // No hit found
         }
         
         // Double check that we actually hit something
