@@ -36,7 +36,16 @@ public class GameEngine {
     private int framesCounter = 0;
 
     private static final int MAX_FPS = 360;
-    private static final int YIELD_THRESHOLD_NS = 1000;
+    private int yieldThresholdNs = 1_000;
+
+    private final int[] yieldDurations = new int[1024];
+    private int yieldDurationIndex = 0;
+
+    private final int[] sleepDurations = new int[1024];
+    private int sleepDurationIndex = 0;
+
+    private long sleepThresholdNs = 500_000;
+
 
     /**
      * Creates a new GameEngine with the specified configuration.
@@ -138,16 +147,87 @@ public class GameEngine {
     }
 
     private void limitFPS() {
+        limitFPSSleep();
+    }
+
+    private void limitFPSSpin() {
         long nsPerFrame = 1000000000 / MAX_FPS;
+        long diff;
+        do {
+            diff = System.nanoTime() - lastFrameStart;
+        } while (diff < nsPerFrame);
+        lastFrameStart = System.nanoTime();
+    }
+
+    private void limitFPSYield() {
+        long nsPerFrame = 1000000000 / MAX_FPS;
+        long diff;
+        do {
+            diff = System.nanoTime() - lastFrameStart;
+            if (diff > yieldThresholdNs) {
+                long yieldStart = System.nanoTime();
+                Thread.yield();
+                long yieldEnd = System.nanoTime();
+                yieldDurations[yieldDurationIndex] = (int) (yieldEnd - yieldStart);
+                yieldDurationIndex = (yieldDurationIndex + 1) % yieldDurations.length;
+                int sum = 0;
+                for (int yieldDuration : yieldDurations) {
+                    sum += yieldDuration;
+                }
+                yieldThresholdNs = sum / yieldDurations.length;
+            }
+        } while (diff < nsPerFrame);
+        lastFrameStart = System.nanoTime();
+    }
+
+    /**
+     * Limits the FPS by sleeping for 1ms at a time.
+     * We measure how long we actually sleep when requested to sleep for 1ms,
+     * and if the pending wait time is less than the expected time until the cpu is returned from a 1ms sleep,
+     * we simply spin until that time has passed.
+     */
+    private void limitFPSSleep() {
+        // Calculate how many nanoseconds each frame should take
+        long nsPerFrame = 1_000_000_000L / MAX_FPS;
 
         long diff;
         do {
             diff = System.nanoTime() - lastFrameStart;
-            if (diff > YIELD_THRESHOLD_NS) {
-                Thread.yield();
+            long waitTimeNs = nsPerFrame - diff;
+
+            // If we still have time left in this frame
+            if (waitTimeNs > 0) {
+                // If we have more time to wait than the measured average of a 1ms sleep,
+                // actually sleep for 1 ms
+                if (waitTimeNs > sleepThresholdNs) {
+                    long sleepStart = System.nanoTime();
+                    try {
+                        Thread.sleep(1);
+                    } catch (InterruptedException e) {
+                        // In a real application, handle the interruption properly
+                        e.printStackTrace();
+                    }
+                    long sleepEnd = System.nanoTime();
+                    long actualSleep = sleepEnd - sleepStart;
+
+                    // Update rolling buffer with the actual sleep time
+                    sleepDurations[sleepDurationIndex] = (int) actualSleep;
+                    sleepDurationIndex = (sleepDurationIndex + 1) % sleepDurations.length;
+
+                    // Recompute the average 1ms sleep cost in nanoseconds
+                    long sum = 0;
+                    for (int s : sleepDurations) {
+                        sum += s;
+                    }
+                    sleepThresholdNs = sum / sleepDurations.length;
+                } else {
+                    // Otherwise, just spin until time has passed
+                    // (empty spin-do-while or loop)
+                }
             }
         } while (diff < nsPerFrame);
 
+        // Mark the start of the next frame
         lastFrameStart = System.nanoTime();
     }
 

@@ -259,7 +259,7 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
             }
 
             // Draw the indexed primitives
-            glDrawElements(translatePrimitiveType(type), count, GL_UNSIGNED_INT, start * 4); // 4 bytes per int
+            glDrawElements(translatePrimitiveType(type), count, GL_UNSIGNED_INT, start * 4L); // 4 bytes per int
 
             // Disable vertex attribute arrays
             if (format.hasPositions()) {
