@@ -1,6 +1,7 @@
 package com.mojang.minecraft.level;
 
 import com.mojang.minecraft.entity.Entity;
+import com.mojang.minecraft.level.generation.ChunkGenerator;
 import com.mojang.minecraft.level.save.LevelLoader;
 import com.mojang.minecraft.level.save.LevelSaver;
 import com.mojang.minecraft.level.tile.Tile;
@@ -29,6 +30,8 @@ public class Level {
 
     private final LevelSaver levelSaver = new LevelSaver(new File(LEVEL_FILE_NAME));
     private final LevelLoader levelLoader = new LevelLoader(new File(LEVEL_FILE_NAME), levelSaver.getSavingLevelMutex());
+
+    private final int seed = 42; // TODO: Make seeds configurable
 
     /**
      * Creates a new level with the specified dimensions.
@@ -310,22 +313,12 @@ public class Level {
         }
     }
 
+    private int makeChunkSeed(int chunkX, int chunkZ) {
+        return (chunkX * 31 + chunkZ) ^ this.seed;
+    }
+
     private void basicWorldGen(Chunk chunk) {
-        // TODO: REMOVE
-        // basic chunk generation
-        for (int x = 0; x < Chunk.CHUNK_SIZE; ++x) {
-            for (int z = 0; z < Chunk.CHUNK_SIZE; ++z) {
-                // set stone
-                for (int y = 0; y < 5; ++y) {
-                    chunk.setTile(x, y, z, Tile.rock.id);
-                }
-                // set dirt
-                for (int y = 5; y < 10; ++y) {
-                    chunk.setTile(x, y, z, Tile.dirt.id);
-                }
-                // set grass
-                chunk.setTile(x, 10, z, Tile.grass.id);
-            }
-        }
+        ChunkGenerator chunkGenerator = new ChunkGenerator(this.seed, makeChunkSeed(chunk.x, chunk.z));
+        chunkGenerator.generate(chunk);
     }
 }

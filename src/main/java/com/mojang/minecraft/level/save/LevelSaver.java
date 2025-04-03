@@ -68,7 +68,7 @@ public class LevelSaver {
     private void writeChunks(List<Chunk> chunks) {
         System.out.println("Saving level...");
         for (Chunk chunk : chunks) {
-            String chunkFileName = "chunk_" + chunk.x + "_" + chunk.z + ".dat";
+            String chunkFileName = "chunk_" + chunk.x0 + "_" + chunk.z0 + ".dat";
             File chunkFile = new File(file, chunkFileName);
             try (GZIPOutputStream writer = new GZIPOutputStream(Files.newOutputStream(chunkFile.toPath()))) {
                 writer.write(chunk.getBlocks());

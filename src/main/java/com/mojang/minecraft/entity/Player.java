@@ -81,11 +81,6 @@ public class Player extends Entity {
             ++xa;
         }
 
-        // TODO: REMOVE; FLY HACK
-        this.yd = 0;
-        this.xd *= 1.1F;
-        this.zd *= 1.1F;
-
         // Jump 
         if (jump && this.onGround) {
             this.yd = 0.5F; // Vertical velocity for jumping

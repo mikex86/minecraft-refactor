@@ -53,7 +53,7 @@ public class GameState {
 
         // Create player
         this.player = new Player(this.level);
-        this.player.setPos(0.0F, 64.0F, 0.0F);
+        this.player.setPos(0.0F, 100, 0.0F);
 
         // Create particle engine
         this.particleEngine = new ParticleEngine(this.level, this.textureManager);

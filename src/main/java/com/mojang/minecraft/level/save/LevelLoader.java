@@ -40,7 +40,7 @@ public class LevelLoader {
         CompletableFuture.supplyAsync(() -> {
             savingLevelState.acquireLoading();
             try {
-                String chunkFileName = "chunk_" + chunk.x + "_" + chunk.z + ".dat";
+                String chunkFileName = "chunk_" + chunk.x0 + "_" + chunk.z0 + ".dat";
                 File chunkFile = new File(levelFile, chunkFileName);
                 if (!chunkFile.exists()) {
                     return false; // Chunk file does not exist
