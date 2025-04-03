@@ -2,13 +2,13 @@ package com.mojang.minecraft.entity;
 
 import com.mojang.minecraft.level.Level;
 
+import java.util.Random;
+
 /**
  * Represents the player entity in the game.
  * Handles player movement, input, and interaction with the world.
  */
 public class Player extends Entity {
-
-    private static final int CHUNK_LOAD_RADIUS = 8;
 
     // Input state
     private boolean forward = false;
@@ -102,22 +102,44 @@ public class Player extends Entity {
             this.xd *= 0.7F;
             this.zd *= 0.7F;
         }
-
-        generateChunksAroundPlayer();
     }
 
-    private void generateChunksAroundPlayer() {
+    private float lastGeneratedPosX = 0;
+    private float lastGeneratedPosZ = 0;
+    private int generateDelay = -1;
+    private final Random random = new Random();
+
+    public void generateChunksAroundPlayer(int renderDistance) {
+        if (generateDelay != -1) {
+            // Check if the player has moved significantly
+            if (Math.abs(this.x - lastGeneratedPosX) < 4 || Math.abs(this.z - lastGeneratedPosZ) < 4) {
+                return; // No significant movement, no need to generate chunks
+            } else {
+                // still delay the generation for a few more frames
+                // because we don't want to hit a frame where a tick is performed.
+                // if we just naively check this, this condition always turns true in a tick frame - or one after it -
+                // and we add more time to an already spiky frame.
+                // We don't want to do that, so we wait a random amount of frames until we actually generate the chunks.
+                if (generateDelay > 0) {
+                    generateDelay--;
+                    if (generateDelay > 0) {
+                        return;
+                    }
+                }
+            }
+        }
+
         int chunkX = (int) this.x >> 4;
         int chunkZ = (int) this.z >> 4;
 
         // Load chunks around the player
-        for (int x = -CHUNK_LOAD_RADIUS; x <= CHUNK_LOAD_RADIUS; ++x) {
-            for (int z = -CHUNK_LOAD_RADIUS; z <= CHUNK_LOAD_RADIUS; ++z) {
+        for (int x = -renderDistance; x <= renderDistance; ++x) {
+            for (int z = -renderDistance; z <= renderDistance; ++z) {
                 int cx = chunkX + x;
                 int cz = chunkZ + z;
 
                 // check if distance is within the load radius
-                if (Math.hypot(x, z) > CHUNK_LOAD_RADIUS) {
+                if (Math.hypot(x, z) > renderDistance) {
                     continue;
                 }
 
@@ -127,5 +149,9 @@ public class Player extends Entity {
                 }
             }
         }
+        // Update the last generated position
+        this.lastGeneratedPosX = this.x;
+        this.lastGeneratedPosZ = this.z;
+        this.generateDelay = random.nextInt(10) + 5; // Random delay for chunk generation
     }
 } 

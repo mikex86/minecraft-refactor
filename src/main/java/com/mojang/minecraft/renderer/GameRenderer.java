@@ -17,6 +17,8 @@ import org.lwjgl.BufferUtils;
 import java.nio.FloatBuffer;
 import java.util.List;
 
+import static com.mojang.minecraft.level.Chunk.CHUNK_SIZE;
+
 /**
  * Handles all rendering operations for Minecraft.
  * Extracted from the main Minecraft class to separate rendering concerns.
@@ -29,6 +31,8 @@ public class GameRenderer implements Disposable {
     // Texture manager
     private final TextureManager textureManager;
 
+    private final int renderDistance = 16; // Render distance in chunks
+
     // Buffers for graphic operations
     private final FloatBuffer fogColor0;
     private final FloatBuffer fogColor1;
@@ -40,10 +44,9 @@ public class GameRenderer implements Disposable {
     private final HudNoTexShader hudNoTexShader;
 
     // Font renderer
-    private Font font;
+    private final Font font;
 
     // Game components
-    private final Level level;
     private final LevelRenderer levelRenderer;
     private final ParticleEngine particleEngine;
     private final Player player;
@@ -74,7 +77,6 @@ public class GameRenderer implements Disposable {
         this.graphics = GraphicsFactory.getGraphicsAPI();
 
         this.textureManager = textureManager;
-        this.level = level;
         this.levelRenderer = levelRenderer;
         this.particleEngine = particleEngine;
         this.player = player;
@@ -84,7 +86,6 @@ public class GameRenderer implements Disposable {
 
         // Create game resources
         this.font = new Font("/default.gif", textureManager);
-
 
         // Create fog color buffers
         this.fogColor0 = BufferUtils.createFloatBuffer(4);
@@ -195,6 +196,16 @@ public class GameRenderer implements Disposable {
 
     private void render(float partialTick) {
         Frustum frustum = Frustum.getFrustum(graphics);
+
+        // generate chunks around the player
+        // NOTE: This will be a NO-OP most of the time
+        // as it checks if the player has moved.
+        // Most of the time this is just an int abs if with a return,
+        // so not expensive.
+        // A ticked frame is already more expensive than a regular one,
+        // so we don't want to add world gen on top of that.
+        // That should hit a different frame.
+        player.generateChunksAroundPlayer(renderDistance);
 
         // render level
         {
