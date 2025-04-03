@@ -7,6 +7,7 @@ import com.mojang.minecraft.renderer.ChunkMesh;
 import com.mojang.minecraft.renderer.Disposable;
 import com.mojang.minecraft.renderer.Frustum;
 import com.mojang.minecraft.renderer.Tesselator;
+import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -148,10 +149,10 @@ public class Chunk implements Disposable {
     /**
      * Renders the given chunk
      */
-    public void render(Frustum frustum) {
+    public void render(GraphicsAPI graphics, Frustum frustum) {
         for (ChunkSection section : sections) {
             if (section.hasMesh() && frustum.isVisible(section.getAABB())) {
-                section.render();
+                section.render(graphics);
             }
         }
     }
@@ -308,10 +309,11 @@ public class Chunk implements Disposable {
 
         /**
          * Renders this section
+         * @param graphics the graphics API
          */
-        public void render() {
+        public void render(GraphicsAPI graphics) {
             if (!empty) {
-                chunkMesh.render();
+                chunkMesh.draw(graphics);
             }
         }
 

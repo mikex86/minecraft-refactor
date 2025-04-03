@@ -2,20 +2,13 @@ package com.mojang.minecraft.renderer;
 
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
-import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
-import com.mojang.minecraft.renderer.graphics.VertexBuffer;
-import com.mojang.minecraft.renderer.graphics.IndexBuffer;
-import com.mojang.minecraft.renderer.Tesselator.IndexedMesh;
-
-import java.nio.FloatBuffer;
-import java.util.Objects;
+import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 
 /**
  * Handles VBO-based rendering for a chunk mesh.
  */
 public class ChunkMesh implements Disposable {
     // Graphics resources
-    private final GraphicsAPI graphics;
     private IndexedMesh mesh;
 
     // Tesselator for building this mesh
@@ -29,9 +22,6 @@ public class ChunkMesh implements Disposable {
      * Creates a new chunk renderer.
      */
     public ChunkMesh() {
-        // Get graphics API instance
-        this.graphics = GraphicsFactory.getGraphicsAPI();
-
         // Create resources
         this.mesh = null;
         this.tesselator = Tesselator.instance;
@@ -83,15 +73,14 @@ public class ChunkMesh implements Disposable {
     }
 
     /**
-     * Renders the mesh.
+     * Draws this chunk mesh
+     *
+     * @param graphics the graphics API
      */
-    public void render() {
-        if (mesh == null) {
-            return;
+    public void draw(GraphicsAPI graphics) {
+        if (mesh != null) {
+            mesh.draw(graphics);
         }
-
-        // Draw the mesh
-        mesh.draw(graphics);
     }
 
     /**

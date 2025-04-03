@@ -1,15 +1,18 @@
-#version 120
+#version 330 core
 
 // Texture sampler
-uniform sampler2D texture;
+uniform sampler2D textureSampler;
 
 // Input from vertex shader
-varying vec4 vertexColor;
-varying vec2 texCoord;
+in vec4 vertexColor;
+in vec2 texCoord;
+
+// Output color
+out vec4 fragColor;
 
 void main() {
     // Sample the texture
-    vec4 texColor = texture2D(texture, texCoord);
+    vec4 texColor = texture(textureSampler, texCoord);
 
     // Apply vertex color
     vec4 finalColor = texColor * vertexColor;
@@ -19,5 +22,5 @@ void main() {
     }
 
     // Output the final color
-    gl_FragColor = finalColor;
+    fragColor = finalColor;
 }

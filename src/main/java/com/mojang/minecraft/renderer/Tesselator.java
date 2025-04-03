@@ -1,11 +1,8 @@
 package com.mojang.minecraft.renderer;
 
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.*;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BufferUsage;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.PrimitiveType;
-import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
-import com.mojang.minecraft.renderer.graphics.VertexBuffer;
-import com.mojang.minecraft.renderer.graphics.IndexBuffer;
 import org.lwjgl.BufferUtils;
 
 import java.nio.FloatBuffer;
@@ -17,6 +14,7 @@ import java.nio.IntBuffer;
  * uses the abstracted graphics API instead of direct OpenGL calls.
  * 
  * This version uses indexed triangles instead of direct quads for modern GPU compatibility.
+ * It also uses Vertex Array Objects (VAOs) for improved rendering performance.
  */
 public class Tesselator implements Disposable {
     private static final int MAX_FLOATS = 262144;
@@ -48,6 +46,7 @@ public class Tesselator implements Disposable {
     private final GraphicsAPI graphics;
     private VertexBuffer vertexBuffer;
     private IndexBuffer indexBuffer;
+    private VertexArrayObject vao;
     private VertexBuffer.VertexFormat format;
 
     public static Tesselator instance = new Tesselator();
@@ -59,6 +58,7 @@ public class Tesselator implements Disposable {
         this.graphics = GraphicsFactory.getGraphicsAPI();
         this.vertexBuffer = graphics.createVertexBuffer(BufferUsage.DYNAMIC);
         this.indexBuffer = graphics.createIndexBuffer(BufferUsage.DYNAMIC);
+        this.vao = graphics.createVertexArrayObject();
         clear();
     }
 
@@ -130,8 +130,12 @@ public class Tesselator implements Disposable {
             vertexBuffer.setData(cpuVertexBuffer, dataIndex * 4); // 4 bytes per float
             indexBuffer.setData(cpuIndexBuffer, indexCount * 4); // 4 bytes per int
 
+            // Set up VAO
+            vao.setVertexBuffer(vertexBuffer);
+            vao.setIndexBuffer(indexBuffer);
+
             // Draw the vertices
-            graphics.drawIndexedPrimitives(vertexBuffer, indexBuffer, PrimitiveType.TRIANGLES, 0, indexCount);
+            graphics.drawPrimitives(vao, PrimitiveType.TRIANGLES, 0, indexCount);
         }
 
         // Reset state
@@ -142,7 +146,7 @@ public class Tesselator implements Disposable {
      * Creates an indexed mesh from the current tesselator state
      *
      * @param bufferUsage The buffer usage hint
-     * @return The created vertex buffer
+     * @return The created indexed mesh
      */
     public IndexedMesh createIndexedMesh(BufferUsage bufferUsage) {
         // Set up vertex format based on tesselator state
@@ -163,7 +167,8 @@ public class Tesselator implements Disposable {
         vertexBuffer.setData(cpuVertexBuffer, dataIndex * 4); // 4 bytes per float
         indexBuffer.setData(cpuIndexBuffer, indexCount * 4); // 4 bytes per int
         
-        return new IndexedMesh(vertexBuffer, indexBuffer, indexCount);
+        // Create mesh with VAO
+        return new IndexedMesh(graphics, vertexBuffer, indexBuffer, indexCount);
     }
 
     /**
@@ -212,16 +217,18 @@ public class Tesselator implements Disposable {
      * @param b Blue component (0.0-1.0)
      */
     public void color(float r, float g, float b) {
-        if (!this.disableColors) {
-            if (!this.hasColor) {
-                this.vertexSize += 3; // Add space for color components
-            }
-
-            this.hasColor = true;
-            this.colorR = r;
-            this.colorG = g;
-            this.colorB = b;
+        if (this.disableColors) {
+            return;
         }
+
+        if (!this.hasColor) {
+            this.vertexSize += 3; // Add space for color
+        }
+
+        this.hasColor = true;
+        this.colorR = r;
+        this.colorG = g;
+        this.colorB = b;
     }
 
     /**
@@ -239,61 +246,61 @@ public class Tesselator implements Disposable {
     }
 
     /**
-     * Add a vertex with current texture coordinates and color
-     * When every 4 vertices are added, they are converted into two triangles.
+     * Add a vertex
      *
      * @param x X coordinate
      * @param y Y coordinate
      * @param z Z coordinate
      */
     public void vertex(float x, float y, float z) {
-        // Add texture coordinates if set
+        // Store vertex attributes in order: texcoords, color, position
+        int currentIndex = this.dataIndex;
+
+        // Add texture coordinates if enabled
         if (this.hasTexture) {
-            this.cpuVertexBuffer.put(this.dataIndex++, this.textureU);
-            this.cpuVertexBuffer.put(this.dataIndex++, this.textureV);
+            this.cpuVertexBuffer.put(currentIndex++, this.textureU);
+            this.cpuVertexBuffer.put(currentIndex++, this.textureV);
         }
 
-        // Add color if set
+        // Add color if enabled
         if (this.hasColor) {
-            this.cpuVertexBuffer.put(this.dataIndex++, this.colorR);
-            this.cpuVertexBuffer.put(this.dataIndex++, this.colorG);
-            this.cpuVertexBuffer.put(this.dataIndex++, this.colorB);
+            this.cpuVertexBuffer.put(currentIndex++, this.colorR);
+            this.cpuVertexBuffer.put(currentIndex++, this.colorG);
+            this.cpuVertexBuffer.put(currentIndex++, this.colorB);
         }
 
-        // Add vertex position
-        this.cpuVertexBuffer.put(this.dataIndex++, x);
-        this.cpuVertexBuffer.put(this.dataIndex++, y);
-        this.cpuVertexBuffer.put(this.dataIndex++, z);
+        // Add position (always present)
+        this.cpuVertexBuffer.put(currentIndex++, x);
+        this.cpuVertexBuffer.put(currentIndex++, y);
+        this.cpuVertexBuffer.put(currentIndex++, z);
 
-        // Increment vertex count
+        // Update data index
+        this.dataIndex = currentIndex;
+
+        // Update vertex count
         this.vertexCount++;
-        
-        // Add indices for triangles every 4 vertices (convert quad to 2 triangles)
+
+        // Add indices for triangles
         if (this.vertexCount % 4 == 0) {
-            int baseVertex = this.vertexCount - 4;
+            // For each quad, generate two triangles
+            int baseIndex = this.vertexCount - 4;
             
-            // First triangle (vertices 0, 1, 2)
-            this.cpuIndexBuffer.put(this.indexCount++, baseVertex);
-            this.cpuIndexBuffer.put(this.indexCount++, baseVertex + 1);
-            this.cpuIndexBuffer.put(this.indexCount++, baseVertex + 2);
+            // First triangle (0, 1, 2)
+            this.cpuIndexBuffer.put(this.indexCount++, baseIndex);
+            this.cpuIndexBuffer.put(this.indexCount++, baseIndex + 1);
+            this.cpuIndexBuffer.put(this.indexCount++, baseIndex + 2);
             
-            // Second triangle (vertices 0, 2, 3)
-            this.cpuIndexBuffer.put(this.indexCount++, baseVertex);
-            this.cpuIndexBuffer.put(this.indexCount++, baseVertex + 2);
-            this.cpuIndexBuffer.put(this.indexCount++, baseVertex + 3);
-            
-            // Flush if buffer is almost full
-            if (this.dataIndex >= MAX_FLOATS - this.vertexSize * 4 || 
-                this.indexCount >= MAX_INDICES - 6) {
-                this.flush();
-            }
+            // Second triangle (0, 2, 3)
+            this.cpuIndexBuffer.put(this.indexCount++, baseIndex);
+            this.cpuIndexBuffer.put(this.indexCount++, baseIndex + 2);
+            this.cpuIndexBuffer.put(this.indexCount++, baseIndex + 3);
         }
     }
 
     /**
-     * Set color using a packed RGB integer
+     * Set color for the next vertex using a packed RGB value
      *
-     * @param c Packed RGB color (0xRRGGBB)
+     * @param c RGB color value
      */
     public void color(int c) {
         float r = (float) (c >> 16 & 255) / 255.0F;
@@ -316,77 +323,10 @@ public class Tesselator implements Disposable {
             indexBuffer.dispose();
             indexBuffer = null;
         }
-    }
-    
-    /**
-     * Represents an indexed mesh with a vertex buffer and an index buffer.
-     */
-    public static class IndexedMesh implements Disposable {
-        private final VertexBuffer vertexBuffer;
-        private final IndexBuffer indexBuffer;
-        private final int indexCount;
         
-        /**
-         * Creates a new indexed mesh.
-         *
-         * @param vertexBuffer The vertex buffer
-         * @param indexBuffer The index buffer
-         * @param indexCount The number of indices
-         */
-        public IndexedMesh(VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int indexCount) {
-            this.vertexBuffer = vertexBuffer;
-            this.indexBuffer = indexBuffer;
-            this.indexCount = indexCount;
-        }
-        
-        /**
-         * Draws this mesh.
-         *
-         * @param graphics The graphics API
-         */
-        public void draw(GraphicsAPI graphics) {
-            graphics.drawIndexedPrimitives(vertexBuffer, indexBuffer, PrimitiveType.TRIANGLES, 0, indexCount);
-        }
-        
-        /**
-         * Gets the vertex buffer.
-         *
-         * @return The vertex buffer
-         */
-        public VertexBuffer getVertexBuffer() {
-            return vertexBuffer;
-        }
-        
-        /**
-         * Gets the index buffer.
-         *
-         * @return The index buffer
-         */
-        public IndexBuffer getIndexBuffer() {
-            return indexBuffer;
-        }
-        
-        /**
-         * Gets the number of indices.
-         *
-         * @return The number of indices
-         */
-        public int getIndexCount() {
-            return indexCount;
-        }
-        
-        /**
-         * Disposes of the resources held by this mesh.
-         */
-        @Override
-        public void dispose() {
-            if (vertexBuffer != null) {
-                vertexBuffer.dispose();
-            }
-            
-            if (indexBuffer != null) {
-                indexBuffer.dispose();
-            }
+        if (vao != null) {
+            vao.dispose();
+            vao = null;
         }
     }
 }

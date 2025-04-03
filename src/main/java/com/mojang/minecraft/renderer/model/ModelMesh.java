@@ -1,48 +1,42 @@
 package com.mojang.minecraft.renderer.model;
 
-import org.lwjgl.BufferUtils;
-
-import java.nio.FloatBuffer;
-
-import static org.lwjgl.opengl.GL15.*;
+import com.mojang.minecraft.renderer.Disposable;
+import com.mojang.minecraft.renderer.Tesselator;
+import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BufferUsage;
+import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
+import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 
 /**
- * Handles VBO-based rendering for character models.
- * Replaces OpenGL display lists with modern VBO rendering.
+ * Handles mesh building and rendering for character models.
+ * Uses Tesselator for mesh building and IndexedMesh for rendering.
  */
-public class ModelMesh {
-    // VBO data
-    private int vboId;
-    private int indexVboId;
-    private int vertexCount;
+public class ModelMesh implements Disposable {
+    // Graphics resources
+    private IndexedMesh mesh;
     
-    // Buffer for vertex data
-    private FloatBuffer vertexBuffer;
+    // Tesselator for building this mesh
+    private final Tesselator tesselator;
+    private final GraphicsAPI graphics;
     
     // State tracking
     private boolean dirty = true;
     private boolean disposed = false;
     
-    // Vertex data layout
-    private static final int VERTEX_SIZE = 5; // 3 position + 2 texture coordinates
-    private static final int MAX_VERTICES = 10000; // Should be enough for character models
-    
     /**
      * Creates a new model mesh.
      */
     public ModelMesh() {
-        this.vboId = glGenBuffers();
-        this.indexVboId = glGenBuffers();
-        this.vertexBuffer = BufferUtils.createFloatBuffer(MAX_VERTICES * VERTEX_SIZE);
-        this.vertexCount = 0;
+        this.graphics = GraphicsFactory.getGraphicsAPI();
+        this.tesselator = new Tesselator(); // Using a dedicated tesselator to avoid conflicts
+        this.mesh = null;
     }
     
     /**
      * Starts a new definition of this mesh.
      */
     public void begin() {
-        this.vertexBuffer.clear();
-        this.vertexCount = 0;
+        this.tesselator.init();
         this.dirty = true;
     }
     
@@ -50,12 +44,9 @@ public class ModelMesh {
      * Adds a vertex with texture coordinates to the mesh.
      */
     public void addVertex(float x, float y, float z, float u, float v) {
-        this.vertexBuffer.put(x);
-        this.vertexBuffer.put(y);
-        this.vertexBuffer.put(z);
-        this.vertexBuffer.put(u);
-        this.vertexBuffer.put(v);
-        this.vertexCount++;
+        tesselator.tex(u, v);
+        tesselator.color(1.0f, 1.0f, 1.0f);
+        tesselator.vertex(x, y, z);
     }
     
     /**
@@ -66,14 +57,19 @@ public class ModelMesh {
             return;
         }
         
-        // Prepare the buffer for reading
-        this.vertexBuffer.flip();
+        // Clean up existing mesh if needed
+        if (mesh != null) {
+            mesh.dispose();
+            mesh = null;
+        }
         
-        if (this.vertexCount > 0) {
-            // Upload vertex data to the VBO
-            glBindBuffer(GL_ARRAY_BUFFER, this.vboId);
-            glBufferData(GL_ARRAY_BUFFER, this.vertexBuffer, GL_STATIC_DRAW);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
+        // Check if we have vertices to build
+        int vertexCount = tesselator.getVertexCount();
+        int indexCount = tesselator.getIndexCount();
+        
+        if (vertexCount > 0 && indexCount > 0) {
+            // Create a new mesh with the tesselator data
+            mesh = tesselator.createIndexedMesh(BufferUsage.STATIC);
         }
         
         this.dirty = false;
@@ -83,49 +79,20 @@ public class ModelMesh {
      * Renders the mesh.
      */
     public void render() {
-        if (this.vertexCount == 0) {
-            return;
+        if (this.mesh != null) {
+            this.mesh.draw(graphics);
         }
-        
-        // Bind the VBO
-        glBindBuffer(GL_ARRAY_BUFFER, this.vboId);
-        
-        // Enable vertex arrays
-        glEnableClientState(GL_VERTEX_ARRAY);
-        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-        
-        // Set up vertex arrays
-        int stride = VERTEX_SIZE * 4; // in bytes
-        
-        // Position (3 floats)
-        glVertexPointer(3, GL_FLOAT, stride, 0);
-        
-        // Texture coordinates (2 floats)
-        glTexCoordPointer(2, GL_FLOAT, stride, 3 * 4); // Offset by 3 floats
-        
-        // Draw the mesh as quads
-        glDrawArrays(GL_QUADS, 0, this.vertexCount);
-        
-        // Disable vertex arrays
-        glDisableClientState(GL_VERTEX_ARRAY);
-        glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-        
-        // Unbind VBO
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
     
     /**
      * Disposes of this mesh's resources.
      */
+    @Override
     public void dispose() {
         if (!this.disposed) {
-            if (this.vboId != 0) {
-                glDeleteBuffers(this.vboId);
-                this.vboId = 0;
-            }
-            if (this.indexVboId != 0) {
-                glDeleteBuffers(this.indexVboId);
-                this.indexVboId = 0;
+            if (this.mesh != null) {
+                this.mesh.dispose();
+                this.mesh = null;
             }
             this.disposed = true;
         }

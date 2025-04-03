@@ -8,10 +8,7 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.particle.ParticleEngine;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
-import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
-import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
-import com.mojang.minecraft.renderer.graphics.Texture;
+import com.mojang.minecraft.renderer.graphics.*;
 import com.mojang.minecraft.renderer.shader.ShaderRegistry;
 import com.mojang.minecraft.renderer.shader.impl.*;
 import com.mojang.minecraft.world.HitResult;
@@ -312,7 +309,7 @@ public class GameRenderer implements Disposable {
         graphics.popMatrix();
     }
 
-    private Tesselator.IndexedMesh crosshairMesh;
+    private IndexedMesh crosshairMesh;
 
     private void drawCrosshair(GraphicsAPI graphics, int screenWidth, int screenHeight) {
         int centerX = screenWidth / 2;

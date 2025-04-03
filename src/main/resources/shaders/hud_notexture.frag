@@ -1,7 +1,10 @@
-#version 120
+#version 330 core
 
 // Input from vertex shader
-varying vec4 vertexColor;
+in vec4 vertexColor;
+
+// Output color
+out vec4 fragColor;
 
 void main() {
     // Apply vertex color
@@ -12,5 +15,5 @@ void main() {
     }
 
     // Output the final color
-    gl_FragColor = finalColor;
+    fragColor = finalColor;
 }

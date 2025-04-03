@@ -71,6 +71,13 @@ public class Shader implements Disposable {
         programId = glCreateProgram();
         glAttachShader(programId, vertexShaderId);
         glAttachShader(programId, fragmentShaderId);
+        
+        // Bind attribute locations to match our VAO setup
+        glBindAttribLocation(programId, 0, "position");
+        glBindAttribLocation(programId, 1, "color");
+        glBindAttribLocation(programId, 2, "texCoord0");
+        glBindAttribLocation(programId, 3, "normal");
+        
         glLinkProgram(programId);
         
         // Check program linking

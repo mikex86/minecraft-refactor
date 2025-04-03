@@ -7,12 +7,14 @@ import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 import com.mojang.minecraft.renderer.graphics.IndexBuffer;
 import com.mojang.minecraft.renderer.shader.Shader;
+import com.mojang.minecraft.renderer.graphics.VertexArrayObject;
 
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
+import static org.lwjgl.opengl.GL30.*;
 
 /**
  * OpenGL implementation of the GraphicsAPI interface.
@@ -25,6 +27,9 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
 
     // Current shader
     private Shader currentShader = null;
+    
+    // Default VAO (required for OpenGL core profile)
+    private int defaultVaoId;
 
     /**
      * Creates a new OpenGL graphics API implementation.
@@ -35,6 +40,11 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
 
     @Override
     public void initialize() {
+        // Create and bind a default VAO
+        // This is required when using an OpenGL core profile
+        defaultVaoId = glGenVertexArrays();
+        glBindVertexArray(defaultVaoId);
+        
         // Set up blending
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -50,7 +60,8 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
 
     @Override
     public void shutdown() {
-        // Nothing to do for OpenGL shutdown
+        // Clean up the default VAO
+        glDeleteVertexArrays(defaultVaoId);
     }
 
     @Override
@@ -61,6 +72,11 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     @Override
     public IndexBuffer createIndexBuffer(BufferUsage usage) {
         return new OpenGLIndexBuffer(translateBufferUsage(usage));
+    }
+
+    @Override
+    public VertexArrayObject createVertexArrayObject() {
+        return new OpenGLVertexArrayObject();
     }
 
     @Override
@@ -191,76 +207,17 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     }
 
     @Override
-    public void drawPrimitives(VertexBuffer buffer, PrimitiveType type, int start, int count) {
-        if (buffer instanceof OpenGLVertexBuffer) {
-            OpenGLVertexBuffer glBuffer = (OpenGLVertexBuffer) buffer;
-            VertexBuffer.VertexFormat format = buffer.getFormat();
-
-            // Bind VBO
-            glBuffer.bind();
-
-            // Set up vertex attribute pointers
-            int stride = format.getStrideInBytes();
-            int offset = 0;
-
-            // Enable vertex arrays
-            glEnableClientState(GL_VERTEX_ARRAY);
-
-            // Set up texture coordinates if present
-            if (format.hasTexCoords()) {
-                glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-                glTexCoordPointer(2, GL_FLOAT, stride, offset);
-                offset += 2 * 4; // 2 floats * 4 bytes
-            }
-
-            // Set up colors if present
-            if (format.hasColors()) {
-                glEnableClientState(GL_COLOR_ARRAY);
-                glColorPointer(3, GL_FLOAT, stride, offset);
-                offset += 3 * 4; // 3 floats * 4 bytes
-            }
-
-            // Set up normals if present
-            if (format.hasNormals()) {
-                glEnableClientState(GL_NORMAL_ARRAY);
-                glNormalPointer(GL_FLOAT, stride, offset);
-                offset += 3 * 4; // 3 floats * 4 bytes
-            }
-
-            // Set up positions (must be present)
-            if (format.hasPositions()) {
-                glVertexPointer(3, GL_FLOAT, stride, offset);
-            }
-
-            // Draw the primitives
-            glDrawArrays(translatePrimitiveType(type), start, count);
-
-            // Disable vertex arrays
-            glDisableClientState(GL_VERTEX_ARRAY);
-            if (format.hasTexCoords()) {
-                glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-            }
-            if (format.hasColors()) {
-                glDisableClientState(GL_COLOR_ARRAY);
-            }
-            if (format.hasNormals()) {
-                glDisableClientState(GL_NORMAL_ARRAY);
-            }
-
-            // Unbind VBO
-            glBuffer.unbind();
-        } else {
-            throw new IllegalArgumentException("Buffer must be an OpenGLVertexBuffer");
-        }
-    }
-
-    @Override
     public void drawIndexedPrimitives(VertexBuffer vertexBuffer, IndexBuffer indexBuffer, PrimitiveType type, int start, int count) {
         if (vertexBuffer instanceof OpenGLVertexBuffer && indexBuffer instanceof OpenGLIndexBuffer) {
             OpenGLVertexBuffer glVertexBuffer = (OpenGLVertexBuffer) vertexBuffer;
             OpenGLIndexBuffer glIndexBuffer = (OpenGLIndexBuffer) indexBuffer;
             VertexBuffer.VertexFormat format = vertexBuffer.getFormat();
 
+            // In core profile, we need to use a VAO for all vertex attribute state
+            // Create a temporary VAO
+            int tempVao = glGenVertexArrays();
+            glBindVertexArray(tempVao);
+            
             // Bind VBO and IBO
             glVertexBuffer.bind();
             glIndexBuffer.bind();
@@ -269,55 +226,82 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
             int stride = format.getStrideInBytes();
             int offset = 0;
 
-            // Enable vertex arrays
-            glEnableClientState(GL_VERTEX_ARRAY);
-
-            // Set up texture coordinates if present
+            // Note: The attribute locations must match the 'in' declarations in our shaders
+            // In our updated shaders, they're:
+            // position = 0, color = 1, texCoord0 = 2, normal = 3
+            
+            // Texture coordinates (attribute location 2)
             if (format.hasTexCoords()) {
-                glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-                glTexCoordPointer(2, GL_FLOAT, stride, offset);
+                glEnableVertexAttribArray(2);
+                glVertexAttribPointer(2, 2, GL_FLOAT, false, stride, offset);
                 offset += 2 * 4; // 2 floats * 4 bytes
             }
-
-            // Set up colors if present
+            
+            // Colors (attribute location 1)
             if (format.hasColors()) {
-                glEnableClientState(GL_COLOR_ARRAY);
-                glColorPointer(3, GL_FLOAT, stride, offset);
+                glEnableVertexAttribArray(1);
+                glVertexAttribPointer(1, 3, GL_FLOAT, false, stride, offset);
                 offset += 3 * 4; // 3 floats * 4 bytes
             }
-
-            // Set up normals if present
+            
+            // Normals (attribute location 3)
             if (format.hasNormals()) {
-                glEnableClientState(GL_NORMAL_ARRAY);
-                glNormalPointer(GL_FLOAT, stride, offset);
+                glEnableVertexAttribArray(3);
+                glVertexAttribPointer(3, 3, GL_FLOAT, false, stride, offset);
                 offset += 3 * 4; // 3 floats * 4 bytes
             }
-
-            // Set up positions (must be present)
+            
+            // Positions (attribute location 0)
             if (format.hasPositions()) {
-                glVertexPointer(3, GL_FLOAT, stride, offset);
+                glEnableVertexAttribArray(0);
+                glVertexAttribPointer(0, 3, GL_FLOAT, false, stride, offset);
+                // No need to update offset as this is the last attribute
             }
 
             // Draw the indexed primitives
             glDrawElements(translatePrimitiveType(type), count, GL_UNSIGNED_INT, start * 4); // 4 bytes per int
 
-            // Disable vertex arrays
-            glDisableClientState(GL_VERTEX_ARRAY);
-            if (format.hasTexCoords()) {
-                glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+            // Disable vertex attribute arrays
+            if (format.hasPositions()) {
+                glDisableVertexAttribArray(0);
             }
             if (format.hasColors()) {
-                glDisableClientState(GL_COLOR_ARRAY);
+                glDisableVertexAttribArray(1);
+            }
+            if (format.hasTexCoords()) {
+                glDisableVertexAttribArray(2);
             }
             if (format.hasNormals()) {
-                glDisableClientState(GL_NORMAL_ARRAY);
+                glDisableVertexAttribArray(3);
             }
 
-            // Unbind IBO and VBO
-            glIndexBuffer.unbind();
-            glVertexBuffer.unbind();
+            // Unbind VAO, IBO, and VBO
+            glBindVertexArray(0);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+            
+            // Delete the temporary VAO
+            glDeleteVertexArrays(tempVao);
         } else {
             throw new IllegalArgumentException("Buffers must be OpenGL buffers");
+        }
+    }
+
+    @Override
+    public void drawPrimitives(VertexArrayObject vao, PrimitiveType type, int start, int count) {
+        if (vao instanceof OpenGLVertexArrayObject) {
+            OpenGLVertexArrayObject glVao = (OpenGLVertexArrayObject) vao;
+            
+            // Bind the VAO
+            glVao.bind();
+            
+            // Draw the indexed primitives
+            glDrawElements(translatePrimitiveType(type), count, GL_UNSIGNED_INT, start * 4); // 4 bytes per int
+            
+            // Unbind the VAO
+            glVao.unbind();
+        } else {
+            throw new IllegalArgumentException("VAO must be an OpenGL VAO");
         }
     }
 

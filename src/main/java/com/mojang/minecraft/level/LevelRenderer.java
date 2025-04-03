@@ -112,7 +112,7 @@ public class LevelRenderer implements LevelListener, Disposable {
         // Render all visible chunks
         for (Chunk chunk : this.chunks) {
             if (frustum.isVisible(chunk.aabb)) {
-                chunk.render(frustum);
+                chunk.render(graphics, frustum);
             }
         }
     }
