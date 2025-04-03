@@ -11,8 +11,6 @@ import com.mojang.minecraft.renderer.graphics.Texture;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.mojang.minecraft.level.Chunk.CHUNK_SIZE;
-
 /**
  * Handles rendering of the Minecraft level.
  */
@@ -102,44 +100,10 @@ public class LevelRenderer implements LevelListener, Disposable {
     }
 
     /**
-     * A block position as dirty and triggers all chunks that contain/border it to be rebuilt.
-     */
-    public void setDirty(int x, int y, int z) {
-        // Calculate the chunk coordinates
-        int cx = x / CHUNK_SIZE;
-        int cy = y / CHUNK_SIZE;
-        int cz = z / CHUNK_SIZE;
-
-        // Mark the chunk as dirty
-        Chunk chunk = this.level.getChunk(cx, cz);
-        chunk.setDirtyBlock(x, y, z);
-
-        // Mark all adjacent chunks as dirty
-        for (int xx = -1; xx <= 1; ++xx) {
-            for (int zz = -1; zz <= 1; ++zz) {
-                // Skip the center chunk
-                if (xx == 0 && zz == 0) {
-                    continue;
-                }
-
-                int ax = cx + xx;
-                int az = cz + zz;
-
-                Chunk adjacentChunk = this.level.getChunk(ax, az);
-                if (adjacentChunk != null && adjacentChunk != chunk) {
-                    adjacentChunk.setDirtyBlock(x, y, z);
-                }
-            }
-        }
-    }
-
-    /**
      * Called when a tile changes.
      */
     @Override
     public void tileChanged(int x, int y, int z) {
-        // Mark a region around the changed tile as dirty
-        this.setDirty(x, y, z);
     }
 
     /**
@@ -147,7 +111,6 @@ public class LevelRenderer implements LevelListener, Disposable {
      */
     @Override
     public void lightColumnChanged(int x, int z, int y0, int y1) {
-        this.setDirty(x, y0, z);
     }
 
     /**
