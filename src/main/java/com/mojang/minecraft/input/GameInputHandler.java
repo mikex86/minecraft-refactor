@@ -161,7 +161,8 @@ public class GameInputHandler {
 
         if (this.editMode == 0) {
             // Destroy mode
-            Tile oldTile = Tile.tiles[this.level.getTile(hitResult.x, hitResult.y, hitResult.z)];
+            int tileId = this.level.getTile(hitResult.x, hitResult.y, hitResult.z);
+            Tile oldTile = Tile.getTileById(tileId);
             boolean changed = this.level.setTile(hitResult.x, hitResult.y, hitResult.z, 0);
             if (oldTile != null && changed) {
                 oldTile.destroy(this.level, hitResult.x, hitResult.y, hitResult.z, this.particleEngine);
@@ -188,7 +189,8 @@ public class GameInputHandler {
             }
 
             // Check if we can place a block here
-            AABB aabb = Tile.tiles[this.paintTexture].getAABB(x, y, z);
+            int tileId = this.level.getTile(x, y, z);
+            AABB aabb = Tile.getTileById(tileId).getAABB(x, y, z);
             if (aabb == null || this.isFree(aabb)) {
                 this.level.setTile(x, y, z, this.paintTexture);
             }

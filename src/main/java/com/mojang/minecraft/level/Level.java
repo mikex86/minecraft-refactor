@@ -1,11 +1,14 @@
 package com.mojang.minecraft.level;
 
 import com.mojang.minecraft.entity.Entity;
+import com.mojang.minecraft.level.save.LevelLoader;
+import com.mojang.minecraft.level.save.LevelSaver;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.util.math.RayCaster;
 import com.mojang.minecraft.world.HitResult;
 
+import java.io.File;
 import java.util.*;
 
 import static com.mojang.minecraft.util.math.MathUtils.ceilFloor;
@@ -15,11 +18,17 @@ import static com.mojang.minecraft.util.math.MathUtils.ceilFloor;
  */
 public class Level {
     private static final int TILE_UPDATE_INTERVAL = 400;
-    private static final String LEVEL_FILE_NAME = "level.dat";
+    private static final String LEVEL_FILE_NAME = "world";
 
     private final List<LevelListener> levelListeners = new ArrayList<>();
     private final Random random = new Random();
-    private final Map<Long, Chunk> loadedChunks = new HashMap<>();
+
+    private final Map<Long, Chunk> chunkMap = new HashMap<>();
+    private final List<Chunk> fullyLoadedChunks = new ArrayList<>();
+    private final Object chunkLoadMutex = new Object();
+
+    private final LevelSaver levelSaver = new LevelSaver(new File(LEVEL_FILE_NAME));
+    private final LevelLoader levelLoader = new LevelLoader(new File(LEVEL_FILE_NAME), levelSaver.getSavingLevelMutex());
 
     /**
      * Creates a new level with the specified dimensions.
@@ -28,20 +37,52 @@ public class Level {
     }
 
     /**
-     * Attempts to load the level from disk.
-     *
-     * @return true if the level was loaded successfully, false otherwise
-     */
-    public boolean load() {
-        // TODO
-        return true;
-    }
-
-    /**
      * Saves the level to disk.
      */
     public void save() {
-        // TODO
+        batchUnloadChunks(this.fullyLoadedChunks, true);
+    }
+
+
+    /**
+     * Unloads the specified chunks and saves them to disk.
+     *
+     * @param chunks   The chunks to unload
+     * @param blocking Whether to block until the chunks are saved
+     */
+    public void batchUnloadChunks(Iterable<Chunk> chunks, boolean blocking) {
+        // create a copy of chunks
+        List<Chunk> chunkList = new ArrayList<>();
+        for (Chunk chunk : chunks) {
+            chunkList.add(chunk);
+        }
+        if (chunkList.isEmpty()) {
+            return;
+        }
+        levelSaver.saveChunks(chunkList, blocking);
+
+        for (Chunk chunk : chunkList) {
+            synchronized (this.chunkLoadMutex) {
+                this.chunkMap.remove(makeChunkKey(chunk.x, chunk.z));
+                this.fullyLoadedChunks.remove(chunk);
+            }
+        }
+    }
+
+    /**
+     * Unloads a chunk at the specified coordinates.
+     *
+     * @param chunkX the X coordinate of the chunk
+     * @param chunkZ the Z coordinate of the chunk
+     */
+    public void unloadChunk(int chunkX, int chunkZ) {
+        long chunkKey = makeChunkKey(chunkX, chunkZ);
+        synchronized (this.chunkLoadMutex) {
+            Chunk chunk = this.chunkMap.remove(chunkKey);
+            if (chunk != null) {
+                batchUnloadChunks(Collections.singleton(chunk), false);
+            }
+        }
     }
 
     /**
@@ -62,7 +103,8 @@ public class Level {
      * Checks if a block blocks light at the specified coordinates.
      */
     public boolean isLightBlocker(int x, int y, int z) {
-        Tile tile = Tile.tiles[this.getTile(x, y, z)];
+        int tileId = this.getTile(x, y, z);
+        Tile tile = Tile.getTileById(tileId);
         return tile != null && tile.blocksLight();
     }
 
@@ -84,7 +126,8 @@ public class Level {
         for (int x = x0; x < x1; ++x) {
             for (int y = y0; y < y1; ++y) {
                 for (int z = z0; z < z1; ++z) {
-                    Tile tile = Tile.tiles[this.getTile(x, y, z)];
+                    int tileId = this.getTile(x, y, z);
+                    Tile tile = Tile.getTileById(tileId);
                     if (tile != null) {
                         AABB tileBox = tile.getAABB(x, y, z);
                         if (tileBox != null) {
@@ -175,7 +218,7 @@ public class Level {
         int cx = x >> 4;
         int cz = z >> 4;
         long chunkKey = makeChunkKey(cx, cz);
-        return this.loadedChunks.get(chunkKey);
+        return this.chunkMap.get(chunkKey);
     }
 
     private static long makeChunkKey(int cx, int cz) {
@@ -186,7 +229,8 @@ public class Level {
      * Checks if a tile is solid at the specified coordinates.
      */
     public boolean isSolidTile(int x, int y, int z) {
-        Tile tile = Tile.tiles[this.getTile(x, y, z)];
+        int tileId = this.getTile(x, y, z);
+        Tile tile = Tile.getTileById(tileId);
         return tile != null && tile.isSolid();
     }
 
@@ -201,13 +245,24 @@ public class Level {
         return RayCaster.raycast(entity, this, partialTick);
     }
 
+    /**
+     * Temporary variable returned by {@link #getLoadedChunks()} to avoid allocating a new list each time.
+     * Serves as a thread-safe copy of {@link #fullyLoadedChunks} for iteration.
+     */
+    private final List<Chunk> loadedChunksTmp = new ArrayList<>();
+
     public Iterable<Chunk> getLoadedChunks() {
-        return this.loadedChunks.values();
+        loadedChunksTmp.clear();
+        synchronized (this.chunkLoadMutex) {
+            // return a copy of the chunk map
+            loadedChunksTmp.addAll(fullyLoadedChunks);
+        }
+        return loadedChunksTmp;
     }
 
     public boolean isChunkLoaded(int chunkX, int chunkZ) {
         long chunkKey = makeChunkKey(chunkX, chunkZ);
-        return this.loadedChunks.containsKey(chunkKey);
+        return this.chunkMap.containsKey(chunkKey); // may be null, indicating loading
     }
 
     public void loadChunk(int chunkX, int chunkZ) {
@@ -215,7 +270,32 @@ public class Level {
             return;
         }
         Chunk chunk = new Chunk(this, chunkX, chunkZ);
-        this.loadedChunks.put(makeChunkKey(chunkX, chunkZ), chunk);
+
+        long chunkKey = makeChunkKey(chunkX, chunkZ);
+
+        // asynchronously load the data for the chunk / generate it if it doesn't exist
+        levelLoader.load(chunk, success -> {
+            if (!success) { // chunk doesn't exist yet, generate it
+                basicWorldGen(chunk);
+            } else {
+                finalizeChunkLoad(chunk);
+            }
+            synchronized (this.chunkLoadMutex) {
+                this.chunkMap.put(chunkKey, chunk); // publish the real chunk
+                this.fullyLoadedChunks.add(chunk); // add to the list of loaded chunks
+            }
+        });
+
+        // we put null into the loaded chunk map to indicate that the chunk is loading
+        // It will be considered "loaded", but no chunk is returned when queried at the coordinates.
+        synchronized (this.chunkLoadMutex) {
+            this.chunkMap.put(chunkKey, null);
+        }
+    }
+
+    private void finalizeChunkLoad(Chunk chunk) {
+        int chunkX = chunk.x;
+        int chunkZ = chunk.z;
 
         // all neighboring chunks that exist need to be rebuilt
         for (int x = -1; x <= 1; ++x) {
@@ -229,9 +309,6 @@ public class Level {
                 }
             }
         }
-
-        // TODO: REMOVE
-        basicWorldGen(chunk);
     }
 
     private void basicWorldGen(Chunk chunk) {

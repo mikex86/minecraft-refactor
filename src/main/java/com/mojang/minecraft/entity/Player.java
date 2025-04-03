@@ -1,7 +1,10 @@
 package com.mojang.minecraft.entity;
 
+import com.mojang.minecraft.level.Chunk;
 import com.mojang.minecraft.level.Level;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 /**
@@ -78,6 +81,11 @@ public class Player extends Entity {
             ++xa;
         }
 
+        // TODO: REMOVE; FLY HACK
+        this.yd = 0;
+        this.xd *= 1.1F;
+        this.zd *= 1.1F;
+
         // Jump 
         if (jump && this.onGround) {
             this.yd = 0.5F; // Vertical velocity for jumping
@@ -109,7 +117,7 @@ public class Player extends Entity {
     private int generateDelay = -1;
     private final Random random = new Random();
 
-    public void generateChunksAroundPlayer(int renderDistance) {
+    public void loadAndUnloadChunksAroundPlayer(int renderDistance) {
         if (generateDelay != -1) {
             // Check if the player has moved significantly
             if (Math.abs(this.x - lastGeneratedPosX) < 4 || Math.abs(this.z - lastGeneratedPosZ) < 4) {
@@ -148,6 +156,21 @@ public class Player extends Entity {
                     this.level.loadChunk(cx, cz);
                 }
             }
+        }
+
+        // Unload chunks that are too far away
+        List<Chunk> toUnload = new ArrayList<>();
+        for (Chunk loadedChunk : this.level.getLoadedChunks()) {
+            int cx = loadedChunk.x;
+            int cz = loadedChunk.z;
+
+            // check if distance is within the load radius
+            if (Math.hypot(cx - chunkX, cz - chunkZ) > renderDistance) {
+                toUnload.add(loadedChunk);
+            }
+        }
+        if (!toUnload.isEmpty()) {
+            this.level.batchUnloadChunks(toUnload, false);
         }
         // Update the last generated position
         this.lastGeneratedPosX = this.x;

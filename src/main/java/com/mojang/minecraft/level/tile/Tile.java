@@ -15,7 +15,7 @@ public class Tile {
     /**
      * Array of all tile types indexed by ID
      */
-    public static final Tile[] tiles = new Tile[256];
+    private static final Tile[] tiles = new Tile[256];
 
     /**
      * Represents an empty tile
@@ -81,6 +81,10 @@ public class Tile {
     protected Tile(int id, int tex) {
         this(id);
         this.tex = tex;
+    }
+
+    public static Tile getTileById(int id) {
+        return tiles[id];
     }
 
     /**

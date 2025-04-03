@@ -17,8 +17,6 @@ import org.lwjgl.BufferUtils;
 import java.nio.FloatBuffer;
 import java.util.List;
 
-import static com.mojang.minecraft.level.Chunk.CHUNK_SIZE;
-
 /**
  * Handles all rendering operations for Minecraft.
  * Extracted from the main Minecraft class to separate rendering concerns.
@@ -205,7 +203,7 @@ public class GameRenderer implements Disposable {
         // A ticked frame is already more expensive than a regular one,
         // so we don't want to add world gen on top of that.
         // That should hit a different frame.
-        player.generateChunksAroundPlayer(renderDistance);
+        player.loadAndUnloadChunksAroundPlayer(renderDistance);
 
         // render level
         {
@@ -316,7 +314,7 @@ public class GameRenderer implements Disposable {
         Texture texture = this.textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
         graphics.setTexture(texture);
         t.init();
-        Tile.tiles[paintTexture].render(t, null, 0, 0, 0);
+        Tile.getTileById(paintTexture).render(t, null, 0, 0, 0);
         t.flush();
         graphics.popMatrix();
     }

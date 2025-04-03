@@ -2,6 +2,9 @@ package com.mojang.minecraft.level;
 
 import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.level.tile.Tile;
+import com.mojang.minecraft.nbt.ByteArrayTag;
+import com.mojang.minecraft.nbt.CompoundTag;
+import com.mojang.minecraft.nbt.Tag;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.ChunkMesh;
 import com.mojang.minecraft.renderer.Disposable;
@@ -39,9 +42,8 @@ public class Chunk implements Disposable {
     private final byte[] blocks;
 
     // Chunk center coordinates
-    public final float x;
-    public final float y;
-    public final float z;
+    public final int x;
+    public final int z;
 
     // Chunk sections
     private final List<ChunkSection> sections = new ArrayList<>();
@@ -74,9 +76,8 @@ public class Chunk implements Disposable {
         this.z1 = this.z0 + CHUNK_SIZE;
 
         // Calculate center coordinates
-        this.x = (float) (x0 + x1) / 2.0F;
-        this.y = (float) (y0 + y1) / 2.0F;
-        this.z = (float) (z0 + z1) / 2.0F;
+        this.x = chunkX;
+        this.z = chunkZ;
 
         // Create bounding box
         this.aabb = new AABB((float) x0, (float) y0, (float) z0, (float) x1, (float) y1, (float) z1);
@@ -232,10 +233,9 @@ public class Chunk implements Disposable {
      * Calculates the squared distance from this chunk to the player.
      */
     public float distanceToSqr(Player player) {
-        float xDistance = player.x - this.x;
-        float yDistance = player.y - this.y;
-        float zDistance = player.z - this.z;
-        return xDistance * xDistance + yDistance * yDistance + zDistance * zDistance;
+        float xDistance = player.x - (this.x + CHUNK_SIZE / 2f);
+        float zDistance = player.z - (this.z + CHUNK_SIZE / 2f);
+        return xDistance * xDistance + zDistance * zDistance;
     }
 
     /**
@@ -248,6 +248,15 @@ public class Chunk implements Disposable {
             section.dispose();
         }
         sections.clear();
+    }
+
+    public void load(byte[] newBlocks) {
+        System.arraycopy(newBlocks, 0, blocks, 0, blocks.length);
+        setFullChunkDirty();
+    }
+
+    public byte[] getBlocks() {
+        return blocks;
     }
 
     /**
@@ -323,7 +332,7 @@ public class Chunk implements Disposable {
                     for (int z = this.z0; z < this.z1; ++z) {
                         int tileId = level.getTile(x, y, z);
                         if (tileId > 0) {
-                            Tile.tiles[tileId].render(tesselator, level, x, y, z);
+                            Tile.getTileById(tileId).render(tesselator, level, x, y, z);
                             ++renderedTiles;
                             empty = false;
                         }

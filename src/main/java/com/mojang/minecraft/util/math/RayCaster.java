@@ -82,7 +82,8 @@ public class RayCaster {
         int blockZ = (int) Math.floor(startZ);
 
         // Early exit if starting inside a solid block
-        Tile startTile = Tile.tiles[level.getTile(blockX, blockY, blockZ)];
+        int tileId = level.getTile(blockX, blockY, blockZ);
+        Tile startTile = Tile.getTileById(tileId);
         if (startTile != null && startTile.isSolid()) {
             // We're inside a block; return a hit at our current position with face 0 (bottom)
             return new HitResult(1, blockX, blockY, blockZ, 0, startX, startY, startZ, 0);
@@ -130,7 +131,8 @@ public class RayCaster {
         // Main DDA loop
         for (int i = 0; i < MAX_STEPS; i++) {
             // Check current block for a hit
-            Tile tile = Tile.tiles[level.getTile(blockX, blockY, blockZ)];
+            int currentTileId = level.getTile(blockX, blockY, blockZ);
+            Tile tile = Tile.getTileById(currentTileId);
             if (tile != null && tile.isSolid()) {
                 // We found a hit
                 break;
@@ -164,7 +166,8 @@ public class RayCaster {
         }
         
         // Double check that we actually hit something
-        Tile hitTile = Tile.tiles[level.getTile(blockX, blockY, blockZ)];
+        int currentTileId = level.getTile(blockX, blockY, blockZ);
+        Tile hitTile = Tile.getTileById(currentTileId);
         if (hitTile == null || !hitTile.isSolid()) {
             return null; // No hit found (should not happen but just in case)
         }
