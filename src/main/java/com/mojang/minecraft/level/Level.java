@@ -273,24 +273,23 @@ public class Level {
 
         long chunkKey = makeChunkKey(chunkX, chunkZ);
 
-        // asynchronously load the data for the chunk / generate it if it doesn't exist
-        levelLoader.load(chunk, success -> {
-            if (!success) { // chunk doesn't exist yet, generate it
-                basicWorldGen(chunk);
-            } else {
-                finalizeChunkLoad(chunk);
-            }
-            synchronized (this.chunkLoadMutex) {
-                this.chunkMap.put(chunkKey, chunk); // publish the real chunk
-                this.fullyLoadedChunks.add(chunk); // add to the list of loaded chunks
-            }
-        });
-
         // we put null into the loaded chunk map to indicate that the chunk is loading
         // It will be considered "loaded", but no chunk is returned when queried at the coordinates.
         synchronized (this.chunkLoadMutex) {
             this.chunkMap.put(chunkKey, null);
         }
+
+        // asynchronously load the data for the chunk / generate it if it doesn't exist
+        levelLoader.load(chunk, loaded -> {
+            if (!loaded) {
+                basicWorldGen(chunk);
+            }
+            finalizeChunkLoad(chunk);
+            synchronized (this.chunkLoadMutex) {
+                this.chunkMap.put(chunkKey, chunk); // publish the real chunk
+                this.fullyLoadedChunks.add(chunk); // add to the list of loaded chunks
+            }
+        });
     }
 
     private void finalizeChunkLoad(Chunk chunk) {
