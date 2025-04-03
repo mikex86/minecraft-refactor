@@ -6,6 +6,7 @@ import com.mojang.minecraft.level.save.LevelLoader;
 import com.mojang.minecraft.level.save.LevelSaver;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.phys.AABB;
+import com.mojang.minecraft.util.LongHashMap;
 import com.mojang.minecraft.util.math.RayCaster;
 import com.mojang.minecraft.world.HitResult;
 
@@ -24,7 +25,7 @@ public class Level {
     private final List<LevelListener> levelListeners = new ArrayList<>();
     private final Random random = new Random();
 
-    private final Map<Long, Chunk> chunkMap = new HashMap<>();
+    private final LongHashMap<Chunk> chunkMap = new LongHashMap<>();
     private final List<Chunk> fullyLoadedChunks = new ArrayList<>();
     private final Object chunkLoadMutex = new Object();
 
@@ -252,10 +253,11 @@ public class Level {
      * Temporary variable returned by {@link #getLoadedChunks()} to avoid allocating a new list each time.
      * Serves as a thread-safe copy of {@link #fullyLoadedChunks} for iteration.
      */
-    private final List<Chunk> loadedChunksTmp = new ArrayList<>();
+    private final ArrayList<Chunk> loadedChunksTmp = new ArrayList<>();
 
     public Iterable<Chunk> getLoadedChunks() {
         loadedChunksTmp.clear();
+        loadedChunksTmp.ensureCapacity(fullyLoadedChunks.size());
         synchronized (this.chunkLoadMutex) {
             // return a copy of the chunk map
             loadedChunksTmp.addAll(fullyLoadedChunks);
