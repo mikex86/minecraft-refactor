@@ -2,9 +2,6 @@ package com.mojang.minecraft.level;
 
 import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.level.tile.Tile;
-import com.mojang.minecraft.nbt.ByteArrayTag;
-import com.mojang.minecraft.nbt.CompoundTag;
-import com.mojang.minecraft.nbt.Tag;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.ChunkMesh;
 import com.mojang.minecraft.renderer.Disposable;
@@ -203,12 +200,11 @@ public class Chunk implements Disposable {
         for (ChunkSection section : sections) {
             if (section.containsOrAdjacent(x, y, z)) {
                 section.setDirty();
-                if (!this.dirty) {
-                    this.dirtiedTime = System.currentTimeMillis();
-                    this.dirty = true;
-                }
-                return;
             }
+        }
+        if (!this.dirty) {
+            this.dirtiedTime = System.currentTimeMillis();
+            this.dirty = true;
         }
     }
 
@@ -290,9 +286,11 @@ public class Chunk implements Disposable {
             return (x >= x0 && x < x1 &&
                     y >= y0 && y < y1 &&
                     z >= z0 && z < z1) ||
-                    (x == x0 - 1 || x == x1) ||
+
+                    // adjacent
+                    ((x == x0 - 1 || x == x1) && (y >= y0 && y < y1)) ||
                     (y == y0 - 1 || y == y1) ||
-                    (z == z0 - 1 || z == z1);
+                    ((z == z0 - 1 || z == z1) && (y >= y0 && y < y1));
         }
 
         /**

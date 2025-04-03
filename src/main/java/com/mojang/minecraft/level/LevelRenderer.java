@@ -116,21 +116,18 @@ public class LevelRenderer implements LevelListener, Disposable {
 
         // Mark all adjacent chunks as dirty
         for (int xx = -1; xx <= 1; ++xx) {
-            for (int yy = -1; yy <= 1; ++yy) {
-                for (int zz = -1; zz <= 1; ++zz) {
-                    // Skip the center chunk
-                    if (xx == 0 && yy == 0 && zz == 0) {
-                        continue;
-                    }
+            for (int zz = -1; zz <= 1; ++zz) {
+                // Skip the center chunk
+                if (xx == 0 && zz == 0) {
+                    continue;
+                }
 
-                    int ax = cx + xx;
-                    int ay = cy + yy;
-                    int az = cz + zz;
+                int ax = cx + xx;
+                int az = cz + zz;
 
-                    Chunk adjacentChunk = this.level.getChunk(ax, az);
-                    if (adjacentChunk != null && adjacentChunk != chunk) {
-                        adjacentChunk.setDirtyBlock(x + xx * CHUNK_SIZE, y + yy * CHUNK_SIZE, z + zz * CHUNK_SIZE);
-                    }
+                Chunk adjacentChunk = this.level.getChunk(ax, az);
+                if (adjacentChunk != null && adjacentChunk != chunk) {
+                    adjacentChunk.setDirtyBlock(x, y, z);
                 }
             }
         }
