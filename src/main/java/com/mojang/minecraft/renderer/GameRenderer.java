@@ -159,11 +159,10 @@ public class GameRenderer implements Disposable {
      *
      * @param partialTick  Interpolation factor between ticks (0.0-1.0)
      * @param hitResult    The current hit result (block selection)
-     * @param editMode     The current edit mode (0 = destroy, 1 = place)
      * @param paintTexture The current block to place
      * @param fpsString    String containing FPS information to display
      */
-    public void render(float partialTick, HitResult hitResult, int editMode,
+    public void render(float partialTick, HitResult hitResult,
                        int paintTexture, String fpsString) {
         // Set viewport and clear buffers
         graphics.setViewport(0, 0, this.width, this.height);
@@ -188,7 +187,7 @@ public class GameRenderer implements Disposable {
 
         // Render HUD elements
         {
-            renderHud(graphics, fpsString, editMode, paintTexture);
+            renderHud(graphics, fpsString, paintTexture);
         }
     }
 
@@ -256,10 +255,9 @@ public class GameRenderer implements Disposable {
      *
      * @param graphics     The graphics api
      * @param fpsString    The FPS string to display
-     * @param editMode     The current edit mode
      * @param paintTexture The current block to place
      */
-    private void renderHud(GraphicsAPI graphics, String fpsString, int editMode, int paintTexture) {
+    private void renderHud(GraphicsAPI graphics, String fpsString, int paintTexture) {
         graphics.setShader(hudShader);
 
         // disable depth test

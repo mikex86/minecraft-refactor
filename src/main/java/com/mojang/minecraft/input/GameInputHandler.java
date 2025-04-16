@@ -190,8 +190,8 @@ public class GameInputHandler {
 
             // Check if we can place a block here
             int tileId = this.level.getTile(x, y, z);
-            AABB aabb = Tile.getTileById(tileId).getAABB(x, y, z);
-            if (aabb == null || this.isFree(aabb)) {
+            AABB aabb = (tileId == 0 ? Tile.rock : Tile.getTileById(tileId)).getAABB(x, y, z);
+            if (this.isFree(aabb)) {
                 this.level.setTile(x, y, z, this.paintTexture);
             }
         }

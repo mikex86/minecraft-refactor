@@ -157,7 +157,6 @@ public class Minecraft implements Runnable {
                     this.renderer.render(
                             partialTick,
                             hitResult,
-                            gameInputHandler.getEditMode(),
                             gameInputHandler.getPaintTexture(),
                             engine.getFpsString()
                     );
