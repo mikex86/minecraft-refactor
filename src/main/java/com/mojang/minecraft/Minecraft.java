@@ -11,10 +11,6 @@ import com.mojang.minecraft.world.HitResult;
 
 import java.io.IOException;
 
-/**
- * Main game class for Minecraft Classic 0.0.11a.
- * Coordinates the different components of the game.
- */
 public class Minecraft implements Runnable {
     // Constants
     public static final String VERSION_STRING = "0.0.11a";

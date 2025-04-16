@@ -5,6 +5,7 @@ import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.util.math.CollisionUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -187,22 +188,24 @@ public class Entity {
         float originalYa = ya;
         float originalZa = za;
 
-        // Get all potential collision boxes within the movement area
-        List<AABB> collisionBoxes = this.level.getCubes(this.bb.expand(xa, ya, za));
-
         // Handle Y-axis collisions first
+        List<AABB> collisionBoxes = new ArrayList<>(this.level.getCubes(this.bb.expand(0, ya, 0)));
         for (AABB collisionBox : collisionBoxes) {
             ya = CollisionUtils.clipYCollide(collisionBox, this.bb, ya);
         }
         this.bb.move(0.0F, ya, 0.0F);
 
         // Handle X-axis collisions
+        collisionBoxes.clear();
+        collisionBoxes.addAll(this.level.getCubes(this.bb.expand(xa, 0, 0)));
         for (AABB box : collisionBoxes) {
             xa = CollisionUtils.clipXCollide(box, this.bb, xa);
         }
         this.bb.move(xa, 0.0F, 0.0F);
 
         // Handle Z-axis collisions
+        collisionBoxes.clear();
+        collisionBoxes.addAll(this.level.getCubes(this.bb.expand(0, 0, za)));
         for (AABB collisionBox : collisionBoxes) {
             za = CollisionUtils.clipZCollide(collisionBox, this.bb, za);
         }

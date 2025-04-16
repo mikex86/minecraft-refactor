@@ -114,6 +114,10 @@ public class GameRenderer implements Disposable {
     public void setDimensions(int width, int height) {
         this.width = width;
         this.height = height;
+
+        // cross-hair mesh needs to be recreated
+        this.crosshairMesh.dispose();
+        this.crosshairMesh = null;
     }
 
     /**
@@ -123,7 +127,7 @@ public class GameRenderer implements Disposable {
      */
     private void setupCamera(float partialTick) {
         // Calculate aspect ratio
-        float aspectRatio = (float) this.width / (float) this.height;
+        float aspectRatio = (float) ((double) this.width / (double) this.height);
 
         // Set viewport
         graphics.setViewport(0, 0, this.width, this.height);
@@ -263,8 +267,8 @@ public class GameRenderer implements Disposable {
         // disable depth test
         graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
 
-        int screenWidth = this.width * 240 / this.height;
-        int screenHeight = this.height * 240 / this.height;
+        float screenWidth = (this.width * 240f) / (float) this.height;
+        float screenHeight = (this.height * 240f) / (float) this.height;
 
         graphics.clear(false, true, 0.0F, 0.0F, 0.0F, 0.0F);
 
@@ -298,7 +302,7 @@ public class GameRenderer implements Disposable {
         this.font.drawShadow(graphics, "x: " + player.x + ", y: " + player.y + ", z: " + player.z, 2, 22, 0xFFFFFF);
     }
 
-    private void drawBlockPreview(GraphicsAPI graphics, int screenWidth, int screenHeight, int paintTexture) {
+    private void drawBlockPreview(GraphicsAPI graphics, float screenWidth, float screenHeight, int paintTexture) {
         Tesselator t = Tesselator.instance;
         graphics.pushMatrix();
         graphics.translate(screenWidth - 16, 32, 0.0F);
@@ -319,9 +323,9 @@ public class GameRenderer implements Disposable {
 
     private IndexedMesh crosshairMesh;
 
-    private void drawCrosshair(GraphicsAPI graphics, int screenWidth, int screenHeight) {
-        int centerX = screenWidth / 2;
-        int centerY = screenHeight / 2;
+    private void drawCrosshair(GraphicsAPI graphics, float screenWidth, float screenHeight) {
+        float centerX = screenWidth / 2f;
+        float centerY = screenHeight / 2f;
 
         graphics.updateShaderMatrices();
 

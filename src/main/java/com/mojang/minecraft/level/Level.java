@@ -109,7 +109,6 @@ public class Level {
     public List<AABB> getCubes(AABB box) {
         List<AABB> cubes = new ArrayList<>();
 
-
         int x0 = ceilFloor(box.x0);
         int x1 = ceilFloor(box.x1 + 1.0F);
         int y0 = ceilFloor(box.y0);
