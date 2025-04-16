@@ -87,6 +87,15 @@ public class Tile {
         return tiles[id];
     }
 
+
+    /**
+     * Checks if a block blocks light at the specified coordinates.
+     */
+    public static boolean isLightBlocker(int id) {
+        Tile tile = Tile.getTileById(id);
+        return tile != null && tile.blocksLight();
+    }
+
     /**
      * Renders the tile in the world.
      *

@@ -104,15 +104,6 @@ public class Level {
     }
 
     /**
-     * Checks if a block blocks light at the specified coordinates.
-     */
-    public boolean isLightBlocker(int x, int y, int z) {
-        int tileId = this.getTile(x, y, z);
-        Tile tile = Tile.getTileById(tileId);
-        return tile != null && tile.blocksLight();
-    }
-
-    /**
      * Gets all the AABBs inside the specified AABB.
      */
     public List<AABB> getCubes(AABB box) {
@@ -203,8 +194,11 @@ public class Level {
      * Checks if a position is lit (above the highest light-blocking block).
      */
     public boolean isLit(int x, int y, int z) {
-        // TODO
-        return true;
+        Chunk chunk = getChunk(x, z);
+        if (chunk == null) {
+            return false;
+        }
+        return chunk.isSkyLit(x & 15, y, z & 15);
     }
 
     /**

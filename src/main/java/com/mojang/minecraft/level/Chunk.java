@@ -60,6 +60,8 @@ public class Chunk implements Disposable {
         totalUpdates = 0;
     }
 
+    private int[] lightDepths;
+
     /**
      * Creates a new chunk with the specified boundaries.
      */
@@ -80,7 +82,8 @@ public class Chunk implements Disposable {
         this.aabb = new AABB((float) x0, (float) y0, (float) z0, (float) x1, (float) y1, (float) z1);
 
         // Initialize blocks array
-        this.blocks = new byte[CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_HEIGHT];
+        this.blocks = new byte[CHUNK_SIZE * CHUNK_SIZE * CHUNK_HEIGHT];
+        this.lightDepths = new int[CHUNK_SIZE * CHUNK_SIZE];
 
         // Initialize sections
         initSections();
@@ -190,6 +193,9 @@ public class Chunk implements Disposable {
         for (ChunkSection section : sections) {
             section.setDirty();
         }
+
+        // Rebuild light depth information
+        rebuildSkylight();
     }
 
     /**
@@ -206,6 +212,9 @@ public class Chunk implements Disposable {
             this.dirtiedTime = System.currentTimeMillis();
             this.dirty = true;
         }
+
+        // Rebuild light depth information
+        rebuildSkylight();
     }
 
     /**
@@ -243,6 +252,26 @@ public class Chunk implements Disposable {
 
     public byte[] getBlocks() {
         return blocks;
+    }
+
+    public boolean isSkyLit(int localX, int y, int localZ) {
+        if (localX >= 0 && y >= 0 && localZ >= 0 && localX < CHUNK_SIZE && y < CHUNK_HEIGHT && localZ < CHUNK_SIZE) {
+            return y >= this.lightDepths[localX + localZ * CHUNK_SIZE];
+        } else {
+            return true;
+        }
+    }
+
+    private void rebuildSkylight() {
+        for (int x = 0; x < CHUNK_SIZE; ++x) {
+            for (int z = 0; z < CHUNK_SIZE; ++z) {
+                // Find the highest light-blocking block
+                int y;
+                for (y = CHUNK_HEIGHT - 1; y > 0 && !Tile.isLightBlocker(getTile(x, y, z)); --y) {
+                }
+                this.lightDepths[x + z * CHUNK_SIZE] = y;
+            }
+        }
     }
 
     /**
