@@ -1,5 +1,6 @@
 package com.mojang.minecraft.level;
 
+import com.mojang.minecraft.Minecraft;
 import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.level.block.Blocks;
 import com.mojang.minecraft.level.block.state.BlockState;
@@ -10,8 +11,8 @@ import com.mojang.minecraft.renderer.Frustum;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.util.math.MathUtils;
+import com.mojang.minecraft.util.nio.NativeByteArray;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,6 +26,7 @@ public class Chunk implements Disposable {
     public static final int CHUNK_HEIGHT = 128;
     public static final int SECTION_SIZE = 32;
     public static final int CHUNK_SIZE_LG2 = MathUtils.log2(CHUNK_SIZE);
+    public static final int CHUNK_SIZE_MINUS_ONE = CHUNK_SIZE - 1;
 
     // Bounding box for this chunk
     public AABB aabb;
@@ -40,7 +42,7 @@ public class Chunk implements Disposable {
     public final int y1;
     public final int z1;
 
-    private final ByteBuffer blockStateIds;
+    private final NativeByteArray blockStateIds;
 
     // Chunk center coordinates
     public final int centerX;
@@ -64,7 +66,7 @@ public class Chunk implements Disposable {
         totalUpdates = 0;
     }
 
-    private final int[] lightDepths;
+    private final NativeByteArray lightDepths;
 
     /**
      * Creates a new chunk with the specified boundaries.
@@ -86,8 +88,8 @@ public class Chunk implements Disposable {
         this.aabb = new AABB((float) x0, (float) y0, (float) z0, (float) x1, (float) y1, (float) z1);
 
         // Initialize blocks array
-        this.blockStateIds = ByteBuffer.allocateDirect(CHUNK_SIZE * CHUNK_SIZE * CHUNK_HEIGHT);
-        this.lightDepths = new int[CHUNK_SIZE * CHUNK_SIZE];
+        this.blockStateIds = new NativeByteArray(CHUNK_SIZE * CHUNK_SIZE * CHUNK_HEIGHT);
+        this.lightDepths = new NativeByteArray(CHUNK_SIZE * CHUNK_SIZE);
 
         // Initialize sections
         initSections();
@@ -124,13 +126,13 @@ public class Chunk implements Disposable {
         }
         // calculate the index in the blocks array
         int index = (localX * CHUNK_HEIGHT + localY) * CHUNK_SIZE + localZ;
-        int blockStateId = blockStateIds.get(index);
+        int blockStateId = blockStateIds.getByte(index);
         return Blocks.globalPalette.fromBlockStateId(blockStateId);
     }
 
     public boolean setBlockState(int localX, int localY, int localZ, BlockState blockState) {
         // check if in bounds
-         if (localX < 0 || localY < 0 || localZ < 0 || localX >= CHUNK_SIZE || localY >= CHUNK_HEIGHT || localZ >= CHUNK_SIZE) {
+        if (localX < 0 || localY < 0 || localZ < 0 || localX >= CHUNK_SIZE || localY >= CHUNK_HEIGHT || localZ >= CHUNK_SIZE) {
             return false;
         }
         // calculate the index in the blocks array
@@ -143,11 +145,11 @@ public class Chunk implements Disposable {
             throw new IllegalArgumentException("Block state ID exceeds 255: " + blockStateId);
         }
 
-        if (blockStateIds.get(index) == blockStateId) {
+        if (blockStateIds.getByte(index) == blockStateId) {
             return false; // no change
         }
 
-        blockStateIds.put(index, (byte) blockStateId);
+        blockStateIds.setByte(index, (byte) blockStateId);
         return true;
     }
 
@@ -258,21 +260,22 @@ public class Chunk implements Disposable {
             section.dispose();
         }
         sections.clear();
+        blockStateIds.dispose();
     }
 
     public void load(byte[] newBlocks) {
-        this.blockStateIds.put(newBlocks);
-        this.blockStateIds.flip();
+        this.blockStateIds.setContents(newBlocks);
         setFullChunkDirty();
     }
 
-    public ByteBuffer getBlockStateIds() {
-        return blockStateIds;
+    public byte[] getBlockStateIds() {
+        return blockStateIds.getAsBytes();
+
     }
 
     public boolean isSkyLit(int localX, int y, int localZ) {
         if (localX >= 0 && y >= 0 && localZ >= 0 && localX < CHUNK_SIZE && y < CHUNK_HEIGHT && localZ < CHUNK_SIZE) {
-            return y >= this.lightDepths[localX + localZ * CHUNK_SIZE];
+            return y >= this.lightDepths.getByte(localX + localZ * CHUNK_SIZE);
         } else {
             return true;
         }
@@ -291,7 +294,7 @@ public class Chunk implements Disposable {
                     }
                     --y;
                 }
-                this.lightDepths[x + z * CHUNK_SIZE] = y;
+                this.lightDepths.setByte(x + z * CHUNK_SIZE, (byte) y);
             }
         }
     }
@@ -359,7 +362,7 @@ public class Chunk implements Disposable {
                 return;
             }
 
-            Tesselator tesselator = chunkMesh.getTesselator();
+            Tesselator tesselator = Tesselator.instance;
             tesselator.init();
 
             renderedTiles = 0;

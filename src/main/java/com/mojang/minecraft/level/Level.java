@@ -183,7 +183,7 @@ public class Level {
         if (chunk == null) {
             return false;
         }
-        return chunk.isSkyLit(x & (Chunk.CHUNK_SIZE - 1), y, z & (Chunk.CHUNK_SIZE - 1));
+        return chunk.isSkyLit(x & Chunk.CHUNK_SIZE_MINUS_ONE, y, z & Chunk.CHUNK_SIZE_MINUS_ONE);
     }
 
     /**
@@ -194,15 +194,24 @@ public class Level {
         if (chunk == null) {
             return null;
         }
-        return chunk.getBlockState(x & (Chunk.CHUNK_SIZE - 1), y, z & (Chunk.CHUNK_SIZE - 1));
+        return chunk.getBlockState(x & Chunk.CHUNK_SIZE_MINUS_ONE, y, z & Chunk.CHUNK_SIZE_MINUS_ONE);
     }
+
+    private long lastChunkKey = 0;
+    private Chunk lastChunk = null;
 
     public Chunk getChunk(int x, int z) {
         int cx = x >> Chunk.CHUNK_SIZE_LG2;
         int cz = z >> Chunk.CHUNK_SIZE_LG2;
         long chunkKey = makeChunkKey(cx, cz);
+        if (chunkKey == lastChunkKey) {
+            return lastChunk;
+        }
         synchronized (this.chunkLoadMutex) {
-            return this.chunkMap.get(chunkKey);
+            Chunk chunk = this.chunkMap.get(chunkKey);
+            lastChunk = chunk;
+            lastChunkKey = chunkKey;
+            return chunk;
         }
     }
 
@@ -279,28 +288,42 @@ public class Level {
                     CrashReporter.logException("Failed to generate chunk", e);
                 }
             }
-            finalizeChunkLoad(chunk);
             synchronized (this.chunkLoadMutex) {
                 this.chunkMap.put(chunkKey, chunk); // publish the real chunk
                 this.fullyLoadedChunks.add(chunk); // add to the list of loaded chunks
             }
+            finalizeChunkLoad(chunk);
         });
     }
 
     private void finalizeChunkLoad(Chunk chunk) {
-        int chunkX = chunk.x0;
-        int chunkZ = chunk.z0;
+        List<Chunk> toRebuild = new ArrayList<>();
+        int x = chunk.x0;
+        int z = chunk.z0;
+        {
+            toRebuild.add(chunk);
+            Chunk westChunk = getChunk(x - Chunk.CHUNK_SIZE, z);
+            if (westChunk != null) {
+                toRebuild.add(westChunk);
+            }
 
-        // all neighboring chunks that exist need to be rebuilt
-        for (int x = -1; x <= 1; ++x) {
-            for (int z = -1; z <= 1; ++z) {
-                if (x == 0 && z == 0) {
-                    continue;
-                }
-                Chunk neighborChunk = getChunk(chunkX + x, chunkZ + z);
-                if (neighborChunk != null) {
-                    neighborChunk.setFullChunkDirty();
-                }
+            Chunk eastChunk = getChunk(x + Chunk.CHUNK_SIZE, z);
+            if (eastChunk != null) {
+                toRebuild.add(eastChunk);
+            }
+
+            Chunk northChunk = getChunk(x, z - Chunk.CHUNK_SIZE);
+            if (northChunk != null) {
+                toRebuild.add(northChunk);
+            }
+
+            Chunk southChunk = getChunk(x, z + Chunk.CHUNK_SIZE);
+            if (southChunk != null) {
+                toRebuild.add(southChunk);
+            }
+
+            for (Chunk c : toRebuild) {
+                c.setFullChunkDirty();
             }
         }
     }

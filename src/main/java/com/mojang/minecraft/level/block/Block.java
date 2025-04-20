@@ -1,5 +1,6 @@
 package com.mojang.minecraft.level.block;
 
+import com.mojang.minecraft.level.Chunk;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.particle.Particle;

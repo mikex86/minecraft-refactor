@@ -11,9 +11,6 @@ public class ChunkMesh implements Disposable {
     // Graphics resources
     private IndexedMesh mesh;
 
-    // Tesselator for building this mesh
-    private final Tesselator tesselator;
-
     // State tracking
     private boolean disposed = false;
 
@@ -23,14 +20,6 @@ public class ChunkMesh implements Disposable {
     public ChunkMesh() {
         // Create resources
         this.mesh = null;
-        this.tesselator = Tesselator.instance;
-    }
-
-    /**
-     * Gets the tesselator for this mesh.
-     */
-    public Tesselator getTesselator() {
-        return tesselator;
     }
 
     /**
@@ -42,6 +31,8 @@ public class ChunkMesh implements Disposable {
             mesh.dispose();
             mesh = null;
         }
+
+        Tesselator tesselator = Tesselator.instance;
 
         int vertexCount = tesselator.getVertexCount();
         int indexCount = tesselator.getIndexCount();
@@ -68,7 +59,7 @@ public class ChunkMesh implements Disposable {
      * Clears the vertex data but keeps the buffer allocated.
      */
     public void clear() {
-        tesselator.init();
+        Tesselator.instance.init();
     }
 
     /**
