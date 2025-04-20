@@ -17,8 +17,8 @@ import java.nio.IntBuffer;
  * It also uses Vertex Array Objects (VAOs) for improved rendering performance.
  */
 public class Tesselator implements Disposable {
-    private static final int MAX_FLOATS = 262144;
-    private static final int MAX_INDICES = 262144;
+    private static final int MAX_FLOATS = 524288;
+    private static final int MAX_INDICES = 524288;
 
     // CPU-side data storage
     private final FloatBuffer cpuVertexBuffer = BufferUtils.createFloatBuffer(MAX_FLOATS);

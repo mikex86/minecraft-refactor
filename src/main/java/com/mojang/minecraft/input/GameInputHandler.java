@@ -3,12 +3,15 @@ package com.mojang.minecraft.input;
 import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.level.Level;
-import com.mojang.minecraft.level.tile.Tile;
+import com.mojang.minecraft.level.block.Block;
+import com.mojang.minecraft.level.block.Blocks;
+import com.mojang.minecraft.level.block.EnumFacing;
+import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.phys.AABB;
-import input.InputHandler;
 import com.mojang.minecraft.util.math.CollisionUtils;
 import com.mojang.minecraft.world.HitResult;
+import input.InputHandler;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,8 +27,7 @@ public class GameInputHandler {
     // Input state
     private boolean mouseGrabbed = false;
     private final int yMouseAxis = 1;  // Controls if mouse Y axis is inverted
-    private int editMode = 0;    // 0 = destroy blocks, 1 = place blocks
-    private int paintTexture = 1;  // Current block type for building
+    private Block placeBlock = Blocks.rock;
 
     // Game references needed for input processing
     private final Player player;
@@ -87,19 +89,19 @@ public class GameInputHandler {
 
                 // Block selection keys
                 if (key == InputHandler.Keys.KEY_1) {
-                    this.paintTexture = 1;  // Stone
+                    this.placeBlock = Blocks.stoneBrick;  // Stone
                 }
                 if (key == InputHandler.Keys.KEY_2) {
-                    this.paintTexture = 3;  // Dirt
+                    this.placeBlock = Blocks.dirt;  // Dirt
                 }
                 if (key == InputHandler.Keys.KEY_3) {
-                    this.paintTexture = 4;  // Cobblestone
+                    this.placeBlock = Blocks.rock;  // Cobblestone
                 }
                 if (key == InputHandler.Keys.KEY_4) {
-                    this.paintTexture = 5;  // Wooden planks
+                    this.placeBlock = Blocks.planks;  // Wooden planks
                 }
                 if (key == InputHandler.Keys.KEY_5) {
-                    this.paintTexture = 6;  // Sapling
+                    this.placeBlock = Blocks.wood;  // Wood
                 }
             }
         }
@@ -115,13 +117,10 @@ public class GameInputHandler {
                 this.grabMouse();
             } else {
                 // Handle left mouse button (destroy/place blocks)
-                if (button == InputHandler.MouseButtons.BUTTON_LEFT && pressed) {
-                    this.handleMouseClick(hitResult);
-                }
-
-                // Handle right mouse button (toggle edit mode)
-                if (button == InputHandler.MouseButtons.BUTTON_RIGHT && pressed) {
-                    this.editMode = (this.editMode + 1) % 2;
+                if (button == InputHandler.MouseButtons.BUTTON_LEFT || button == InputHandler.MouseButtons.BUTTON_RIGHT) {
+                    if (pressed) {
+                        this.handleMouseClick(hitResult, button == InputHandler.MouseButtons.BUTTON_RIGHT);
+                    }
                 }
             }
         }
@@ -154,18 +153,17 @@ public class GameInputHandler {
     /**
      * Handles mouse click actions in the world, either destroying or placing blocks.
      */
-    private void handleMouseClick(HitResult hitResult) {
+    private void handleMouseClick(HitResult hitResult, boolean isRightClick) {
         if (hitResult == null) {
             return;
         }
 
-        if (this.editMode == 0) {
+        if (!isRightClick) {
             // Destroy mode
-            int tileId = this.level.getTile(hitResult.x, hitResult.y, hitResult.z);
-            Tile oldTile = Tile.getTileById(tileId);
-            boolean changed = this.level.setTile(hitResult.x, hitResult.y, hitResult.z, 0);
-            if (oldTile != null && changed) {
-                oldTile.destroy(this.level, hitResult.x, hitResult.y, hitResult.z, this.particleEngine);
+            BlockState oldBlock = this.level.getBlockState(hitResult.x, hitResult.y, hitResult.z);
+            boolean changed = this.level.setBlockState(hitResult.x, hitResult.y, hitResult.z, null);
+            if (oldBlock != null && changed) {
+                oldBlock.block.destroy(this.level, hitResult.x, hitResult.y, hitResult.z, this.particleEngine);
             }
         } else {
             // Build mode
@@ -189,10 +187,10 @@ public class GameInputHandler {
             }
 
             // Check if we can place a block here
-            int tileId = this.level.getTile(x, y, z);
-            AABB aabb = (tileId == 0 ? Tile.rock : Tile.getTileById(tileId)).getAABB(x, y, z);
+            BlockState blockState = this.level.getBlockState(x, y, z);
+            AABB aabb = (blockState == null ? Blocks.rock : blockState.block).getAABB(x, y, z);
             if (this.isFree(aabb)) {
-                this.level.setTile(x, y, z, this.paintTexture);
+                this.level.setBlockState(x, y, z, this.placeBlock.getBlockState(hitResult.facingDirection));
             }
         }
     }
@@ -251,20 +249,11 @@ public class GameInputHandler {
     }
 
     /**
-     * Gets the current edit mode.
-     *
-     * @return 0 for destroy mode, 1 for build mode
-     */
-    public int getEditMode() {
-        return editMode;
-    }
-
-    /**
      * Gets the current block type for building.
      *
-     * @return The block texture/type ID
+     * @return The block to place
      */
-    public int getPaintTexture() {
-        return paintTexture;
+    public Block getPlaceBlock() {
+        return placeBlock;
     }
 } 

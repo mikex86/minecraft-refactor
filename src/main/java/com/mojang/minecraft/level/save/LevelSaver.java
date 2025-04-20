@@ -71,7 +71,7 @@ public class LevelSaver {
             String chunkFileName = "chunk_" + chunk.x0 + "_" + chunk.z0 + ".dat";
             File chunkFile = new File(file, chunkFileName);
             try (GZIPOutputStream writer = new GZIPOutputStream(Files.newOutputStream(chunkFile.toPath()))) {
-                writer.write(chunk.getBlocks());
+                writer.write(chunk.getBlockStateIds());
             } catch (IOException e) {
                 CrashReporter.logException("Failed to write chunk data", e);
             }

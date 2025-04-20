@@ -6,7 +6,8 @@ import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.gui.Font;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
-import com.mojang.minecraft.level.tile.Tile;
+import com.mojang.minecraft.level.block.Block;
+import com.mojang.minecraft.level.block.EnumFacing;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.renderer.graphics.*;
 import com.mojang.minecraft.renderer.shader.ShaderRegistry;
@@ -127,7 +128,7 @@ public class GameRenderer implements Disposable {
      */
     private void setupCamera(float partialTick) {
         // Calculate aspect ratio
-        float aspectRatio = (float) ((double) this.width / (double) this.height);
+        float aspectRatio = (float) (this.width) / this.height;
 
         // Set viewport
         graphics.setViewport(0, 0, this.width, this.height);
@@ -161,13 +162,13 @@ public class GameRenderer implements Disposable {
     /**
      * Renders a single frame of the game.
      *
-     * @param partialTick  Interpolation factor between ticks (0.0-1.0)
-     * @param hitResult    The current hit result (block selection)
-     * @param paintTexture The current block to place
-     * @param fpsString    String containing FPS information to display
+     * @param partialTick Interpolation factor between ticks (0.0-1.0)
+     * @param hitResult   The current hit result (block selection)
+     * @param placeBlock  The current block to place
+     * @param fpsString   String containing FPS information to display
      */
     public void render(float partialTick, HitResult hitResult,
-                       int paintTexture, String fpsString) {
+                       Block placeBlock, String fpsString) {
         // Set viewport and clear buffers
         graphics.setViewport(0, 0, this.width, this.height);
         graphics.clear(true, true, 0.5F, 0.8F, 1.0F, 0.0F);
@@ -191,7 +192,7 @@ public class GameRenderer implements Disposable {
 
         // Render HUD elements
         {
-            renderHud(graphics, fpsString, paintTexture);
+            renderHud(graphics, fpsString, placeBlock);
         }
     }
 
@@ -257,11 +258,11 @@ public class GameRenderer implements Disposable {
     /**
      * Renders the HUD (head-up display) elements.
      *
-     * @param graphics     The graphics api
-     * @param fpsString    The FPS string to display
-     * @param paintTexture The current block to place
+     * @param graphics   The graphics api
+     * @param fpsString  The FPS string to display
+     * @param placeBlock The current block to place
      */
-    private void renderHud(GraphicsAPI graphics, String fpsString, int paintTexture) {
+    private void renderHud(GraphicsAPI graphics, String fpsString, Block placeBlock) {
         graphics.setShader(hudShader);
 
         // disable depth test
@@ -278,7 +279,7 @@ public class GameRenderer implements Disposable {
         graphics.translate(0.0F, 0.0F, -200.0F);
 
         // Draw the selected block preview
-        drawBlockPreview(graphics, screenWidth, screenHeight, paintTexture);
+        drawBlockPreview(graphics, screenWidth, placeBlock);
 
         // Render debug string
         graphics.setBlendState(true, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
@@ -302,7 +303,7 @@ public class GameRenderer implements Disposable {
         this.font.drawShadow(graphics, "x: " + player.x + ", y: " + player.y + ", z: " + player.z, 2, 22, 0xFFFFFF);
     }
 
-    private void drawBlockPreview(GraphicsAPI graphics, float screenWidth, float screenHeight, int paintTexture) {
+    private void drawBlockPreview(GraphicsAPI graphics, float screenWidth, Block placeBlock) {
         Tesselator t = Tesselator.instance;
         graphics.pushMatrix();
         graphics.translate(screenWidth - 16, 32, 0.0F);
@@ -316,7 +317,7 @@ public class GameRenderer implements Disposable {
         Texture texture = this.textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
         graphics.setTexture(texture);
         t.init();
-        Tile.getTileById(paintTexture).render(t, null, 0, 0, 0);
+        placeBlock.render(t, null, 0, 0, 0, EnumFacing.UP);
         t.flush();
         graphics.popMatrix();
     }

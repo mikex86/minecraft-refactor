@@ -156,8 +156,8 @@ public class Player extends Entity {
         // Unload chunks that are too far away
         List<Chunk> toUnload = new ArrayList<>();
         for (Chunk loadedChunk : this.level.getLoadedChunks()) {
-            int cx = loadedChunk.x;
-            int cz = loadedChunk.z;
+            int cx = loadedChunk.x0 >> 4;
+            int cz = loadedChunk.z0 >> 4;
 
             // check if distance is within the load radius
             if (Math.hypot(cx - chunkX, cz - chunkZ) > renderDistance) {

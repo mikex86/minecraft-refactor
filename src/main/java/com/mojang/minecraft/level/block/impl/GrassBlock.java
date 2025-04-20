@@ -1,22 +1,25 @@
-package com.mojang.minecraft.level.tile;
+package com.mojang.minecraft.level.block.impl;
 
 import com.mojang.minecraft.level.Level;
+import com.mojang.minecraft.level.block.Block;
+import com.mojang.minecraft.level.block.Blocks;
+import com.mojang.minecraft.level.block.EnumFacing;
+import com.mojang.minecraft.level.block.state.BlockState;
 
 import java.util.Random;
 
 /**
  * Grass tile implementation that can spread to nearby dirt and turn to dirt in darkness.
  */
-public class GrassTile extends Tile {
+public class GrassBlock extends Block {
 
     /**
      * Creates a new grass tile with the specified ID.
      *
      * @param id The tile ID
      */
-    protected GrassTile(int id) {
-        super(id);
-        this.tex = 3; // Side texture (grass side)
+    public GrassBlock(int id) {
+        super(3); // Side texture (grass side)
     }
 
     /**
@@ -27,7 +30,7 @@ public class GrassTile extends Tile {
      * @return The texture index
      */
     @Override
-    protected int getTexture(int face) {
+    protected int getTexture(int face, EnumFacing facing) {
         // Top face (1) uses grass top texture (0)
         if (face == 1) {
             return 0;
@@ -52,7 +55,7 @@ public class GrassTile extends Tile {
     public void tick(Level level, int x, int y, int z, Random random) {
         // If not lit, convert to dirt
         if (!level.isLit(x, y, z)) {
-            level.setTile(x, y, z, Tile.dirt.id);
+            level.setBlockState(x, y, z, Blocks.rock.getDefaultBlockState());
         } else {
             // Try to spread grass to nearby dirt blocks
             for (int i = 0; i < 4; ++i) {
@@ -62,8 +65,9 @@ public class GrassTile extends Tile {
                 int zt = z + random.nextInt(3) - 1;
 
                 // If it's dirt and lit, convert it to grass
-                if (level.getTile(xt, yt, zt) == Tile.dirt.id && level.isLit(xt, yt, zt)) {
-                    level.setTile(xt, yt, zt, Tile.grass.id);
+                BlockState blockState = level.getBlockState(xt, yt, zt);
+                if (blockState != null && blockState.block == Blocks.rock && level.isLit(xt, yt, zt)) {
+                    level.setBlockState(xt, yt, zt, Blocks.grass.getDefaultBlockState());
                 }
             }
         }

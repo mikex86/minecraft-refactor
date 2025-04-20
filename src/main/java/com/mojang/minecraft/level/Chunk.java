@@ -1,7 +1,8 @@
 package com.mojang.minecraft.level;
 
 import com.mojang.minecraft.entity.Player;
-import com.mojang.minecraft.level.tile.Tile;
+import com.mojang.minecraft.level.block.Blocks;
+import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.ChunkMesh;
 import com.mojang.minecraft.renderer.Disposable;
@@ -36,11 +37,11 @@ public class Chunk implements Disposable {
     public final int y1;
     public final int z1;
 
-    private final byte[] blocks;
+    private final byte[] blockStateIds;
 
     // Chunk center coordinates
-    public final int x;
-    public final int z;
+    public final int centerX;
+    public final int centerZ;
 
     // Chunk sections
     private final List<ChunkSection> sections = new ArrayList<>();
@@ -60,7 +61,7 @@ public class Chunk implements Disposable {
         totalUpdates = 0;
     }
 
-    private int[] lightDepths;
+    private final int[] lightDepths;
 
     /**
      * Creates a new chunk with the specified boundaries.
@@ -75,14 +76,14 @@ public class Chunk implements Disposable {
         this.z1 = this.z0 + CHUNK_SIZE;
 
         // Calculate center coordinates
-        this.x = chunkX;
-        this.z = chunkZ;
+        this.centerX = chunkX;
+        this.centerZ = chunkZ;
 
         // Create bounding box
         this.aabb = new AABB((float) x0, (float) y0, (float) z0, (float) x1, (float) y1, (float) z1);
 
         // Initialize blocks array
-        this.blocks = new byte[CHUNK_SIZE * CHUNK_SIZE * CHUNK_HEIGHT];
+        this.blockStateIds = new byte[CHUNK_SIZE * CHUNK_SIZE * CHUNK_HEIGHT];
         this.lightDepths = new int[CHUNK_SIZE * CHUNK_SIZE];
 
         // Initialize sections
@@ -113,28 +114,37 @@ public class Chunk implements Disposable {
         }
     }
 
-    public int getTile(int localX, int localY, int localZ) {
+    public BlockState getBlockState(int localX, int localY, int localZ) {
         // check if in bounds
         if (localX < 0 || localY < 0 || localZ < 0 || localX >= CHUNK_SIZE || localY >= CHUNK_HEIGHT || localZ >= CHUNK_SIZE) {
-            return 0;
+            return null;
         }
         // calculate the index in the blocks array
         int index = (localX * CHUNK_HEIGHT + localY) * CHUNK_SIZE + localZ;
-        return blocks[index];
+        int blockStateId = blockStateIds[index];
+        return Blocks.globalPalette.fromBlockStateId(blockStateId);
     }
 
-    public boolean setTile(int localX, int localY, int localZ, int tileId) {
+    public boolean setBlockState(int localX, int localY, int localZ, BlockState blockState) {
         // check if in bounds
         if (localX < 0 || localY < 0 || localZ < 0 || localX >= CHUNK_SIZE || localY >= CHUNK_HEIGHT || localZ >= CHUNK_SIZE) {
             return false;
         }
         // calculate the index in the blocks array
         int index = (localX * CHUNK_HEIGHT + localY) * CHUNK_SIZE + localZ;
-        if (blocks[index] == tileId) {
+
+        int blockStateId = Blocks.globalPalette.getPaletteId(blockState);
+
+        // TODO: REMOVE
+        if (blockStateId > 255) {
+            throw new IllegalArgumentException("Block state ID exceeds 255: " + blockStateId);
+        }
+
+        if (blockStateIds[index] == blockStateId) {
             return false; // no change
         }
 
-        blocks[index] = (byte) tileId;
+        blockStateIds[index] = (byte) blockStateId;
         return true;
     }
 
@@ -228,8 +238,8 @@ public class Chunk implements Disposable {
      * Calculates the squared distance from this chunk to the player.
      */
     public float distanceToSqr(Player player) {
-        float xDistance = player.x - (this.x + CHUNK_SIZE / 2f);
-        float zDistance = player.z - (this.z + CHUNK_SIZE / 2f);
+        float xDistance = player.x - this.centerX;
+        float zDistance = player.z - this.centerZ;
         return xDistance * xDistance + zDistance * zDistance;
     }
 
@@ -246,12 +256,12 @@ public class Chunk implements Disposable {
     }
 
     public void load(byte[] newBlocks) {
-        System.arraycopy(newBlocks, 0, blocks, 0, blocks.length);
+        System.arraycopy(newBlocks, 0, blockStateIds, 0, blockStateIds.length);
         setFullChunkDirty();
     }
 
-    public byte[] getBlocks() {
-        return blocks;
+    public byte[] getBlockStateIds() {
+        return blockStateIds;
     }
 
     public boolean isSkyLit(int localX, int y, int localZ) {
@@ -267,7 +277,13 @@ public class Chunk implements Disposable {
             for (int z = 0; z < CHUNK_SIZE; ++z) {
                 // Find the highest light-blocking block
                 int y;
-                for (y = CHUNK_HEIGHT - 1; y > 0 && !Tile.isLightBlocker(getTile(x, y, z)); --y) {
+                y = CHUNK_HEIGHT - 1;
+                while (y > 0) {
+                    BlockState blockState = getBlockState(x, y, z);
+                    if (blockState != null && blockState.block.isLightBlocker()) {
+                        break;
+                    }
+                    --y;
                 }
                 this.lightDepths[x + z * CHUNK_SIZE] = y;
             }
@@ -347,9 +363,9 @@ public class Chunk implements Disposable {
             for (int x = this.x0; x < this.x1; ++x) {
                 for (int y = this.y0; y < this.y1; ++y) {
                     for (int z = this.z0; z < this.z1; ++z) {
-                        int tileId = level.getTile(x, y, z);
-                        if (tileId > 0) {
-                            Tile.getTileById(tileId).render(tesselator, level, x, y, z);
+                        BlockState blockState = level.getBlockState(x, y, z);
+                        if (blockState != null) {
+                            blockState.block.render(tesselator, level, x, y, z, blockState.facing);
                             ++renderedTiles;
                             empty = false;
                         }

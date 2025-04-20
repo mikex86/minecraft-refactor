@@ -1,17 +1,23 @@
 package com.mojang.minecraft.level;
 
+import com.mojang.minecraft.crash.CrashReporter;
 import com.mojang.minecraft.entity.Entity;
-import com.mojang.minecraft.level.generation.ChunkGenerator;
+import com.mojang.minecraft.level.block.state.BlockState;
+import com.mojang.minecraft.level.generation.WorldGenerator;
 import com.mojang.minecraft.level.save.LevelLoader;
 import com.mojang.minecraft.level.save.LevelSaver;
-import com.mojang.minecraft.level.tile.Tile;
+import com.mojang.minecraft.level.block.Block;
+import com.mojang.minecraft.level.block.EnumFacing;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.util.LongHashMap;
 import com.mojang.minecraft.util.math.RayCaster;
 import com.mojang.minecraft.world.HitResult;
 
 import java.io.File;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Random;
 
 import static com.mojang.minecraft.util.math.MathUtils.ceilFloor;
 
@@ -67,7 +73,7 @@ public class Level {
 
         for (Chunk chunk : chunkList) {
             synchronized (this.chunkLoadMutex) {
-                this.chunkMap.remove(makeChunkKey(chunk.x, chunk.z));
+                this.chunkMap.remove(makeChunkKey(chunk.x0, chunk.z0));
                 this.fullyLoadedChunks.remove(chunk);
             }
         }
@@ -120,10 +126,9 @@ public class Level {
         for (int x = x0; x < x1; ++x) {
             for (int y = y0; y < y1; ++y) {
                 for (int z = z0; z < z1; ++z) {
-                    int tileId = this.getTile(x, y, z);
-                    Tile tile = Tile.getTileById(tileId);
-                    if (tile != null) {
-                        AABB tileBox = tile.getAABB(x, y, z);
+                    BlockState blockState = this.getBlockState(x, y, z);
+                    if (blockState != null) {
+                        AABB tileBox = blockState.block.getAABB(x, y, z);
                         if (tileBox != null) {
                             cubes.add(tileBox);
                         }
@@ -135,18 +140,18 @@ public class Level {
     }
 
     /**
-     * Sets a tile at the specified coordinates.
+     * Sets a block state at the specified coordinates.
      *
-     * @return true if the tile was changed, false if it was already the same or out of bounds
+     * @return true if the block state was changed, false if it was already the same or out of bounds
      */
-    public boolean setTile(int x, int y, int z, int tileId) {
+    public boolean setBlockState(int x, int y, int z, BlockState blockState) {
         Chunk chunk = getChunk(x, z);
         if (chunk == null) {
             return false;
         }
         int localX = x & 15;
         int localZ = z & 15;
-        if (chunk.setTile(localX, y, localZ, tileId)) {
+        if (chunk.setBlockState(localX, y, localZ, blockState)) {
             List<Chunk> toRebuild = new ArrayList<>();
 
             // determine chunks to rebuild
@@ -201,14 +206,14 @@ public class Level {
     }
 
     /**
-     * Gets the tile ID at the specified coordinates.
+     * Gets the block at the specified coordinates.
      */
-    public int getTile(int x, int y, int z) {
+    public BlockState getBlockState(int x, int y, int z) {
         Chunk chunk = getChunk(x, z);
         if (chunk == null) {
-            return 0;
+            return null;
         }
-        return chunk.getTile(x & 15, y, z & 15);
+        return chunk.getBlockState(x & 15, y, z & 15);
     }
 
     public Chunk getChunk(int x, int z) {
@@ -226,9 +231,8 @@ public class Level {
      * Checks if a tile is solid at the specified coordinates.
      */
     public boolean isSolidTile(int x, int y, int z) {
-        int tileId = this.getTile(x, y, z);
-        Tile tile = Tile.getTileById(tileId);
-        return tile != null && tile.isSolid();
+        BlockState blockState = this.getBlockState(x, y, z);
+        return blockState != null && blockState.block.isSolid() && !blockState.block.isTransparent();
     }
 
     /**
@@ -280,7 +284,11 @@ public class Level {
         // asynchronously load the data for the chunk / generate it if it doesn't exist
         levelLoader.load(chunk, loaded -> {
             if (!loaded) {
-                basicWorldGen(chunk);
+                try {
+                    generateChunk(chunk);
+                } catch (Exception e) {
+                    CrashReporter.logException("Failed to generate chunk", e);
+                }
             }
             finalizeChunkLoad(chunk);
             synchronized (this.chunkLoadMutex) {
@@ -291,8 +299,8 @@ public class Level {
     }
 
     private void finalizeChunkLoad(Chunk chunk) {
-        int chunkX = chunk.x;
-        int chunkZ = chunk.z;
+        int chunkX = chunk.x0;
+        int chunkZ = chunk.z0;
 
         // all neighboring chunks that exist need to be rebuilt
         for (int x = -1; x <= 1; ++x) {
@@ -308,12 +316,9 @@ public class Level {
         }
     }
 
-    private int makeChunkSeed(int chunkX, int chunkZ) {
-        return (chunkX * 31 + chunkZ) ^ this.seed;
-    }
+    private final WorldGenerator worldGenerator = new WorldGenerator(seed);
 
-    private void basicWorldGen(Chunk chunk) {
-        ChunkGenerator chunkGenerator = new ChunkGenerator(this.seed, makeChunkSeed(chunk.x, chunk.z));
-        chunkGenerator.generate(chunk);
+    private void generateChunk(Chunk chunk) {
+        worldGenerator.generate(chunk);
     }
 }

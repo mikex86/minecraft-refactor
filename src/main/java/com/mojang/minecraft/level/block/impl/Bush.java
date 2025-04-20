@@ -1,6 +1,10 @@
-package com.mojang.minecraft.level.tile;
+package com.mojang.minecraft.level.block.impl;
 
 import com.mojang.minecraft.level.Level;
+import com.mojang.minecraft.level.block.Block;
+import com.mojang.minecraft.level.block.Blocks;
+import com.mojang.minecraft.level.block.EnumFacing;
+import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.Tesselator;
 
@@ -10,7 +14,7 @@ import java.util.Random;
  * Implementation of a bush/plant tile.
  * Bushes are non-solid, don't block light, and need dirt or grass beneath them.
  */
-public class Bush extends Tile {
+public class Bush extends Block {
 
     /**
      * Creates a new bush tile with the specified ID.
@@ -18,8 +22,7 @@ public class Bush extends Tile {
      * @param id The tile ID
      */
     protected Bush(int id) {
-        super(id);
-        this.tex = 15; // Bush texture
+        super(16);
     }
 
     /**
@@ -34,11 +37,11 @@ public class Bush extends Tile {
      */
     @Override
     public void tick(Level level, int x, int y, int z, Random random) {
-        int tileBelow = level.getTile(x, y - 1, z);
+        BlockState tileBelow = level.getBlockState(x, y - 1, z);
 
         // Check if bush has valid ground below and sufficient light
-        if (!level.isLit(x, y, z) || (tileBelow != Tile.dirt.id && tileBelow != Tile.grass.id)) {
-            level.setTile(x, y, z, 0); // Remove bush if conditions not met
+        if (!level.isLit(x, y, z) || (tileBelow.block != Blocks.dirt && tileBelow.block != Blocks.grass)) {
+            level.setBlockState(x, y, z, null); // Remove bush if conditions not met
         }
     }
 
@@ -52,8 +55,8 @@ public class Bush extends Tile {
      * @param z     Z coordinate
      */
     @Override
-    public void render(Tesselator t, Level level, int x, int y, int z) {
-        int tex = this.getTexture(this.tex);
+    public void render(Tesselator t, Level level, int x, int y, int z, EnumFacing facing) {
+        int tex = this.getTexture(this.tex, facing);
         float u0 = (tex % 16) / 16.0F;
         float u1 = u0 + 0.0624375F;
         float v0 = (tex / 16) / 16.0F;
@@ -110,7 +113,7 @@ public class Bush extends Tile {
      * @return false as bushes don't block light
      */
     @Override
-    public boolean blocksLight() {
+    public boolean isLightBlocker() {
         return false;
     }
 

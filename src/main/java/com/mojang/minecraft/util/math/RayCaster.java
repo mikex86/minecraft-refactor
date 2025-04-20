@@ -1,9 +1,9 @@
 package com.mojang.minecraft.util.math;
 
 import com.mojang.minecraft.entity.Entity;
-import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.level.Level;
-import com.mojang.minecraft.level.tile.Tile;
+import com.mojang.minecraft.level.block.Block;
+import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.world.HitResult;
 
 /**
@@ -82,9 +82,8 @@ public class RayCaster {
         int blockZ = (int) Math.floor(startZ);
 
         // Early exit if starting inside a solid block
-        int tileId = level.getTile(blockX, blockY, blockZ);
-        Tile startTile = Tile.getTileById(tileId);
-        if (startTile != null && startTile.isSolid()) {
+        BlockState startBlock = level.getBlockState(blockX, blockY, blockZ);
+        if (startBlock != null && startBlock.block.isSolid()) {
             // We're inside a block; return a hit at our current position with face 0 (bottom)
             return new HitResult(1, blockX, blockY, blockZ, 0, startX, startY, startZ, 0);
         }
@@ -131,9 +130,8 @@ public class RayCaster {
         // Main DDA loop
         for (int i = 0; i < MAX_STEPS; i++) {
             // Check current block for a hit
-            int currentTileId = level.getTile(blockX, blockY, blockZ);
-            Tile tile = Tile.getTileById(currentTileId);
-            if (tile != null && tile.isSolid()) {
+            BlockState blockState = level.getBlockState(blockX, blockY, blockZ);
+            if (blockState != null && blockState.block.isSolid()) {
                 // We found a hit
                 break;
             }
@@ -166,9 +164,8 @@ public class RayCaster {
         }
         
         // Double check that we actually hit something
-        int currentTileId = level.getTile(blockX, blockY, blockZ);
-        Tile hitTile = Tile.getTileById(currentTileId);
-        if (hitTile == null || !hitTile.isSolid()) {
+        BlockState hitTile = level.getBlockState(blockX, blockY, blockZ);
+        if (hitTile == null || !hitTile.block.isSolid()) {
             return null; // No hit found (should not happen but just in case)
         }
         
