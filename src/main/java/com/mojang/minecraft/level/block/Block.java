@@ -7,6 +7,7 @@ import com.mojang.minecraft.particle.Particle;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.Tesselator;
+import jdk.internal.vm.annotation.ForceInline;
 
 import java.util.Collections;
 import java.util.List;
@@ -140,6 +141,7 @@ public class Block {
      * @param z     Z coordinate
      * @return True if the face should be rendered
      */
+    @ForceInline
     protected boolean shouldRenderFace(Level level, int x, int y, int z) {
         if (level == null) {
             return true;
@@ -437,6 +439,7 @@ public class Block {
     /**
      * @return Whether this tile blocks light
      */
+    @ForceInline
     public boolean isLightBlocker() {
         return true;
     }
@@ -444,10 +447,12 @@ public class Block {
     /**
      * @return Whether this tile is solid (for collision)
      */
+    @ForceInline
     public boolean isSolid() {
         return true;
     }
 
+    @ForceInline
     public boolean isTransparent() {
         return false;
     }

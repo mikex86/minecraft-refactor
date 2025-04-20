@@ -1,6 +1,7 @@
 package com.mojang.minecraft.level.block.palette;
 
 import com.mojang.minecraft.level.block.state.BlockState;
+import jdk.internal.vm.annotation.ForceInline;
 
 import java.util.*;
 
@@ -26,10 +27,12 @@ public class BlockStatePalette {
         }
     }
 
+    @ForceInline
     public int getPaletteId(BlockState state) {
         return blockStateIds.get(state);
     }
 
+    @ForceInline
     public BlockState fromBlockStateId(int blockStateId) {
         return blockStates[blockStateId];
     }

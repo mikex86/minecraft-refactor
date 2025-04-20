@@ -12,6 +12,7 @@ import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.util.math.MathUtils;
 import com.mojang.minecraft.util.nio.NativeByteArray;
+import jdk.internal.vm.annotation.ForceInline;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -119,6 +120,7 @@ public class Chunk implements Disposable {
         }
     }
 
+    @ForceInline
     public BlockState getBlockState(int localX, int localY, int localZ) {
         // check if in bounds
         if (localX < 0 || localY < 0 || localZ < 0 || localX >= CHUNK_SIZE || localY >= CHUNK_HEIGHT || localZ >= CHUNK_SIZE) {
@@ -130,6 +132,7 @@ public class Chunk implements Disposable {
         return Blocks.globalPalette.fromBlockStateId(blockStateId);
     }
 
+    @ForceInline
     public boolean setBlockState(int localX, int localY, int localZ, BlockState blockState) {
         // check if in bounds
         if (localX < 0 || localY < 0 || localZ < 0 || localX >= CHUNK_SIZE || localY >= CHUNK_HEIGHT || localZ >= CHUNK_SIZE) {
@@ -273,6 +276,7 @@ public class Chunk implements Disposable {
 
     }
 
+    @ForceInline
     public boolean isSkyLit(int localX, int y, int localZ) {
         if (localX >= 0 && y >= 0 && localZ >= 0 && localX < CHUNK_SIZE && y < CHUNK_HEIGHT && localZ < CHUNK_SIZE) {
             return y >= this.lightDepths.getByte(localX + localZ * CHUNK_SIZE);

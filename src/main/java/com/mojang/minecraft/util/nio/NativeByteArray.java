@@ -2,6 +2,7 @@ package com.mojang.minecraft.util.nio;
 
 import com.mojang.minecraft.Minecraft;
 import jdk.internal.misc.Unsafe;
+import jdk.internal.vm.annotation.ForceInline;
 
 public class NativeByteArray {
 
@@ -19,6 +20,7 @@ public class NativeByteArray {
         this.size = size;
     }
 
+    @ForceInline
     public void setByte(int index, byte value) {
         if (DEBUG) {
             if (index < 0 || index >= size) {
@@ -31,6 +33,7 @@ public class NativeByteArray {
         unsafe.putByte(address + index, value);
     }
 
+    @ForceInline
     public byte getByte(int index) {
         if (DEBUG) {
             if (index < 0 || index >= size) {
@@ -48,6 +51,7 @@ public class NativeByteArray {
         unsafe.freeMemory(address);
     }
 
+    @ForceInline
     public void setContents(byte[] data) {
         if (data.length > this.size) {
             throw new IllegalArgumentException("Data size exceeds allocated memory");
@@ -57,6 +61,7 @@ public class NativeByteArray {
         }
     }
 
+    @ForceInline
     public byte[] getAsBytes() {
         byte[] data = new byte[size];
         for (int i = 0; i < size; i++) {

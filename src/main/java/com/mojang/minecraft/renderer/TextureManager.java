@@ -4,29 +4,28 @@ import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.Texture;
+import com.mojang.minecraft.util.io.IOUtils;
 import org.lwjgl.BufferUtils;
+import org.lwjgl.system.MemoryStack;
 
 import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
+import static org.lwjgl.stb.STBImage.*;
+
 /**
- * Manages texture loading and caching for OpenGL rendering
+ * Manages texture loading and caching for OpenGL rendering using STBImage
  */
 public class TextureManager implements Disposable {
-
-    // Graphics context
     private final GraphicsAPI graphics = GraphicsFactory.getGraphicsAPI();
-
-    // Texture cache
     private final Map<String, Texture> textureCache = new HashMap<>();
 
-    // Textures
     public Texture charTexture;
     public Texture terrainTexture;
     public Texture fontTexture;
@@ -37,116 +36,58 @@ public class TextureManager implements Disposable {
         fontTexture = loadTexture("/default.gif", Texture.FilterMode.NEAREST);
     }
 
-    /**
-     * Loads a texture from a resource path.
-     *
-     * @param resourcePath The path to the texture resource
-     * @return The texture ID
-     */
     private Texture loadTexture(String resourcePath, Texture.FilterMode filterMode) {
         Objects.requireNonNull(graphics, "GraphicsAPI not initialized");
 
-        // If already loaded, return its ID
-        if (textureCache.containsKey(resourcePath)) {
+        if (textureCache.containsKey(resourcePath))
             return textureCache.get(resourcePath);
-        }
 
-        // Load image
-        BufferedImage image;
+        byte[] bytes;
         try {
-            image = loadImage(resourcePath);
+            bytes = IOUtils.readAllBytes(Objects.requireNonNull(getClass().getResourceAsStream(resourcePath)));
         } catch (IOException e) {
-            // TODO: FIX THIS BY REMOVING THE DYNAMIC LOAD SYSTEM
-            throw new RuntimeException(e);
+            throw new RuntimeException("Failed to load texture: " + resourcePath, e);
         }
 
-        // Convert image to byte buffer
-        ByteBuffer buffer = imageToBuffer(image);
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            IntBuffer w = stack.mallocInt(1);
+            IntBuffer h = stack.mallocInt(1);
+            IntBuffer comp = stack.mallocInt(1);
 
-        // Create texture
-        Texture texture = graphics.createTexture(
-                image.getWidth(),
-                image.getHeight(),
-                GraphicsEnums.TextureFormat.RGBA8,
-                buffer
-        );
+            // Flip vertically if your textures expect bottom‐up origin:
+            stbi_set_flip_vertically_on_load(false);
 
-        // Set filtering
-        texture.setFiltering(filterMode, filterMode);
-
-        // Store in cache
-        textureCache.put(resourcePath, texture);
-
-        // For debugging
-        System.out.println("Loaded texture: " + resourcePath +
-                " (" + image.getWidth() + "x" + image.getHeight() + ")");
-
-        return texture;
-    }
-
-    /**
-     * Loads an image from a resource path.
-     *
-     * @param resourcePath The path to the image resource
-     * @return The loaded image
-     * @throws IOException If the image couldn't be loaded
-     */
-    private BufferedImage loadImage(String resourcePath) throws IOException {
-        try (InputStream is = TextureManager.class.getResourceAsStream(resourcePath)) {
-            if (is == null) {
-                throw new IOException("Resource not found: " + resourcePath);
+            ByteBuffer imageBuffer = ByteBuffer.allocateDirect(bytes.length);
+            imageBuffer.put(bytes);
+            imageBuffer.flip();
+            ByteBuffer decoded = stbi_load_from_memory(imageBuffer, w, h, comp, 4);
+            if (decoded == null) {
+                throw new RuntimeException("STBImage failed to load: " + stbi_failure_reason());
             }
-            return ImageIO.read(is);
+
+            int width = w.get(0);
+            int height = h.get(0);
+
+            Texture texture = graphics.createTexture(
+                    width,
+                    height,
+                    GraphicsEnums.TextureFormat.RGBA8,
+                    decoded
+            );
+            texture.setFiltering(filterMode, filterMode);
+
+
+            textureCache.put(resourcePath, texture);
+            System.out.println("Loaded texture: " + resourcePath +
+                    " (" + width + "x" + height + ")");
+            stbi_image_free(decoded);
+            return texture;
         }
     }
 
-    /**
-     * Converts a BufferedImage to a ByteBuffer.
-     *
-     * @param image The image to convert
-     * @return The image data as a ByteBuffer
-     */
-    private ByteBuffer imageToBuffer(BufferedImage image) {
-        int width = image.getWidth();
-        int height = image.getHeight();
-
-        // Get pixel data
-        int[] pixels = new int[width * height];
-        image.getRGB(0, 0, width, height, pixels, 0, width);
-
-        // Convert to RGBA format
-        byte[] buffer = new byte[width * height * 4];
-
-        for (int i = 0; i < pixels.length; i++) {
-            int pixel = pixels[i];
-            int alpha = (pixel >> 24) & 0xFF;
-            int red = (pixel >> 16) & 0xFF;
-            int green = (pixel >> 8) & 0xFF;
-            int blue = pixel & 0xFF;
-
-            // RGBA format (byte order)
-            buffer[i * 4] = (byte) red;
-            buffer[i * 4 + 1] = (byte) green;
-            buffer[i * 4 + 2] = (byte) blue;
-            buffer[i * 4 + 3] = (byte) alpha;
-        }
-
-        // Convert to ByteBuffer
-        ByteBuffer byteBuffer = BufferUtils.createByteBuffer(buffer.length);
-        byteBuffer.put(buffer);
-        byteBuffer.flip();
-
-        return byteBuffer;
-    }
-
-    /**
-     * Disposes of all textures.
-     */
     @Override
     public void dispose() {
-        for (Texture texture : textureCache.values()) {
-            texture.dispose();
-        }
+        textureCache.values().forEach(Texture::dispose);
         textureCache.clear();
     }
 }

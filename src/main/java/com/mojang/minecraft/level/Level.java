@@ -10,6 +10,7 @@ import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.util.LongHashMap;
 import com.mojang.minecraft.util.math.RayCaster;
 import com.mojang.minecraft.world.HitResult;
+import jdk.internal.vm.annotation.ForceInline;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -189,6 +190,7 @@ public class Level {
     /**
      * Gets the block at the specified coordinates.
      */
+    @ForceInline
     public BlockState getBlockState(int x, int y, int z) {
         Chunk chunk = getChunk(x, z);
         if (chunk == null) {
@@ -200,6 +202,7 @@ public class Level {
     private long lastChunkKey = 0;
     private Chunk lastChunk = null;
 
+    @ForceInline
     public Chunk getChunk(int x, int z) {
         int cx = x >> Chunk.CHUNK_SIZE_LG2;
         int cz = z >> Chunk.CHUNK_SIZE_LG2;
@@ -222,6 +225,7 @@ public class Level {
     /**
      * Checks if a tile is solid at the specified coordinates.
      */
+    @ForceInline
     public boolean isSolidTile(int x, int y, int z) {
         BlockState blockState = this.getBlockState(x, y, z);
         return blockState != null && blockState.block.isSolid() && !blockState.block.isTransparent();
