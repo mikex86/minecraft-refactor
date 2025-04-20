@@ -16,7 +16,7 @@ import java.util.List;
  */
 public class LevelRenderer implements LevelListener, Disposable {
     // Constants
-    public static final int MAX_REBUILDS_PER_FRAME = 128;
+    public static final int MAX_REBUILDS_PER_FRAME = 4;
 
     // Level data
     private final Level level;
@@ -38,16 +38,19 @@ public class LevelRenderer implements LevelListener, Disposable {
     }
 
     /**
+     * Instance to return in {@link #getAllDirtyChunks()};
+     * This makes the function not thread-safe, but this reduces allocation rate
+     */
+    private final ArrayList<Chunk> dirtyChunks = new ArrayList<>();
+
+    /**
      * Gets all chunks that need to be rebuilt.
+     * This function is not thread-safe and should only be called from the main thread.
      */
     public List<Chunk> getAllDirtyChunks() {
-        ArrayList<Chunk> dirtyChunks = null;
-
+        dirtyChunks.clear();
         for (Chunk chunk : this.level.getLoadedChunks()) {
             if (chunk.isDirty()) {
-                if (dirtyChunks == null) {
-                    dirtyChunks = new ArrayList<>();
-                }
                 dirtyChunks.add(chunk);
             }
         }

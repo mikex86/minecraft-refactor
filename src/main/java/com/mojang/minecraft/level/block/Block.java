@@ -139,7 +139,7 @@ public class Block {
      * @param z     Z coordinate
      * @return True if the face should be rendered
      */
-    private boolean shouldRenderFace(Level level, int x, int y, int z) {
+    protected boolean shouldRenderFace(Level level, int x, int y, int z) {
         if (level == null) {
             return true;
         }

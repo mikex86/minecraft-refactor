@@ -20,6 +20,12 @@ public class Player extends Entity {
     private boolean right = false;
     private boolean jump = false;
     private boolean sneak = false;
+    private boolean sprinting = false;
+    // Remaining ticks before sprint expires (600 ticks = 30s)
+    private int sprintingTicksLeft = 0;
+    // FOV smoothing fields
+    private float fovModifier = 1.0F;
+    private float prevFovModifier = 1.0F;
 
     /**
      * Creates a new Player instance.
@@ -34,20 +40,26 @@ public class Player extends Entity {
     /**
      * Sets the player's input state based on keyboard/controller input.
      *
-     * @param forward Whether the forward key is pressed
-     * @param back    Whether the back key is pressed
-     * @param left    Whether the left key is pressed
-     * @param right   Whether the right key is pressed
-     * @param jump    Whether the jump key is pressed
-     * @param sneak   Whether the sneak key is pressed
+     * @param forward   Whether the forward key is pressed
+     * @param back      Whether the back key is pressed
+     * @param left      Whether the left key is pressed
+     * @param right     Whether the right key is pressed
+     * @param jump      Whether the jump key is pressed
+     * @param sneak     Whether the sneak key is pressed
+     * @param sprinting Whether the sprinting key is pressed
      */
-    public void setInput(boolean forward, boolean back, boolean left, boolean right, boolean jump, boolean sneak) {
+    public void setInput(boolean forward, boolean back, boolean left, boolean right, boolean jump, boolean sneak, boolean sprinting) {
         this.forward = forward;
         this.back = back;
         this.left = left;
         this.right = right;
         this.jump = jump;
         this.sneak = sneak;
+        // When sprinting is started, reset the 30s timer
+        if (sprinting) {
+            this.sprinting = true;
+            this.sprintingTicksLeft = 600;
+        }
     }
 
     /**
@@ -81,13 +93,17 @@ public class Player extends Entity {
             ++xa;
         }
 
-        // Jump 
+        // Jump
         if (jump && this.onGround) {
             this.yd = 0.5F; // Vertical velocity for jumping
         }
 
-        // Apply movement - different friction when in air vs on ground
-        this.moveRelative(xa, ya, this.onGround ? 0.1F : 0.02F);
+        float speed = this.onGround ? 0.1F : 0.02F;
+        if (this.sprinting) {
+            speed *= 1.3F;
+        }
+
+        this.moveRelative(xa, ya, speed);
 
         // Apply gravity
         this.yd = (float) ((double) this.yd - 0.08);
@@ -104,6 +120,37 @@ public class Player extends Entity {
         if (this.onGround) {
             this.xd *= 0.7F;
             this.zd *= 0.7F;
+        }
+        // FOV smoothing
+        this.prevFovModifier = this.fovModifier;
+        float targetFov = this.getFOVMultiplier();
+        this.fovModifier += (targetFov - this.fovModifier) * 0.5F;
+
+        // clamp to [0.1, 1.5] as in vanilla
+        if (this.fovModifier < 0.1F) {
+            this.fovModifier = 0.1F;
+        } else if (this.fovModifier > 1.5F) {
+            this.fovModifier = 1.5F;
+        }
+
+        // Auto-expire after timer runs out
+        if (this.sprintingTicksLeft > 0) {
+            if (--this.sprintingTicksLeft <= 0) {
+                this.sprinting = false;
+            }
+        }
+
+        // Stop sprinting on any of these conditions
+        if (this.sprinting) {
+            boolean stop = false;
+            if (!this.forward) stop = true;                     // let go of forward
+            if (this.back) stop = true;                         // moving backward
+            if (this.isCollidedHorizontally) stop = true;       // hit a wall
+            if (this.sneak) stop = true;                        // started sneaking
+
+            if (stop) {
+                this.sprinting = false;
+            }
         }
     }
 
@@ -172,4 +219,24 @@ public class Player extends Entity {
         this.lastGeneratedPosZ = this.z;
         this.generateDelay = random.nextInt(10) + 5; // Random delay for chunk generation
     }
-} 
+
+    public float getFOVMultiplier() {
+        float baseSpeed = this.onGround ? 0.1f : 0.02f;
+        float currentSpeed = this.sprinting ? baseSpeed * 1.3f : baseSpeed;
+
+        float speedRatio = currentSpeed / baseSpeed;
+
+        return (speedRatio + 1.0f) * 0.5f;
+    }
+
+    /**
+     * Returns the per-frame‐interpolated FOV multiplier.
+     *
+     * @param partialTicks interpolation factor between ticks [0..1)
+     * @return smooth FOV factor to multiply your base FOV by
+     */
+    public float getInterpolatedFOV(float partialTicks) {
+        // linear interpolate between last and current smoothed FOV
+        return this.prevFovModifier + (this.fovModifier - this.prevFovModifier) * partialTicks;
+    }
+}

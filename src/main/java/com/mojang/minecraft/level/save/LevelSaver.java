@@ -5,6 +5,8 @@ import com.mojang.minecraft.level.Chunk;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.channels.Channels;
+import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -71,7 +73,8 @@ public class LevelSaver {
             String chunkFileName = "chunk_" + chunk.x0 + "_" + chunk.z0 + ".dat";
             File chunkFile = new File(file, chunkFileName);
             try (GZIPOutputStream writer = new GZIPOutputStream(Files.newOutputStream(chunkFile.toPath()))) {
-                writer.write(chunk.getBlockStateIds());
+                WritableByteChannel channel = Channels.newChannel(writer);
+                channel.write(chunk.getBlockStateIds());
             } catch (IOException e) {
                 CrashReporter.logException("Failed to write chunk data", e);
             }

@@ -6,6 +6,7 @@ import com.mojang.minecraft.util.io.IOUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;

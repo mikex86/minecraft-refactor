@@ -10,8 +10,10 @@ import com.mojang.minecraft.renderer.Frustum;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Represents a chunk of the world that can be rendered independently.
@@ -37,7 +39,7 @@ public class Chunk implements Disposable {
     public final int y1;
     public final int z1;
 
-    private final byte[] blockStateIds;
+    private final ByteBuffer blockStateIds;
 
     // Chunk center coordinates
     public final int centerX;
@@ -83,7 +85,7 @@ public class Chunk implements Disposable {
         this.aabb = new AABB((float) x0, (float) y0, (float) z0, (float) x1, (float) y1, (float) z1);
 
         // Initialize blocks array
-        this.blockStateIds = new byte[CHUNK_SIZE * CHUNK_SIZE * CHUNK_HEIGHT];
+        this.blockStateIds = ByteBuffer.allocateDirect(CHUNK_SIZE * CHUNK_SIZE * CHUNK_HEIGHT);
         this.lightDepths = new int[CHUNK_SIZE * CHUNK_SIZE];
 
         // Initialize sections
@@ -121,13 +123,13 @@ public class Chunk implements Disposable {
         }
         // calculate the index in the blocks array
         int index = (localX * CHUNK_HEIGHT + localY) * CHUNK_SIZE + localZ;
-        int blockStateId = blockStateIds[index];
+        int blockStateId = blockStateIds.get(index);
         return Blocks.globalPalette.fromBlockStateId(blockStateId);
     }
 
     public boolean setBlockState(int localX, int localY, int localZ, BlockState blockState) {
         // check if in bounds
-        if (localX < 0 || localY < 0 || localZ < 0 || localX >= CHUNK_SIZE || localY >= CHUNK_HEIGHT || localZ >= CHUNK_SIZE) {
+         if (localX < 0 || localY < 0 || localZ < 0 || localX >= CHUNK_SIZE || localY >= CHUNK_HEIGHT || localZ >= CHUNK_SIZE) {
             return false;
         }
         // calculate the index in the blocks array
@@ -140,11 +142,11 @@ public class Chunk implements Disposable {
             throw new IllegalArgumentException("Block state ID exceeds 255: " + blockStateId);
         }
 
-        if (blockStateIds[index] == blockStateId) {
+        if (blockStateIds.get(index) == blockStateId) {
             return false; // no change
         }
 
-        blockStateIds[index] = (byte) blockStateId;
+        blockStateIds.put(index, (byte) blockStateId);
         return true;
     }
 
@@ -256,11 +258,12 @@ public class Chunk implements Disposable {
     }
 
     public void load(byte[] newBlocks) {
-        System.arraycopy(newBlocks, 0, blockStateIds, 0, blockStateIds.length);
+        this.blockStateIds.put(newBlocks);
+        this.blockStateIds.flip();
         setFullChunkDirty();
     }
 
-    public byte[] getBlockStateIds() {
+    public ByteBuffer getBlockStateIds() {
         return blockStateIds;
     }
 

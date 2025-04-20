@@ -134,7 +134,7 @@ public class GameRenderer implements Disposable {
         graphics.setViewport(0, 0, this.width, this.height);
 
         // Set up projection matrix
-        graphics.setPerspectiveProjection(70.0F, aspectRatio, 0.05F, 1000.0F);
+        graphics.setPerspectiveProjection(70.0F * player.getInterpolatedFOV(partialTick), aspectRatio, 0.05F, 1000.0F);
 
         // Set up camera transformation
         graphics.setMatrixMode(GraphicsAPI.MatrixMode.MODELVIEW);
@@ -167,8 +167,7 @@ public class GameRenderer implements Disposable {
      * @param placeBlock  The current block to place
      * @param fpsString   String containing FPS information to display
      */
-    public void render(float partialTick, HitResult hitResult,
-                       Block placeBlock, String fpsString) {
+    public void render(float partialTick, HitResult hitResult, Block placeBlock, String fpsString) {
         // Set viewport and clear buffers
         graphics.setViewport(0, 0, this.width, this.height);
         graphics.clear(true, true, 0.5F, 0.8F, 1.0F, 0.0F);

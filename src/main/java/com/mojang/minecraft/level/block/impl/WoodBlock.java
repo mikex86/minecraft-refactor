@@ -15,8 +15,8 @@ public class WoodBlock extends Block {
      * Creates a new wood tile with the specified ID.
      *
      */
-    public WoodBlock(int id) {
-        super(id);
+    public WoodBlock() {
+        super(21);
     }
 
     @Override

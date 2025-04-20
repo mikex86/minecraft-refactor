@@ -6,8 +6,6 @@ import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.level.generation.WorldGenerator;
 import com.mojang.minecraft.level.save.LevelLoader;
 import com.mojang.minecraft.level.save.LevelSaver;
-import com.mojang.minecraft.level.block.Block;
-import com.mojang.minecraft.level.block.EnumFacing;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.util.LongHashMap;
 import com.mojang.minecraft.util.math.RayCaster;
@@ -15,7 +13,6 @@ import com.mojang.minecraft.world.HitResult;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
@@ -71,26 +68,10 @@ public class Level {
         }
         levelSaver.saveChunks(chunkList, blocking);
 
-        for (Chunk chunk : chunkList) {
-            synchronized (this.chunkLoadMutex) {
-                this.chunkMap.remove(makeChunkKey(chunk.x0, chunk.z0));
-                this.fullyLoadedChunks.remove(chunk);
-            }
-        }
-    }
-
-    /**
-     * Unloads a chunk at the specified coordinates.
-     *
-     * @param chunkX the X coordinate of the chunk
-     * @param chunkZ the Z coordinate of the chunk
-     */
-    public void unloadChunk(int chunkX, int chunkZ) {
-        long chunkKey = makeChunkKey(chunkX, chunkZ);
         synchronized (this.chunkLoadMutex) {
-            Chunk chunk = this.chunkMap.remove(chunkKey);
-            if (chunk != null) {
-                batchUnloadChunks(Collections.singleton(chunk), false);
+            for (Chunk chunk : chunkList) {
+                this.chunkMap.remove(makeChunkKey(chunk.x0 >> 4, chunk.z0 >> 4));
+                this.fullyLoadedChunks.remove(chunk);
             }
         }
     }
@@ -220,7 +201,9 @@ public class Level {
         int cx = x >> 4;
         int cz = z >> 4;
         long chunkKey = makeChunkKey(cx, cz);
-        return this.chunkMap.get(chunkKey);
+        synchronized (this.chunkLoadMutex) {
+            return this.chunkMap.get(chunkKey);
+        }
     }
 
     private static long makeChunkKey(int cx, int cz) {
@@ -256,15 +239,21 @@ public class Level {
         loadedChunksTmp.clear();
         loadedChunksTmp.ensureCapacity(fullyLoadedChunks.size());
         synchronized (this.chunkLoadMutex) {
-            // return a copy of the chunk map
-            loadedChunksTmp.addAll(fullyLoadedChunks);
+            // we don't use addAll here because it allocates too much memory
+            for (Chunk fullyLoadedChunk : fullyLoadedChunks) {
+                //noinspection UseBulkOperation
+                loadedChunksTmp.add(fullyLoadedChunk);
+            }
         }
+        // return a copy of fullyLoadedChunks
         return loadedChunksTmp;
     }
 
     public boolean isChunkLoaded(int chunkX, int chunkZ) {
         long chunkKey = makeChunkKey(chunkX, chunkZ);
-        return this.chunkMap.containsKey(chunkKey); // may be null, indicating loading
+        synchronized (this.chunkLoadMutex) {
+            return this.chunkMap.containsKey(chunkKey); // may be null, indicating loading
+        }
     }
 
     public void loadChunk(int chunkX, int chunkZ) {

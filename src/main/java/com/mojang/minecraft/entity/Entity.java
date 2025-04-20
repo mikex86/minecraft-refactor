@@ -94,6 +94,11 @@ public class Entity {
     protected float bbHeight = 1.8F;
 
     /**
+     * Whether the entity has collided horizontally
+     */
+    protected boolean isCollidedHorizontally;
+
+    /**
      * Creates a new entity in the specified level.
      *
      * @param level The level this entity belongs to
@@ -215,14 +220,17 @@ public class Entity {
         this.onGround = originalYa != ya && originalYa < 0.0F;
 
         // Reset velocity on collision
+        this.isCollidedHorizontally = false;
         if (originalXa != xa) {
             this.xd = 0.0F;
+            this.isCollidedHorizontally = true;
         }
         if (originalYa != ya) {
             this.yd = 0.0F;
         }
         if (originalZa != za) {
             this.zd = 0.0F;
+            this.isCollidedHorizontally = true;
         }
 
         // Update position based on bounding box position

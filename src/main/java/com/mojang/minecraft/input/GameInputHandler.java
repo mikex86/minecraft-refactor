@@ -103,6 +103,9 @@ public class GameInputHandler {
                 if (key == InputHandler.Keys.KEY_5) {
                     this.placeBlock = Blocks.wood;  // Wood
                 }
+                if (key == InputHandler.Keys.KEY_6) {
+                    this.placeBlock = Blocks.glass; // Glass
+                }
             }
         }
 
@@ -132,8 +135,9 @@ public class GameInputHandler {
         boolean right = inputHandler.isKeyDown(InputHandler.Keys.KEY_D);
         boolean jump = inputHandler.isKeyDown(InputHandler.Keys.KEY_SPACE);
         boolean sneak = inputHandler.isKeyDown(InputHandler.Keys.KEY_LSHIFT);
+        boolean sprinting = inputHandler.isKeyDown(InputHandler.Keys.KEY_LCONTROL);
 
-        this.player.setInput(forward, back, left, right, jump, sneak);
+        this.player.setInput(forward, back, left, right, jump, sneak, sprinting);
 
     }
 

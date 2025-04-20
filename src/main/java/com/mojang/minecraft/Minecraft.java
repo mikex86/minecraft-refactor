@@ -194,7 +194,7 @@ public class Minecraft implements Runnable {
 
         try {
             Minecraft minecraft = new Minecraft(854, 480, false);
-            // Run directly on the main thread instead of creating a new thread
+            Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
             minecraft.run();
         } catch (Exception e) {
             CrashReporter.handleCrash("Failed to start Minecraft", e);
