@@ -55,8 +55,9 @@ public class Player extends Entity {
         this.right = right;
         this.jump = jump;
         this.sneak = sneak;
-        // When sprinting is started, reset the 30s timer
-        if (sprinting) {
+
+        if (forward && sprinting && !this.sprinting) {
+            // When sprinting is started, reset the 30s timer
             this.sprinting = true;
             this.sprintingTicksLeft = 600;
         }
