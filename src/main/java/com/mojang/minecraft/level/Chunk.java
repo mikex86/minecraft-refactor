@@ -9,11 +9,11 @@ import com.mojang.minecraft.renderer.Disposable;
 import com.mojang.minecraft.renderer.Frustum;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.util.math.MathUtils;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * Represents a chunk of the world that can be rendered independently.
@@ -24,6 +24,7 @@ public class Chunk implements Disposable {
     public static final int CHUNK_SIZE = 16;
     public static final int CHUNK_HEIGHT = 128;
     public static final int SECTION_SIZE = 16;
+    public static final int CHUNK_SIZE_LG2 = MathUtils.log2(CHUNK_SIZE);
 
     // Bounding box for this chunk
     public AABB aabb;

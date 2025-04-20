@@ -180,8 +180,8 @@ public class Player extends Entity {
             }
         }
 
-        int chunkX = (int) this.x >> 4;
-        int chunkZ = (int) this.z >> 4;
+        int chunkX = (int) this.x >> Chunk.CHUNK_SIZE_LG2;
+        int chunkZ = (int) this.z >> Chunk.CHUNK_SIZE_LG2;
 
         // Load chunks around the player
         for (int x = -renderDistance; x <= renderDistance; ++x) {
@@ -204,8 +204,8 @@ public class Player extends Entity {
         // Unload chunks that are too far away
         List<Chunk> toUnload = new ArrayList<>();
         for (Chunk loadedChunk : this.level.getLoadedChunks()) {
-            int cx = loadedChunk.x0 >> 4;
-            int cz = loadedChunk.z0 >> 4;
+            int cx = loadedChunk.x0 >> Chunk.CHUNK_SIZE_LG2;
+            int cz = loadedChunk.z0 >> Chunk.CHUNK_SIZE_LG2;
 
             // check if distance is within the load radius
             if (Math.hypot(cx - chunkX, cz - chunkZ) > renderDistance) {

@@ -70,7 +70,7 @@ public class Level {
 
         synchronized (this.chunkLoadMutex) {
             for (Chunk chunk : chunkList) {
-                this.chunkMap.remove(makeChunkKey(chunk.x0 >> 4, chunk.z0 >> 4));
+                this.chunkMap.remove(makeChunkKey(chunk.x0 >> Chunk.CHUNK_SIZE_LG2, chunk.z0 >> Chunk.CHUNK_SIZE_LG2));
                 this.fullyLoadedChunks.remove(chunk);
             }
         }
@@ -198,8 +198,8 @@ public class Level {
     }
 
     public Chunk getChunk(int x, int z) {
-        int cx = x >> 4;
-        int cz = z >> 4;
+        int cx = x >> Chunk.CHUNK_SIZE_LG2;
+        int cz = z >> Chunk.CHUNK_SIZE_LG2;
         long chunkKey = makeChunkKey(cx, cz);
         synchronized (this.chunkLoadMutex) {
             return this.chunkMap.get(chunkKey);
