@@ -130,8 +130,8 @@ public class Level {
         if (chunk == null) {
             return false;
         }
-        int localX = x & 15;
-        int localZ = z & 15;
+        int localX = x & (Chunk.CHUNK_SIZE - 1);
+        int localZ = z & (Chunk.CHUNK_SIZE - 1);
         if (chunk.setBlockState(localX, y, localZ, blockState)) {
             List<Chunk> toRebuild = new ArrayList<>();
 
@@ -183,7 +183,7 @@ public class Level {
         if (chunk == null) {
             return false;
         }
-        return chunk.isSkyLit(x & 15, y, z & 15);
+        return chunk.isSkyLit(x & (Chunk.CHUNK_SIZE - 1), y, z & (Chunk.CHUNK_SIZE - 1));
     }
 
     /**
@@ -194,7 +194,7 @@ public class Level {
         if (chunk == null) {
             return null;
         }
-        return chunk.getBlockState(x & 15, y, z & 15);
+        return chunk.getBlockState(x & (Chunk.CHUNK_SIZE - 1), y, z & (Chunk.CHUNK_SIZE - 1));
     }
 
     public Chunk getChunk(int x, int z) {

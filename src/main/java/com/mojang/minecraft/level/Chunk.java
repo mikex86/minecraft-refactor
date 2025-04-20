@@ -21,9 +21,9 @@ import java.util.List;
  */
 public class Chunk implements Disposable {
 
-    public static final int CHUNK_SIZE = 16;
+    public static final int CHUNK_SIZE = 32;
     public static final int CHUNK_HEIGHT = 128;
-    public static final int SECTION_SIZE = 16;
+    public static final int SECTION_SIZE = 32;
     public static final int CHUNK_SIZE_LG2 = MathUtils.log2(CHUNK_SIZE);
 
     // Bounding box for this chunk

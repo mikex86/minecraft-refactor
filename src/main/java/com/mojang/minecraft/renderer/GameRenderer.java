@@ -30,7 +30,7 @@ public class GameRenderer implements Disposable {
     // Texture manager
     private final TextureManager textureManager;
 
-    private final int renderDistance = 16; // Render distance in chunks
+    private final int renderDistance = 8; // Render distance in chunks
 
     // Buffers for graphic operations
     private final FloatBuffer fogColor0;
