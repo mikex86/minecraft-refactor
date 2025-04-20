@@ -56,10 +56,12 @@ public class ChunkMesh implements Disposable {
      *
      * @param graphics the graphics API
      */
-    public void draw(GraphicsAPI graphics) {
+    public int draw(GraphicsAPI graphics) {
         if (mesh != null) {
             mesh.draw(graphics);
+            return 1;
         }
+        return 0;
     }
 
     /**

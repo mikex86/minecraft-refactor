@@ -185,12 +185,14 @@ public class Chunk implements Disposable {
     /**
      * Renders the given chunk
      */
-    public void render(GraphicsAPI graphics, Frustum frustum) {
+    public int render(GraphicsAPI graphics, Frustum frustum) {
+        int numSectionDrawCalls = 0;
         for (ChunkSection section : sections) {
             if (section.hasMesh() && frustum.isVisible(section.getAABB())) {
-                section.render(graphics);
+                numSectionDrawCalls += section.render(graphics);
             }
         }
+        return numSectionDrawCalls;
     }
 
     /**
@@ -390,10 +392,11 @@ public class Chunk implements Disposable {
          *
          * @param graphics the graphics API
          */
-        public void render(GraphicsAPI graphics) {
+        public int render(GraphicsAPI graphics) {
             if (!empty) {
-                chunkMesh.draw(graphics);
+                return chunkMesh.draw(graphics);
             }
+            return 0;
         }
 
         /**

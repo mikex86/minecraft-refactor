@@ -25,6 +25,9 @@ public class LevelRenderer implements LevelListener, Disposable {
     private final GraphicsAPI graphics;
     private final TextureManager textureManager;
 
+    // Number of chunk sections draw calls issued this frame
+    public static int numSectionDrawCalls = 0;
+
     /**
      * Creates a new GraphicsLevelRenderer for the specified level.
      */
@@ -70,9 +73,10 @@ public class LevelRenderer implements LevelListener, Disposable {
         Frustum frustum = Frustum.getFrustum(graphics);
 
         // Render all visible chunks
+        numSectionDrawCalls = 0;
         for (Chunk chunk : this.level.getLoadedChunks()) {
             if (frustum.isVisible(chunk.aabb)) {
-                chunk.render(graphics, frustum);
+                numSectionDrawCalls += chunk.render(graphics, frustum);
             }
         }
     }

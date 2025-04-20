@@ -2,6 +2,7 @@ package com.mojang.minecraft.engine;
 
 import com.mojang.minecraft.crash.CrashReporter;
 import com.mojang.minecraft.level.Chunk;
+import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.renderer.GameWindow;
 import com.mojang.minecraft.util.time.Timer;
 import input.InputHandler;
@@ -125,7 +126,7 @@ public class GameEngine {
 
         // Update the FPS string once per second
         if (currentTime >= lastFpsUpdateTime + 1000L) {
-            this.fpsString = framesCounter + " fps, " + Chunk.updates + " chunk updates";
+            this.fpsString = framesCounter + " fps, " + Chunk.updates + " chunk updates" + ", " + LevelRenderer.numSectionDrawCalls + " section draw calls";
             Chunk.updates = 0;
             lastFpsUpdateTime += 1000L;
             framesCounter = 0;
