@@ -11,9 +11,9 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Manages texture loading and caching for OpenGL rendering
@@ -21,16 +21,20 @@ import java.util.Map;
 public class TextureManager implements Disposable {
 
     // Graphics context
-    private final GraphicsAPI graphics;
+    private final GraphicsAPI graphics = GraphicsFactory.getGraphicsAPI();
 
     // Texture cache
     private final Map<String, Texture> textureCache = new HashMap<>();
 
-    /**
-     * Creates a new texture manager.
-     */
-    public TextureManager() {
-        this.graphics = GraphicsFactory.getGraphicsAPI();
+    // Textures
+    public Texture charTexture;
+    public Texture terrainTexture;
+    public Texture fontTexture;
+
+    public void loadTextures() {
+        charTexture = loadTexture("/char.png", Texture.FilterMode.NEAREST);
+        terrainTexture = loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
+        fontTexture = loadTexture("/default.gif", Texture.FilterMode.NEAREST);
     }
 
     /**
@@ -39,14 +43,16 @@ public class TextureManager implements Disposable {
      * @param resourcePath The path to the texture resource
      * @return The texture ID
      */
-    public Texture loadTexture(String resourcePath, Texture.FilterMode filterMode) {
+    private Texture loadTexture(String resourcePath, Texture.FilterMode filterMode) {
+        Objects.requireNonNull(graphics, "GraphicsAPI not initialized");
+
         // If already loaded, return its ID
         if (textureCache.containsKey(resourcePath)) {
             return textureCache.get(resourcePath);
         }
 
         // Load image
-        BufferedImage image = null;
+        BufferedImage image;
         try {
             image = loadImage(resourcePath);
         } catch (IOException e) {

@@ -39,9 +39,10 @@ public class Zombie extends Entity {
     public float timeOffs;     // Time offset for animation
     public float speed;        // Movement speed
     public float rotA;         // Rotation acceleration/velocity
-    private final TextureManager textureManager; // Texture manager
+    private final Texture texture;
 
     private static final Model ZOMBIE_MODEL = ModelRegistry.getInstance().getModel("zombie", ZombieModel::new);
+
 
     /**
      * Creates a new zombie entity at the specified position.
@@ -54,12 +55,12 @@ public class Zombie extends Entity {
      */
     public Zombie(Level level, TextureManager textureManager, float x, float y, float z) {
         super(level);
-        this.textureManager = textureManager;
         this.rotA = (float) (Math.random() + 1.0F) * 0.01F;
         this.setPos(x, y, z);
         this.timeOffs = (float) Math.random() * 1239813.0F;
         this.rot = (float) (Math.random() * Math.PI * 2.0F);
         this.speed = 1.0F;
+        this.texture = textureManager.charTexture;
     }
 
     /**
@@ -117,8 +118,6 @@ public class Zombie extends Entity {
      */
     @Override
     public void render(GraphicsAPI graphics, float partialTick) {
-        // Load texture
-        Texture texture = this.textureManager.loadTexture("/char.png", Texture.FilterMode.NEAREST);
         graphics.setTexture(texture);
 
         graphics.pushMatrix();

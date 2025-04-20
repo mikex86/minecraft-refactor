@@ -282,7 +282,6 @@ public class GameRenderer implements Disposable {
 
         // Render debug string
         graphics.setBlendState(true, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
-
         drawDebugText(graphics, fpsString);
 
         graphics.setBlendState(false, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
@@ -313,8 +312,7 @@ public class GameRenderer implements Disposable {
 
         graphics.updateShaderMatrices();
 
-        Texture texture = this.textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
-        graphics.setTexture(texture);
+        graphics.setTexture(textureManager.terrainTexture);
         t.init();
         placeBlock.render(t, null, 0, 0, 0, EnumFacing.UP);
         t.flush();

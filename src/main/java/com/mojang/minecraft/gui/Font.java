@@ -58,7 +58,7 @@ public class Font {
         calculateCharacterWidths(rawPixels, imageWidth);
 
         // Load the font texture
-        this.fontTexture = textureManager.loadTexture(name, Texture.FilterMode.NEAREST);
+        this.fontTexture = textureManager.fontTexture;
     }
 
     /**

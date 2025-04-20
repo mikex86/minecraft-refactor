@@ -71,7 +71,7 @@ public class ParticleEngine {
         }
 
         // Setup texture
-        Texture texture = this.textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
+        Texture texture = this.textureManager.terrainTexture;
         graphics.setTexture(texture);
 
         // Enable additive blending for particles

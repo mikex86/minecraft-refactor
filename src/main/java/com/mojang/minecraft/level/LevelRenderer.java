@@ -63,7 +63,7 @@ public class LevelRenderer implements LevelListener, Disposable {
      */
     public void render() {
         // Enable texturing and bind the terrain texture
-        Texture texture = textureManager.loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
+        Texture texture = textureManager.terrainTexture;
         graphics.setTexture(texture);
 
         // Get the current view frustum

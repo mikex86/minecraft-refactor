@@ -57,6 +57,9 @@ public class Minecraft implements Runnable {
             // Initialize the shader manager
             shaderRegistry.initialize();
 
+            // Initialize texture manager
+            textureManager.loadTextures();
+
             // Create game state (manages level, entities, player)
             this.gameState = new GameState(this.textureManager);
             this.gameState.initialize();
