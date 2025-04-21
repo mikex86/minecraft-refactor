@@ -110,10 +110,6 @@ public class Player extends Entity {
         // Apply gravity
         this.yd = (float) ((double) this.yd - 0.08);
 
-        yd = 0;
-        xd *= 1.1f;
-        zd *= 1.1f;
-
         // Move based on current velocity
         this.move(this.xd, this.yd, this.zd);
 
