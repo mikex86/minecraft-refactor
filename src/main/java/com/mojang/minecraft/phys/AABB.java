@@ -127,4 +127,15 @@ public class AABB {
         this.y1 += ya;
         this.z1 += za;
     }
+
+    /**
+     * Returns a new AABB that is offset by the specified amounts.
+     * @param xa Amount to move in x direction
+     * @param ya Amount to move in y direction
+     * @param za Amount to move in z direction
+     * @return A new AABB that is offset by the specified amounts
+     */
+    public AABB offset(float xa, float ya, float za) {
+        return new AABB(this.x0 + xa, this.y0 + ya, this.z0 + za, this.x1 + xa, this.y1 + ya, this.z1 + za);
+    }
 }

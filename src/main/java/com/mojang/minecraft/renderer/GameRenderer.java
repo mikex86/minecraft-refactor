@@ -156,7 +156,7 @@ public class GameRenderer implements Disposable {
         // Apply camera transforms
         graphics.rotateX(player.xRot);          // Pitch
         graphics.rotateY(player.yRot);          // Yaw
-        graphics.translate(-playerX, -playerY - player.getHeightOffset(), -playerZ);
+        graphics.translate(-playerX, -playerY - player.getInterpolatedEyeHeight(partialTick), -playerZ);
     }
 
     /**

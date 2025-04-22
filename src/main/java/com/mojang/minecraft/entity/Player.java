@@ -26,6 +26,8 @@ public class Player extends Entity {
     // FOV smoothing fields
     private float fovModifier = 1.0F;
     private float prevFovModifier = 1.0F;
+    // Eye‐height interpolation fields
+    private float prevHeightOffset = 1.62F;
 
     /**
      * Creates a new Player instance.
@@ -35,6 +37,7 @@ public class Player extends Entity {
     public Player(Level level) {
         super(level);
         this.heightOffset = 1.62F; // Eye height offset
+        this.prevHeightOffset = this.heightOffset;
     }
 
     /**
@@ -100,10 +103,18 @@ public class Player extends Entity {
         }
 
         float speed = this.onGround ? 0.1F : 0.02F;
+
+        if (this.sneak) {
+            this.sprinting = false;
+            speed *= 0.3F;
+        }
+
         if (this.sprinting) {
             speed *= 1.3F;
         }
 
+        // Enable safe walking when sneaking
+        this.safeWalk = this.sneak;
 
         this.moveRelative(xa, ya, speed);
 
@@ -123,6 +134,7 @@ public class Player extends Entity {
             this.xd *= 0.7F;
             this.zd *= 0.7F;
         }
+
         // FOV smoothing
         this.prevFovModifier = this.fovModifier;
         float targetFov = this.getFOVMultiplier();
@@ -134,6 +146,10 @@ public class Player extends Entity {
         } else if (this.fovModifier > 1.5F) {
             this.fovModifier = 1.5F;
         }
+
+        // --- Eye‐height interpolation update ---
+        this.prevHeightOffset = this.heightOffset;
+        this.heightOffset = this.sneak ? 1.54F : 1.62F;
 
         // Auto-expire after timer runs out
         if (this.sprintingTicksLeft > 0) {
@@ -240,5 +256,15 @@ public class Player extends Entity {
     public float getInterpolatedFOV(float partialTicks) {
         // linear interpolate between last and current smoothed FOV
         return this.prevFovModifier + (this.fovModifier - this.prevFovModifier) * partialTicks;
+    }
+
+    /**
+     * Returns the per‐frame interpolated eye height (in world units).
+     *
+     * @param partialTicks fraction of tick [0..1)
+     * @return smooth eye‐height offset for the camera
+     */
+    public float getInterpolatedEyeHeight(float partialTicks) {
+        return this.prevHeightOffset + (this.heightOffset - this.prevHeightOffset) * partialTicks;
     }
 }

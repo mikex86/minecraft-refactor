@@ -81,6 +81,11 @@ public class Entity {
     public boolean removed = false;
 
     /**
+     * Whether the entity moves "safely" meaning it cannot fall of ledges through movement.
+     */
+    protected boolean safeWalk = false;
+
+    /**
      * Vertical offset for camera and rendering
      */
     protected float heightOffset = 0.0F;
@@ -189,6 +194,43 @@ public class Entity {
      * @param za Movement in z direction
      */
     public void move(float xa, float ya, float za) {
+        if (this.onGround && this.safeWalk) {
+            float dX = xa;
+            float dZ = za;
+            final float limit = 0.05f;
+            // X-axis safe walk
+            while (dX != 0.0D && this.level.getCubes(this.bb.offset(dX, -1.0f, 0.0f)).isEmpty()) {
+                if (dX > 0.0D) {
+                    dX = Math.max(dX - limit, 0.0f);
+                } else {
+                    dX = Math.min(dX + limit, 0.0f);
+                }
+            }
+            // Z-axis safe walk
+            while (dZ != 0.0f && this.level.getCubes(this.bb.offset(0.0f, -1.0f, dZ)).isEmpty()) {
+                if (dZ > 0.0f) {
+                    dZ = Math.max(dZ - limit, 0.0f);
+                } else {
+                    dZ = Math.min(dZ + limit, 0.0f);
+                }
+            }
+            // Diagonal safe walk
+            while (dX != 0.0f && dZ != 0.0f && this.level.getCubes(this.bb.offset(dX, -1.0f, dZ)).isEmpty()) {
+                if (dX > 0.0f) {
+                    dX = Math.max(dX - limit, 0.0f);
+                } else {
+                    dX = Math.min(dX + limit, 0.0f);
+                }
+                if (dZ > 0.0D) {
+                    dZ = Math.max(dZ - limit, 0.0f);
+                } else {
+                    dZ = Math.min(dZ + limit, 0.0f);
+                }
+            }
+            xa = dX;
+            za = dZ;
+        }
+
         float originalXa = xa;
         float originalYa = ya;
         float originalZa = za;
