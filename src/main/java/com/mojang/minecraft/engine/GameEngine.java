@@ -5,7 +5,7 @@ import com.mojang.minecraft.level.Chunk;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.renderer.GameWindow;
 import com.mojang.minecraft.util.time.Timer;
-import input.InputHandler;
+import com.mojang.minecraft.input.InputHandler;
 
 import java.io.IOException;
 

@@ -5,13 +5,11 @@ import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.level.block.Blocks;
-import com.mojang.minecraft.level.block.EnumFacing;
 import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.util.math.CollisionUtils;
 import com.mojang.minecraft.world.HitResult;
-import input.InputHandler;
 
 import java.util.ArrayList;
 import java.util.List;

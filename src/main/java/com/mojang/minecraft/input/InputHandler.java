@@ -1,4 +1,4 @@
-package input;
+package com.mojang.minecraft.input;
 
 import com.mojang.minecraft.renderer.GameWindow;
 
