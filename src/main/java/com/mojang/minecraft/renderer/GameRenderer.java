@@ -4,12 +4,17 @@ import com.mojang.minecraft.Minecraft;
 import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.gui.Font;
+import com.mojang.minecraft.input.GameInputHandler;
+import com.mojang.minecraft.item.Inventory;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.level.block.EnumFacing;
 import com.mojang.minecraft.particle.ParticleEngine;
-import com.mojang.minecraft.renderer.graphics.*;
+import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
+import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
+import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 import com.mojang.minecraft.renderer.shader.ShaderRegistry;
 import com.mojang.minecraft.renderer.shader.impl.*;
 import com.mojang.minecraft.world.HitResult;
@@ -117,8 +122,16 @@ public class GameRenderer implements Disposable {
         this.height = height;
 
         // cross-hair mesh needs to be recreated
-        this.crosshairMesh.dispose();
-        this.crosshairMesh = null;
+        if (this.crosshairMesh != null) {
+            this.crosshairMesh.dispose();
+            this.crosshairMesh = null;
+        }
+
+        // hotbar mesh needs to be recreated
+        if (this.hotbarMesh != null) {
+            this.hotbarMesh.dispose();
+            this.hotbarMesh = null;
+        }
     }
 
     /**
@@ -162,12 +175,12 @@ public class GameRenderer implements Disposable {
     /**
      * Renders a single frame of the game.
      *
-     * @param partialTick Interpolation factor between ticks (0.0-1.0)
-     * @param hitResult   The current hit result (block selection)
-     * @param placeBlock  The current block to place
-     * @param fpsString   String containing FPS information to display
+     * @param partialTick      Interpolation factor between ticks (0.0-1.0)
+     * @param hitResult        The current hit result (block selection)
+     * @param gameInputHandler the game input handler
+     * @param fpsString        String containing FPS information to display
      */
-    public void render(float partialTick, HitResult hitResult, Block placeBlock, String fpsString) {
+    public void render(float partialTick, HitResult hitResult, GameInputHandler gameInputHandler, String fpsString) {
         // Set viewport and clear buffers
         graphics.setViewport(0, 0, this.width, this.height);
         graphics.clear(true, true, 0.5F, 0.8F, 1.0F, 0.0F);
@@ -191,7 +204,7 @@ public class GameRenderer implements Disposable {
 
         // Render HUD elements
         {
-            renderHud(graphics, fpsString, placeBlock);
+            renderHud(graphics, fpsString, gameInputHandler);
         }
     }
 
@@ -257,11 +270,11 @@ public class GameRenderer implements Disposable {
     /**
      * Renders the HUD (head-up display) elements.
      *
-     * @param graphics   The graphics api
-     * @param fpsString  The FPS string to display
-     * @param placeBlock The current block to place
+     * @param graphics         The graphics api
+     * @param fpsString        The FPS string to display
+     * @param gameInputHandler The game input handler
      */
-    private void renderHud(GraphicsAPI graphics, String fpsString, Block placeBlock) {
+    private void renderHud(GraphicsAPI graphics, String fpsString, GameInputHandler gameInputHandler) {
         graphics.setShader(hudShader);
 
         // disable depth test
@@ -277,12 +290,13 @@ public class GameRenderer implements Disposable {
         graphics.loadIdentity();
         graphics.translate(0.0F, 0.0F, -200.0F);
 
-        // Draw the selected block preview
-        drawBlockPreview(graphics, screenWidth, placeBlock);
-
         // Render debug string
         graphics.setBlendState(true, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
+
         drawDebugText(graphics, fpsString);
+
+        // Draw hotbar
+        drawHotbar(graphics, screenWidth, screenHeight, gameInputHandler.getHotbarSlotIndex());
 
         graphics.setBlendState(false, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
 
@@ -293,30 +307,89 @@ public class GameRenderer implements Disposable {
         drawCrosshair(graphics, screenWidth, screenHeight);
     }
 
+    private IndexedMesh hotbarMesh;
+    private IndexedMesh hotbarSelectorMesh;
+
+    private static final int HOTBAR_HEIGHT = 22;
+    private static final int HOTBAR_WIDTH = 92 * 2;
+    private static final int HOTBAR_SELECTOR_SIZE = 24;
+    private static final int HOTBAR_SLOT_WIDTH = 20;
+
+    private void drawHotbar(GraphicsAPI graphics, float screenWidth, float screenHeight, int hotbarSlotIndex) {
+        float centerX = screenWidth / 2f;
+
+        if (hotbarMesh == null) {
+            Tesselator t = Tesselator.instance;
+            t.init();
+            t.color(1, 1, 1);
+
+            // draw quad
+            t.vertexUV(centerX + HOTBAR_WIDTH / 2f, screenHeight - HOTBAR_HEIGHT, 0.0F, (HOTBAR_WIDTH) / 256f, 0.0F);
+            t.vertexUV(centerX - HOTBAR_WIDTH / 2f, screenHeight - HOTBAR_HEIGHT, 0.0F, 0.0F, 0.0F);
+            t.vertexUV(centerX - HOTBAR_WIDTH / 2f, screenHeight, 0.0F, 0.0F, HOTBAR_HEIGHT / 256f);
+            t.vertexUV(centerX + HOTBAR_WIDTH / 2f, screenHeight, 0.0F, (HOTBAR_WIDTH) / 256f, HOTBAR_HEIGHT / 256f);
+
+            hotbarMesh = t.createIndexedMesh(GraphicsEnums.BufferUsage.STATIC);
+        }
+
+        if (hotbarSelectorMesh == null) {
+            Tesselator t = Tesselator.instance;
+            t.init();
+            t.color(1, 1, 1);
+
+            // draw selector quad
+            t.vertexUV((float) HOTBAR_HEIGHT, 0, 0.0F, HOTBAR_SELECTOR_SIZE / 256f, HOTBAR_HEIGHT / 256f);
+            t.vertexUV(0, 0, 0.0F, 0.0F, HOTBAR_HEIGHT / 256f);
+            t.vertexUV(0, (float) HOTBAR_SELECTOR_SIZE, 0.0F, 0.0F, (HOTBAR_HEIGHT + HOTBAR_SELECTOR_SIZE) / 256f);
+            t.vertexUV((float) HOTBAR_HEIGHT, (float) HOTBAR_SELECTOR_SIZE, 0.0F, HOTBAR_SELECTOR_SIZE / 256f, (HOTBAR_HEIGHT + HOTBAR_SELECTOR_SIZE) / 256f);
+
+            hotbarSelectorMesh = t.createIndexedMesh(GraphicsEnums.BufferUsage.STATIC);
+        }
+
+        // draw hot-bar background
+        graphics.setTexture(textureManager.guiTexture);
+        graphics.updateShaderMatrices();
+        hotbarMesh.draw(graphics);
+
+        // draw hot-bar items
+        for (int i = 0; i < Inventory.HOTBAR_SIZE; i++) {
+            Block block = player.getInventory().getHotbarItem(i);
+            if (block == null) {
+                continue;
+            }
+            int itemSize = 10;
+            Tesselator t = Tesselator.instance;
+            graphics.pushMatrix();
+            graphics.translate(centerX - HOTBAR_WIDTH / 2f + (i * HOTBAR_SLOT_WIDTH) + HOTBAR_SLOT_WIDTH / 2f + 1, screenHeight - HOTBAR_SELECTOR_SIZE + itemSize * 2 + 1, 0);
+            graphics.scale(itemSize, itemSize, itemSize);
+            graphics.rotateX(30.0F);
+            graphics.rotateY(45.0F);
+            graphics.scale(-1.0F, -1.0F, 1.0F);
+
+            graphics.updateShaderMatrices();
+
+            graphics.setTexture(textureManager.terrainTexture);
+            t.init();
+            block.render(t, null, 0, 0, 0, EnumFacing.UP);
+            t.flush();
+            graphics.popMatrix();
+        }
+
+        // draw selector
+        graphics.pushMatrix();
+        graphics.translate(centerX - HOTBAR_WIDTH / 2f + hotbarSlotIndex * HOTBAR_SLOT_WIDTH, screenHeight - HOTBAR_SELECTOR_SIZE + 1, 0.0F);
+        graphics.updateShaderMatrices();
+        graphics.setTexture(textureManager.guiTexture);
+        hotbarSelectorMesh.draw(graphics);
+        graphics.popMatrix();
+    }
+
     private void drawDebugText(GraphicsAPI graphics, String fpsString) {
         graphics.updateShaderMatrices();
 
         this.font.drawShadow(graphics, Minecraft.VERSION_STRING, 2, 2, 0xFFFFFF);
         this.font.drawShadow(graphics, fpsString, 2, 12, 0xFFFFFF);
         this.font.drawShadow(graphics, "x: " + player.x + ", y: " + player.y + ", z: " + player.z, 2, 22, 0xFFFFFF);
-    }
-
-    private void drawBlockPreview(GraphicsAPI graphics, float screenWidth, Block placeBlock) {
-        Tesselator t = Tesselator.instance;
-        graphics.pushMatrix();
-        graphics.translate(screenWidth - 16, 32, 0.0F);
-        graphics.scale(16.0F, 16.0F, 16.0F);
-        graphics.rotateX(30.0F);
-        graphics.rotateY(45.0F);
-        graphics.scale(-1.0F, -1.0F, 1.0F);
-
-        graphics.updateShaderMatrices();
-
-        graphics.setTexture(textureManager.terrainTexture);
-        t.init();
-        placeBlock.render(t, null, 0, 0, 0, EnumFacing.UP);
-        t.flush();
-        graphics.popMatrix();
     }
 
     private IndexedMesh crosshairMesh;
@@ -328,7 +401,7 @@ public class GameRenderer implements Disposable {
         graphics.updateShaderMatrices();
 
         if (crosshairMesh == null) {
-            Tesselator t = new Tesselator();
+            Tesselator t = Tesselator.instance;
             t.init();
             t.color(1, 1, 1);
 
@@ -358,4 +431,4 @@ public class GameRenderer implements Disposable {
             crosshairMesh = null;
         }
     }
-} 
+}

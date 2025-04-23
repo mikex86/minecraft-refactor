@@ -2,6 +2,7 @@ package com.mojang.minecraft.input;
 
 import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.entity.Player;
+import com.mojang.minecraft.item.Inventory;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.level.block.Blocks;
@@ -25,7 +26,8 @@ public class GameInputHandler {
     // Input state
     private boolean mouseGrabbed = false;
     private final int yMouseAxis = 1;  // Controls if mouse Y axis is inverted
-    private Block placeBlock = Blocks.rock;
+
+    private int hotbarSlotIndex = 0;
 
     // Game references needed for input processing
     private final Player player;
@@ -87,22 +89,31 @@ public class GameInputHandler {
 
                 // Block selection keys
                 if (key == InputHandler.Keys.KEY_1) {
-                    this.placeBlock = Blocks.stoneBrick;  // Stone
+                    hotbarSlotIndex = 0;
                 }
                 if (key == InputHandler.Keys.KEY_2) {
-                    this.placeBlock = Blocks.dirt;  // Dirt
+                    hotbarSlotIndex = 1;
                 }
                 if (key == InputHandler.Keys.KEY_3) {
-                    this.placeBlock = Blocks.rock;  // Cobblestone
+                    hotbarSlotIndex = 2;
                 }
                 if (key == InputHandler.Keys.KEY_4) {
-                    this.placeBlock = Blocks.planks;  // Wooden planks
+                    hotbarSlotIndex = 3;
                 }
                 if (key == InputHandler.Keys.KEY_5) {
-                    this.placeBlock = Blocks.wood;  // Wood
+                    hotbarSlotIndex = 4;
                 }
                 if (key == InputHandler.Keys.KEY_6) {
-                    this.placeBlock = Blocks.glass; // Glass
+                    hotbarSlotIndex = 5;
+                }
+                if (key == InputHandler.Keys.KEY_7) {
+                    hotbarSlotIndex = 6;
+                }
+                if (key == InputHandler.Keys.KEY_8) {
+                    hotbarSlotIndex = 7;
+                }
+                if (key == InputHandler.Keys.KEY_9) {
+                    hotbarSlotIndex = 8;
                 }
             }
         }
@@ -124,6 +135,18 @@ public class GameInputHandler {
                     }
                 }
             }
+        }
+
+        // Process scroll events
+        double scrollDelta = inputHandler.getMouseScrollY();
+        if (scrollDelta < 0) {
+            this.hotbarSlotIndex += 1;
+        } else if (scrollDelta > 0) {
+            this.hotbarSlotIndex -= 1;
+        }
+        this.hotbarSlotIndex %= Inventory.HOTBAR_SIZE;
+        if (this.hotbarSlotIndex < 0) {
+            this.hotbarSlotIndex += Inventory.HOTBAR_SIZE;
         }
 
         // Update player movement based on keyboard input
@@ -191,8 +214,9 @@ public class GameInputHandler {
             // Check if we can place a block here
             BlockState blockState = this.level.getBlockState(x, y, z);
             AABB aabb = (blockState == null ? Blocks.rock : blockState.block).getAABB(x, y, z);
-            if (this.isFree(aabb)) {
-                this.level.setBlockState(x, y, z, this.placeBlock.getBlockState(hitResult.facingDirection));
+            Block block = this.player.getInventory().getHotbarItem(this.hotbarSlotIndex);
+            if (block != null && this.isFree(aabb)) {
+                this.level.setBlockState(x, y, z, block.getBlockState(hitResult.facingDirection));
             }
         }
     }
@@ -251,11 +275,10 @@ public class GameInputHandler {
     }
 
     /**
-     * Gets the current block type for building.
-     *
-     * @return The block to place
+     * @return the current hotbar slot index
      */
-    public Block getPlaceBlock() {
-        return placeBlock;
+    public int getHotbarSlotIndex() {
+        return hotbarSlotIndex;
     }
-} 
+
+}

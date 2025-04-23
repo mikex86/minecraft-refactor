@@ -1,5 +1,6 @@
 package com.mojang.minecraft.entity;
 
+import com.mojang.minecraft.item.Inventory;
 import com.mojang.minecraft.level.Chunk;
 import com.mojang.minecraft.level.Level;
 
@@ -21,13 +22,18 @@ public class Player extends Entity {
     private boolean jump = false;
     private boolean sneak = false;
     private boolean sprinting = false;
+
     // Remaining ticks before sprint expires (600 ticks = 30s)
     private int sprintingTicksLeft = 0;
+
     // FOV smoothing fields
     private float fovModifier = 1.0F;
     private float prevFovModifier = 1.0F;
+
     // Eye‐height interpolation fields
-    private float prevHeightOffset = 1.62F;
+    private float prevHeightOffset;
+
+    private final Inventory inventory = new Inventory();
 
     /**
      * Creates a new Player instance.
@@ -266,5 +272,9 @@ public class Player extends Entity {
      */
     public float getInterpolatedEyeHeight(float partialTicks) {
         return this.prevHeightOffset + (this.heightOffset - this.prevHeightOffset) * partialTicks;
+    }
+
+    public Inventory getInventory() {
+        return inventory;
     }
 }

@@ -5,12 +5,9 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.util.io.IOUtils;
-import org.lwjgl.BufferUtils;
 import org.lwjgl.system.MemoryStack;
 
-import javax.imageio.ImageIO;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.HashMap;
@@ -29,11 +26,13 @@ public class TextureManager implements Disposable {
     public Texture charTexture;
     public Texture terrainTexture;
     public Texture fontTexture;
+    public Texture guiTexture;
 
     public void loadTextures() {
         charTexture = loadTexture("/char.png", Texture.FilterMode.NEAREST);
         terrainTexture = loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
         fontTexture = loadTexture("/default.gif", Texture.FilterMode.NEAREST);
+        guiTexture = loadTexture("/gui.png", Texture.FilterMode.NEAREST);
     }
 
     private Texture loadTexture(String resourcePath, Texture.FilterMode filterMode) {

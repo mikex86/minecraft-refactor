@@ -12,7 +12,6 @@ import com.mojang.minecraft.renderer.graphics.VertexArrayObject;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
-import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL30.*;
 
