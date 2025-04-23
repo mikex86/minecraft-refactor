@@ -35,6 +35,8 @@ public class Player extends Entity {
 
     private final Inventory inventory = new Inventory();
 
+    private boolean wasSprintKeyPressed;
+
     /**
      * Creates a new Player instance.
      *
@@ -68,10 +70,13 @@ public class Player extends Entity {
         this.jump = jump;
         this.sneak = sneak;
 
-        if (forward && sprinting && !this.sprinting) {
-            // When sprinting is started, reset the 30s timer
-            this.sprinting = true;
-            this.sprintingTicksLeft = 600;
+        if (this.wasSprintKeyPressed != sprinting) {
+            this.wasSprintKeyPressed = sprinting;
+            if (forward && sprinting && !this.sprinting && !this.isCollidedHorizontally) {
+                // When sprinting is started, reset the 30s timer
+                this.sprinting = true;
+                this.sprintingTicksLeft = 600;
+            }
         }
     }
 

@@ -5,6 +5,7 @@ import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.gui.Font;
 import com.mojang.minecraft.gui.TextLabel;
+import com.mojang.minecraft.gui.scaling.ScaledResolution;
 import com.mojang.minecraft.gui.screen.GuiScreen;
 import com.mojang.minecraft.gui.screen.InventoryScreen;
 import com.mojang.minecraft.input.GameInputHandler;
@@ -152,7 +153,9 @@ public class GameRenderer implements Disposable {
 
         // notify current screen of resize if it exists
         if (this.currentScreen != null) {
-            this.currentScreen.onResized(width, height);
+            float scaledWidth = ScaledResolution.getScaledWidth(width, height);
+            float scaledHeight = ScaledResolution.getScaledHeight(height);
+            this.currentScreen.onResized(scaledWidth, scaledHeight);
         }
     }
 
@@ -301,12 +304,12 @@ public class GameRenderer implements Disposable {
         // disable depth test
         graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
 
-        float screenWidth = (this.width * 240f) / (float) this.height;
-        float screenHeight = (this.height * 240f) / (float) this.height;
+        float scaledWidth = ScaledResolution.getScaledWidth(this.width, this.height);
+        float scaledHeight = ScaledResolution.getScaledHeight(this.height);
 
         graphics.clear(false, true, 0.0F, 0.0F, 0.0F, 0.0F);
 
-        graphics.setOrthographicProjection(0.0F, screenWidth, screenHeight, 0.0F, 100.0F, 300.0F);
+        graphics.setOrthographicProjection(0.0F, scaledWidth, scaledHeight, 0.0F, 100.0F, 300.0F);
         graphics.setMatrixMode(GraphicsAPI.MatrixMode.MODELVIEW);
         graphics.loadIdentity();
         graphics.translate(0.0F, 0.0F, -200.0F);
@@ -327,7 +330,7 @@ public class GameRenderer implements Disposable {
         }
 
         // Draw hotbar
-        drawHotbar(graphics, screenWidth, screenHeight, gameInputHandler.getHotbarSlotIndex());
+        drawHotbar(graphics, scaledWidth, scaledHeight, gameInputHandler.getHotbarSlotIndex());
 
         graphics.setBlendState(false, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
 
@@ -335,20 +338,21 @@ public class GameRenderer implements Disposable {
         graphics.updateShaderMatrices();
 
         // Draw cross-hair
-        drawCrosshair(graphics, screenWidth, screenHeight);
+        drawCrosshair(graphics, scaledWidth, scaledHeight);
 
         graphics.setShader(hudShader);
         graphics.updateShaderMatrices();
 
         // Draw current screen if it exists
         if (currentScreen != null) {
-            currentScreen.drawScreen(graphics, screenWidth, screenHeight);
+            currentScreen.drawScreen(graphics, scaledWidth, scaledHeight);
         }
     }
 
     public void openScreen(GuiScreen screen) {
         this.gameInputHandler.setLockMouseReleased(true);
         this.gameInputHandler.releaseMouse();
+        this.gameInputHandler.setCurrentScreen(screen);
         this.currentScreen = screen;
         this.currentScreen.onResized(this.width, this.height);
     }
@@ -357,6 +361,7 @@ public class GameRenderer implements Disposable {
         if (this.currentScreen != null) {
             this.currentScreen.dispose();
             this.currentScreen = null;
+            this.gameInputHandler.setCurrentScreen(null);
             this.gameInputHandler.setLockMouseReleased(false);
             this.gameInputHandler.grabMouse();
         }
@@ -369,6 +374,7 @@ public class GameRenderer implements Disposable {
     private static final int HOTBAR_WIDTH = 92 * 2;
     private static final int HOTBAR_SELECTOR_SIZE = 24;
     private static final int HOTBAR_SLOT_WIDTH = 20;
+    private static final int ITEM_SIZE = 10;
 
     private void drawHotbar(GraphicsAPI graphics, float screenWidth, float screenHeight, int hotbarSlotIndex) {
         float centerX = screenWidth / 2f;
@@ -408,15 +414,15 @@ public class GameRenderer implements Disposable {
 
         // draw hot-bar items
         graphics.setTexture(textureManager.terrainTexture);
-        for (int i = 0; i < Inventory.HOTBAR_SIZE; i++) {
+        int hotBarSize = player.getInventory().getHotbarSize();
+        for (int i = 0; i < hotBarSize; i++) {
             Block block = player.getInventory().getHotbarItem(i);
             if (block == null) {
                 continue;
             }
-            int itemSize = 10;
             graphics.pushMatrix();
-            graphics.translate(centerX - HOTBAR_WIDTH / 2f + (i * HOTBAR_SLOT_WIDTH) + HOTBAR_SLOT_WIDTH / 2f + 1, screenHeight - HOTBAR_SELECTOR_SIZE + itemSize * 2 + 1, 0);
-            BlockPreviewRenderer.renderBlock(graphics, block, itemSize);
+            graphics.translate(centerX - HOTBAR_WIDTH / 2f + (i * HOTBAR_SLOT_WIDTH) + HOTBAR_SLOT_WIDTH / 2f + 1, screenHeight - HOTBAR_SELECTOR_SIZE + ITEM_SIZE * 2 + 1, 0);
+            BlockPreviewRenderer.renderBlock(graphics, block, ITEM_SIZE);
             graphics.popMatrix();
         }
 

@@ -2,7 +2,8 @@ package com.mojang.minecraft.input;
 
 import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.entity.Player;
-import com.mojang.minecraft.item.Inventory;
+import com.mojang.minecraft.gui.scaling.ScaledResolution;
+import com.mojang.minecraft.gui.screen.GuiScreen;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.level.block.Blocks;
@@ -36,6 +37,9 @@ public class GameInputHandler {
     private final ArrayList<Entity> entities;
     private final boolean fullscreen;
 
+    // Currently open GUI screen (if any)
+    private GuiScreen currentScreen = null;
+
     /**
      * Creates a new GameInputHandler.
      *
@@ -67,9 +71,11 @@ public class GameInputHandler {
     /**
      * Process all pending input events and update game state accordingly.
      *
-     * @param hitResult The current hit result (block being looked at)
+     * @param hitResult    The current hit result (block being looked at)
+     * @param windowWidth  the window width
+     * @param windowHeight the window height
      */
-    public void processInput(HitResult hitResult) {
+    public void processInput(HitResult hitResult, int windowWidth, int windowHeight) {
         // Process all keyboard events
         while (inputHandler.hasNextKeyEvent()) {
             InputHandler.KeyEvent event = inputHandler.getNextKeyEvent();
@@ -128,6 +134,22 @@ public class GameInputHandler {
             int button = event.getButton();
             boolean pressed = event.isPressed();
 
+            if (this.currentScreen != null) {
+                float mouseX = (float) inputHandler.getMouseX();
+                float mouseY = (float) inputHandler.getMouseY();
+
+                float scaledWidth = ScaledResolution.getScaledWidth(windowWidth, windowHeight);
+                float scaledHeight = ScaledResolution.getScaledHeight(windowHeight);
+
+                float mouseXRelative = mouseX / (float) windowWidth;
+                float mouseYRelative = mouseY / (float) windowHeight;
+
+                float mouseXScaled = mouseXRelative * scaledWidth;
+                float mouseYScaled = mouseYRelative * scaledHeight;
+
+                this.currentScreen.onMouseClicked(mouseXScaled, mouseYScaled, button, pressed);
+            }
+
             if (!this.mouseGrabbed && pressed) {
                 // Auto-grab mouse on click when not grabbed
                 this.grabMouse();
@@ -143,14 +165,19 @@ public class GameInputHandler {
 
         // Process scroll events
         double scrollDelta = inputHandler.getMouseScrollY();
-        if (scrollDelta < 0) {
-            this.hotbarSlotIndex += 1;
-        } else if (scrollDelta > 0) {
-            this.hotbarSlotIndex -= 1;
-        }
-        this.hotbarSlotIndex %= Inventory.HOTBAR_SIZE;
-        if (this.hotbarSlotIndex < 0) {
-            this.hotbarSlotIndex += Inventory.HOTBAR_SIZE;
+
+        if (currentScreen == null) {
+            // process hotbar scroll
+            if (scrollDelta < 0) {
+                this.hotbarSlotIndex += 1;
+            } else if (scrollDelta > 0) {
+                this.hotbarSlotIndex -= 1;
+            }
+            int hotBarSize = player.getInventory().getHotbarSize();
+            this.hotbarSlotIndex %= hotBarSize;
+            if (this.hotbarSlotIndex < 0) {
+                this.hotbarSlotIndex += hotBarSize;
+            }
         }
 
         // Update player movement based on keyboard input
@@ -169,13 +196,32 @@ public class GameInputHandler {
     /**
      * Processes mouse movement for looking around.
      */
-    public void processMouseLook() {
-        if (this.mouseGrabbed) {
-            float mouseX = (float) inputHandler.getMouseDX();
-            float mouseY = (float) inputHandler.getMouseDY();
+    public void processMouseLook(int windowWidth, int windowHeight) {
+        float dX = (float) inputHandler.getMouseDX();
+        float dY = (float) inputHandler.getMouseDY();
 
-            // Apply mouse movement to player rotation
-            this.player.turn(mouseX, mouseY * (float) this.yMouseAxis);
+        if (currentScreen != null) {
+            if (dX != 0 || dY != 0) {
+                float mouseX = (float) inputHandler.getMouseX();
+                float mouseY = (float) inputHandler.getMouseY();
+
+                float scaledWidth = ScaledResolution.getScaledWidth(windowWidth, windowHeight);
+                float scaledHeight = ScaledResolution.getScaledHeight(windowHeight);
+
+                float mouseXRelative = mouseX / (float) windowWidth;
+                float mouseYRelative = mouseY / (float) windowHeight;
+
+                float mouseXScaled = mouseXRelative * scaledWidth;
+                float mouseYScaled = mouseYRelative * scaledHeight;
+                currentScreen.onMouseMove(mouseXScaled, mouseYScaled, dX, dY);
+            }
+        }
+
+        if (this.mouseGrabbed) {
+            if (dX != 0 || dY != 0) {
+                // Apply mouse movement to player rotation
+                this.player.turn(dX, dY * (float) this.yMouseAxis);
+            }
         }
     }
 
@@ -299,4 +345,7 @@ public class GameInputHandler {
         return hotbarSlotIndex;
     }
 
+    public void setCurrentScreen(GuiScreen screen) {
+        this.currentScreen = screen;
+    }
 }

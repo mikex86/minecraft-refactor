@@ -127,7 +127,6 @@ public class GameEngine {
         // Update the FPS string once per second
         if (currentTime >= lastFpsUpdateTime + 1000L) {
             this.fpsString = framesCounter + " fps, " + Chunk.updates + " chunk updates" + ", " + LevelRenderer.numSectionDrawCalls + " section draw calls";
-            System.out.println(fpsString);
             Chunk.updates = 0;
             lastFpsUpdateTime += 1000L;
             framesCounter = 0;

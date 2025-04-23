@@ -145,7 +145,7 @@ public class Minecraft implements Runnable {
 
                     // Process input
                     HitResult hitResult = this.gameState.getLevel().raycast(this.gameState.getPlayer(), partialTick);
-                    gameInputHandler.processInput(hitResult);
+                    gameInputHandler.processInput(hitResult, this.engine.getWidth(), this.engine.getHeight());
 
                     // Process game ticks
                     for (int i = 0; i < ticksToProcess; ++i) {
@@ -153,7 +153,7 @@ public class Minecraft implements Runnable {
                     }
 
                     // Handle mouse look
-                    gameInputHandler.processMouseLook();
+                    gameInputHandler.processMouseLook(this.engine.getWidth(), this.engine.getHeight());
                     engine.resetMouse();
 
                     // Render the frame
