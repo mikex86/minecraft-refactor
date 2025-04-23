@@ -33,6 +33,7 @@ public class Font {
     // Character width mapping for proportional font rendering
     private final int[] charWidths = new int[256];
     private final Texture fontTexture;
+    private final Tesselator tessellator;
 
     /**
      * Creates a new Font instance from a texture resource.
@@ -59,6 +60,8 @@ public class Font {
 
         // Load the font texture
         this.fontTexture = textureManager.fontTexture;
+
+        this.tessellator = Tesselator.instance;
     }
 
     /**
@@ -101,14 +104,14 @@ public class Font {
     /**
      * Draws text with a drop shadow.
      *
-     * @param graphics The graphics API to use for rendering
-     * @param text     The text to draw
-     * @param x        The x position
-     * @param y        The y position
-     * @param color    The color of the text (RGB format)
+     * @param graphics        The graphics API to use for rendering
+     * @param text            The text to draw
+     * @param x               The x position
+     * @param y               The y position
+     * @param color           The color of the text (RGB format)
      */
     public void drawShadow(GraphicsAPI graphics, String text, int x, int y, int color) {
-        this.draw(graphics, text, x + 1, y + 1, color, true);
+        this.draw(graphics, text, x + 1, y + 1, color, true, false);
         this.draw(graphics, text, x, y, color);
     }
 
@@ -121,20 +124,21 @@ public class Font {
      * @param color The color of the text (RGB format)
      */
     public void draw(GraphicsAPI graphics, String text, int x, int y, int color) {
-        this.draw(graphics, text, x, y, color, false);
+        this.draw(graphics, text, x, y, color, false, true);
     }
 
     /**
      * Internal method to draw text with optional shadow effect.
      *
-     * @param graphics The graphics API to use for rendering
-     * @param text     The text to draw
-     * @param x        The x position
-     * @param y        The y position
-     * @param color    The color of the text (RGB format)
-     * @param darken   Whether to darken the color (for shadow effect)
+     * @param graphics        The graphics API to use for rendering
+     * @param text            The text to draw
+     * @param x               The x position
+     * @param y               The y position
+     * @param color           The color of the text (RGB format)
+     * @param darken          Whether to darken the color (for shadow effect)
+     * @param flushTesselator Whether to immediately render the text on screen or keep it buffered in the tesselator
      */
-    public void draw(GraphicsAPI graphics, String text, int x, int y, int color, boolean darken) {
+    public void draw(GraphicsAPI graphics, String text, int x, int y, int color, boolean darken, boolean flushTesselator) {
         char[] chars = text.toCharArray();
         if (darken) {
             color = (color & COLOR_DARKEN_MASK) >> 2;
@@ -143,7 +147,6 @@ public class Font {
         graphics.setTexture(this.fontTexture);
 
         // Initialize the tessellator for rendering
-        Tesselator tessellator = Tesselator.instance;
         tessellator.init();
         tessellator.color(color);
         int xOffset = 0;
@@ -216,7 +219,9 @@ public class Font {
         }
 
         // Render the text and clean up OpenGL state
-        tessellator.flush();
+        if (flushTesselator) {
+            tessellator.flush();
+        }
     }
 
     /**
@@ -240,5 +245,13 @@ public class Font {
         }
 
         return width;
+    }
+
+    public Tesselator getTessellator() {
+        return tessellator;
+    }
+
+    public Texture getFontTexture() {
+        return fontTexture;
     }
 }

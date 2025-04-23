@@ -76,6 +76,11 @@ public class RayCaster {
      */
     private static HitResult raycastBlocks(Level level, float startX, float startY, float startZ,
                                           float dirX, float dirY, float dirZ, float maxDistance) {
+
+        // calculate angle from direction vector
+        float yaw = (float) Math.toDegrees(Math.atan2(dirX, dirZ));
+        float pitch = (float) Math.toDegrees(Math.atan2(dirY, dirZ));
+
         // Initial block position (the block containing the ray start point)
         int blockX = (int) Math.floor(startX);
         int blockY = (int) Math.floor(startY);

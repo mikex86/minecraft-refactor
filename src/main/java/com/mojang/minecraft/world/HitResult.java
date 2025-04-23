@@ -53,28 +53,6 @@ public class HitResult {
     public final EnumFacing facingDirection;
 
     /**
-     * Creates a new hit result.
-     *
-     * @param type The type of hit (0 for miss, 1 for block, etc.)
-     * @param x    X coordinate of the hit
-     * @param y    Y coordinate of the hit
-     * @param z    Z coordinate of the hit
-     * @param face Direction of the hit
-     */
-    public HitResult(int type, int x, int y, int z, int face) {
-        this.type = type;
-        this.x = x;
-        this.y = y;
-        this.z = z;
-        this.face = face;
-        this.facingDirection = fromFace(face);
-        this.hitX = x + 0.5f;
-        this.hitY = y + 0.5f;
-        this.hitZ = z + 0.5f;
-        this.distanceSq = 0.0f;
-    }
-
-    /**
      * Creates a new hit result with exact hit coordinates.
      *
      * @param type       The type of hit (0 for miss, 1 for block, etc.)

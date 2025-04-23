@@ -4,6 +4,7 @@ import com.mojang.minecraft.Minecraft;
 import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.gui.Font;
+import com.mojang.minecraft.gui.TextLabel;
 import com.mojang.minecraft.gui.screen.GuiScreen;
 import com.mojang.minecraft.gui.screen.InventoryScreen;
 import com.mojang.minecraft.input.GameInputHandler;
@@ -11,7 +12,6 @@ import com.mojang.minecraft.item.Inventory;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.level.block.Block;
-import com.mojang.minecraft.level.block.EnumFacing;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.renderer.block.BlockPreviewRenderer;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
@@ -67,6 +67,10 @@ public class GameRenderer implements Disposable {
     // The current gui screen (if any)
     private GuiScreen currentScreen;
 
+    private final TextLabel versionStringLabel;
+    private final TextLabel fpsStringLabel;
+    private final TextLabel positionStringLabel;
+
     /**
      * Creates a new graphics renderer.
      *
@@ -118,6 +122,10 @@ public class GameRenderer implements Disposable {
         this.entityShader = shaderRegistry.getEntityShader();
         this.hudShader = shaderRegistry.getHudShader();
         this.hudNoTexShader = shaderRegistry.getHudNoTexShader();
+
+        this.versionStringLabel = new TextLabel(font, 0xFFFFFF, true);
+        this.fpsStringLabel = new TextLabel(font, 0xFFFFFF, true);
+        this.positionStringLabel = new TextLabel(font, 0xFFFFFF, true);
     }
 
     /**
@@ -189,9 +197,9 @@ public class GameRenderer implements Disposable {
     /**
      * Renders a single frame of the game.
      *
-     * @param partialTick      Interpolation factor between ticks (0.0-1.0)
-     * @param hitResult        The current hit result (block selection)
-     * @param fpsString        String containing FPS information to display
+     * @param partialTick Interpolation factor between ticks (0.0-1.0)
+     * @param hitResult   The current hit result (block selection)
+     * @param fpsString   String containing FPS information to display
      */
     public void render(float partialTick, HitResult hitResult, String fpsString) {
         // Set viewport and clear buffers
@@ -424,9 +432,13 @@ public class GameRenderer implements Disposable {
     private void drawDebugText(GraphicsAPI graphics, String fpsString) {
         graphics.updateShaderMatrices();
 
-        this.font.drawShadow(graphics, Minecraft.VERSION_STRING, 2, 2, 0xFFFFFF);
-        this.font.drawShadow(graphics, fpsString, 2, 12, 0xFFFFFF);
-        this.font.drawShadow(graphics, "x: " + player.x + ", y: " + player.y + ", z: " + player.z, 2, 22, 0xFFFFFF);
+        this.versionStringLabel.setText(Minecraft.MINECRAFT_VERSION_STRING);
+        this.versionStringLabel.render(graphics, 2, 2);
+        this.fpsStringLabel.setText(fpsString);
+        this.fpsStringLabel.render(graphics, 2, 12);
+        this.positionStringLabel.setText("x: " + player.x + ", y: " + player.y + ", z: " + player.z);
+        this.positionStringLabel.render(graphics, 2, 22);
+
     }
 
     private IndexedMesh crosshairMesh;

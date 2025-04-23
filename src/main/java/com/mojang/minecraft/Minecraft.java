@@ -14,6 +14,7 @@ import java.io.IOException;
 public class Minecraft implements Runnable {
     // Constants
     public static final String VERSION_STRING = "0.0.11a";
+    public static final String MINECRAFT_VERSION_STRING = "Minecraft " + VERSION_STRING;
     public static final boolean DEBUG = false;
 
     // Core systems
@@ -40,7 +41,7 @@ public class Minecraft implements Runnable {
      * @param fullscreen Whether to run in fullscreen mode
      */
     public Minecraft(int width, int height, boolean fullscreen) {
-        this.engine = new GameEngine(width, height, fullscreen, "Minecraft " + VERSION_STRING);
+        this.engine = new GameEngine(width, height, fullscreen, MINECRAFT_VERSION_STRING);
         this.textureManager = new TextureManager();
         this.shaderRegistry = ShaderRegistry.getInstance();
     }
