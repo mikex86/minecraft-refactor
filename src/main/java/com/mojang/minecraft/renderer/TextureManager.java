@@ -27,12 +27,14 @@ public class TextureManager implements Disposable {
     public Texture terrainTexture;
     public Texture fontTexture;
     public Texture guiTexture;
+    public Texture inventoryTexture;
 
     public void loadTextures() {
         charTexture = loadTexture("/char.png", Texture.FilterMode.NEAREST);
         terrainTexture = loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
         fontTexture = loadTexture("/default.gif", Texture.FilterMode.NEAREST);
         guiTexture = loadTexture("/gui.png", Texture.FilterMode.NEAREST);
+        inventoryTexture = loadTexture("/inventory.png", Texture.FilterMode.NEAREST);
     }
 
     private Texture loadTexture(String resourcePath, Texture.FilterMode filterMode) {

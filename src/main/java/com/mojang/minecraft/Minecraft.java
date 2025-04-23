@@ -65,19 +65,6 @@ public class Minecraft implements Runnable {
             this.gameState = new GameState(this.textureManager);
             this.gameState.initialize();
 
-            // Create renderer
-            this.renderer = new GameRenderer(
-                    this.textureManager,
-                    this.shaderRegistry,
-                    this.gameState.getLevel(),
-                    gameState.getLevelRenderer(),
-                    gameState.getParticleEngine(),
-                    gameState.getPlayer(),
-                    gameState.getEntities(),
-                    engine.getWidth(),
-                    engine.getHeight()
-            );
-
             // Initialize game input handler
             this.gameInputHandler = new GameInputHandler(
                     engine.getInputHandler(),
@@ -87,6 +74,21 @@ public class Minecraft implements Runnable {
                     gameState.getEntities(),
                     engine.isFullscreen()
             );
+
+            // Create renderer
+            this.renderer = new GameRenderer(
+                    this.textureManager,
+                    this.shaderRegistry,
+                    this.gameInputHandler,
+                    this.gameState.getLevel(),
+                    gameState.getLevelRenderer(),
+                    gameState.getParticleEngine(),
+                    gameState.getPlayer(),
+                    gameState.getEntities(),
+                    engine.getWidth(),
+                    engine.getHeight()
+            );
+
             this.engine.postInit();
         } catch (Exception e) {
             CrashReporter.handleCrash("Failed to initialize game", e);
@@ -157,7 +159,6 @@ public class Minecraft implements Runnable {
                     this.renderer.render(
                             partialTick,
                             hitResult,
-                            gameInputHandler,
                             engine.getFpsString()
                     );
 
@@ -165,7 +166,7 @@ public class Minecraft implements Runnable {
                     if (engine.hasResized()) {
                         int newWidth = engine.getWidth();
                         int newHeight = engine.getHeight();
-                        renderer.setDimensions(newWidth, newHeight);
+                        renderer.setScreenSize(newWidth, newHeight);
                     }
 
                     // Handle window focus change

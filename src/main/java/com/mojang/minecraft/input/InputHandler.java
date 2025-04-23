@@ -194,6 +194,14 @@ public class InputHandler {
     }
 
     /**
+     * Clears all current mouse delta values.
+     */
+    public void clearMouseDelta() {
+        mouseDX = 0;
+        mouseDY = 0;
+    }
+
+    /**
      * Sets the mouse position.
      *
      * @param x X position in pixels
@@ -247,6 +255,7 @@ public class InputHandler {
 
     public void resetMouse() {
     }
+
 
     /**
      * Keyboard event class.

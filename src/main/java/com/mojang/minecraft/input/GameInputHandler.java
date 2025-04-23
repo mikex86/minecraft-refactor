@@ -115,6 +115,10 @@ public class GameInputHandler {
                 if (key == InputHandler.Keys.KEY_9) {
                     hotbarSlotIndex = 8;
                 }
+
+                if (key == InputHandler.Keys.KEY_E) {
+                    this.player.toggleInventory();
+                }
             }
         }
 
@@ -244,12 +248,22 @@ public class GameInputHandler {
     }
 
     /**
+     * State whether grabMouse() should be a no-op.
+     * This is needed to cancel mouse grabbing when the window regains focus when a current gui screen is active.
+     */
+    private boolean lockMouseReleased = false;
+
+    /**
      * Grabs the mouse cursor, hiding it and enabling mouse look.
      */
     public void grabMouse() {
+        if (lockMouseReleased) {
+            return;
+        }
         if (!this.mouseGrabbed) {
             this.mouseGrabbed = true;
             inputHandler.setCursorCaptured(true);
+            inputHandler.clearMouseDelta();
         }
     }
 
@@ -261,6 +275,10 @@ public class GameInputHandler {
             this.mouseGrabbed = false;
             inputHandler.setCursorCaptured(false);
         }
+    }
+
+    public void setLockMouseReleased(boolean lockMouseReleased) {
+        this.lockMouseReleased = lockMouseReleased;
     }
 
     /**

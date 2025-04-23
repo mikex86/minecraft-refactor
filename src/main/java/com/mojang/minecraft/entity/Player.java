@@ -58,6 +58,9 @@ public class Player extends Entity {
      * @param sprinting Whether the sprinting key is pressed
      */
     public void setInput(boolean forward, boolean back, boolean left, boolean right, boolean jump, boolean sneak, boolean sprinting) {
+        if (this.inventoryOpen) {
+            return;
+        }
         this.forward = forward;
         this.back = back;
         this.left = left;
@@ -71,6 +74,7 @@ public class Player extends Entity {
             this.sprintingTicksLeft = 600;
         }
     }
+
 
     /**
      * Updates the player's position and movement based on keyboard input.
@@ -86,26 +90,28 @@ public class Player extends Entity {
         float xa = 0.0F; // X movement input
         float ya = 0.0F; // Z movement input (forward/backward)
 
-        // Apply movement based on input state
-        if (forward) {
-            --ya;
-        }
+        if (!this.inventoryOpen) {
+            // Apply movement based on input state
+            if (forward) {
+                --ya;
+            }
 
-        if (back) {
-            ++ya;
-        }
+            if (back) {
+                ++ya;
+            }
 
-        if (left) {
-            --xa;
-        }
+            if (left) {
+                --xa;
+            }
 
-        if (right) {
-            ++xa;
-        }
+            if (right) {
+                ++xa;
+            }
 
-        // Jump
-        if (jump && this.onGround) {
-            this.yd = 0.5F; // Vertical velocity for jumping
+            // Jump
+            if (jump && this.onGround) {
+                this.yd = 0.5F; // Vertical velocity for jumping
+            }
         }
 
         float speed = this.onGround ? 0.1F : 0.02F;
@@ -276,5 +282,26 @@ public class Player extends Entity {
 
     public Inventory getInventory() {
         return inventory;
+    }
+
+    private boolean inventoryOpen = false;
+
+    public void toggleInventory() {
+        if (!this.inventoryOpen) {
+            this.inventoryOpen = true;
+            this.sprinting = false;
+            this.forward = false;
+            this.back = false;
+            this.left = false;
+            this.right = false;
+            this.jump = false;
+            this.sneak = false;
+        } else {
+            this.inventoryOpen = false;
+        }
+    }
+
+    public boolean isInventoryOpen() {
+        return inventoryOpen;
     }
 }

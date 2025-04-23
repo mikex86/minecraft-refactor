@@ -9,6 +9,8 @@ public class Inventory {
 
     private final Block[] hotbarBlocks = new Block[HOTBAR_SIZE];
 
+    private final Block[] inventoryBlocks = new Block[27];
+
     {
         Block[] defaultBlocks = new Block[]{
                 Blocks.grass,
@@ -22,7 +24,6 @@ public class Inventory {
         };
         System.arraycopy(defaultBlocks, 0, hotbarBlocks, 0, defaultBlocks.length);
     }
-
 
     public Block getHotbarItem(int slotIndex) {
         if (slotIndex < 0 || slotIndex >= HOTBAR_SIZE) {

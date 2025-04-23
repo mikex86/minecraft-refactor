@@ -4,6 +4,8 @@ import com.mojang.minecraft.Minecraft;
 import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.gui.Font;
+import com.mojang.minecraft.gui.screen.GuiScreen;
+import com.mojang.minecraft.gui.screen.InventoryScreen;
 import com.mojang.minecraft.input.GameInputHandler;
 import com.mojang.minecraft.item.Inventory;
 import com.mojang.minecraft.level.Level;
@@ -11,6 +13,7 @@ import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.level.block.EnumFacing;
 import com.mojang.minecraft.particle.ParticleEngine;
+import com.mojang.minecraft.renderer.block.BlockPreviewRenderer;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
@@ -53,6 +56,7 @@ public class GameRenderer implements Disposable {
     // Game components
     private final LevelRenderer levelRenderer;
     private final ParticleEngine particleEngine;
+    private final GameInputHandler gameInputHandler;
     private final Player player;
     private final List<Entity> entities;
 
@@ -60,20 +64,24 @@ public class GameRenderer implements Disposable {
     private int width;
     private int height;
 
+    // The current gui screen (if any)
+    private GuiScreen currentScreen;
+
     /**
      * Creates a new graphics renderer.
      *
-     * @param textureManager The texture manager
-     * @param shaderRegistry The shader registry
-     * @param level          The level
-     * @param levelRenderer  The level renderer
-     * @param particleEngine The particle engine
-     * @param player         The player
-     * @param entities       The entity list
-     * @param width          The initial window width
-     * @param height         The initial window height
+     * @param textureManager   The texture manager
+     * @param shaderRegistry   The shader registry
+     * @param gameInputHandler The game input handler
+     * @param level            The level
+     * @param levelRenderer    The level renderer
+     * @param particleEngine   The particle engine
+     * @param player           The player
+     * @param entities         The entity list
+     * @param width            The initial window width
+     * @param height           The initial window height
      */
-    public GameRenderer(TextureManager textureManager, ShaderRegistry shaderRegistry,
+    public GameRenderer(TextureManager textureManager, ShaderRegistry shaderRegistry, GameInputHandler gameInputHandler,
                         Level level, LevelRenderer levelRenderer,
                         ParticleEngine particleEngine, Player player,
                         List<Entity> entities, int width, int height) {
@@ -82,6 +90,7 @@ public class GameRenderer implements Disposable {
 
         this.textureManager = textureManager;
         this.levelRenderer = levelRenderer;
+        this.gameInputHandler = gameInputHandler;
         this.particleEngine = particleEngine;
         this.player = player;
         this.entities = entities;
@@ -117,7 +126,7 @@ public class GameRenderer implements Disposable {
      * @param width  New window width
      * @param height New window height
      */
-    public void setDimensions(int width, int height) {
+    public void setScreenSize(int width, int height) {
         this.width = width;
         this.height = height;
 
@@ -131,6 +140,11 @@ public class GameRenderer implements Disposable {
         if (this.hotbarMesh != null) {
             this.hotbarMesh.dispose();
             this.hotbarMesh = null;
+        }
+
+        // notify current screen of resize if it exists
+        if (this.currentScreen != null) {
+            this.currentScreen.onResized(width, height);
         }
     }
 
@@ -177,10 +191,9 @@ public class GameRenderer implements Disposable {
      *
      * @param partialTick      Interpolation factor between ticks (0.0-1.0)
      * @param hitResult        The current hit result (block selection)
-     * @param gameInputHandler the game input handler
      * @param fpsString        String containing FPS information to display
      */
-    public void render(float partialTick, HitResult hitResult, GameInputHandler gameInputHandler, String fpsString) {
+    public void render(float partialTick, HitResult hitResult, String fpsString) {
         // Set viewport and clear buffers
         graphics.setViewport(0, 0, this.width, this.height);
         graphics.clear(true, true, 0.5F, 0.8F, 1.0F, 0.0F);
@@ -204,7 +217,7 @@ public class GameRenderer implements Disposable {
 
         // Render HUD elements
         {
-            renderHud(graphics, fpsString, gameInputHandler);
+            drawUI(graphics, fpsString, gameInputHandler);
         }
     }
 
@@ -268,13 +281,13 @@ public class GameRenderer implements Disposable {
     }
 
     /**
-     * Renders the HUD (head-up display) elements.
+     * Draws all UI elements, including the hotbar and crosshair.
      *
      * @param graphics         The graphics api
      * @param fpsString        The FPS string to display
      * @param gameInputHandler The game input handler
      */
-    private void renderHud(GraphicsAPI graphics, String fpsString, GameInputHandler gameInputHandler) {
+    private void drawUI(GraphicsAPI graphics, String fpsString, GameInputHandler gameInputHandler) {
         graphics.setShader(hudShader);
 
         // disable depth test
@@ -295,6 +308,16 @@ public class GameRenderer implements Disposable {
 
         drawDebugText(graphics, fpsString);
 
+        if (player.isInventoryOpen()) {
+            if (currentScreen == null) {
+                openScreen(new InventoryScreen(textureManager, player, player.getInventory()));
+            }
+        } else {
+            if (currentScreen != null) {
+                closeScreen();
+            }
+        }
+
         // Draw hotbar
         drawHotbar(graphics, screenWidth, screenHeight, gameInputHandler.getHotbarSlotIndex());
 
@@ -305,6 +328,30 @@ public class GameRenderer implements Disposable {
 
         // Draw cross-hair
         drawCrosshair(graphics, screenWidth, screenHeight);
+
+        graphics.setShader(hudShader);
+        graphics.updateShaderMatrices();
+
+        // Draw current screen if it exists
+        if (currentScreen != null) {
+            currentScreen.drawScreen(graphics, screenWidth, screenHeight);
+        }
+    }
+
+    public void openScreen(GuiScreen screen) {
+        this.gameInputHandler.setLockMouseReleased(true);
+        this.gameInputHandler.releaseMouse();
+        this.currentScreen = screen;
+        this.currentScreen.onResized(this.width, this.height);
+    }
+
+    public void closeScreen() {
+        if (this.currentScreen != null) {
+            this.currentScreen.dispose();
+            this.currentScreen = null;
+            this.gameInputHandler.setLockMouseReleased(false);
+            this.gameInputHandler.grabMouse();
+        }
     }
 
     private IndexedMesh hotbarMesh;
@@ -352,26 +399,16 @@ public class GameRenderer implements Disposable {
         hotbarMesh.draw(graphics);
 
         // draw hot-bar items
+        graphics.setTexture(textureManager.terrainTexture);
         for (int i = 0; i < Inventory.HOTBAR_SIZE; i++) {
             Block block = player.getInventory().getHotbarItem(i);
             if (block == null) {
                 continue;
             }
             int itemSize = 10;
-            Tesselator t = Tesselator.instance;
             graphics.pushMatrix();
             graphics.translate(centerX - HOTBAR_WIDTH / 2f + (i * HOTBAR_SLOT_WIDTH) + HOTBAR_SLOT_WIDTH / 2f + 1, screenHeight - HOTBAR_SELECTOR_SIZE + itemSize * 2 + 1, 0);
-            graphics.scale(itemSize, itemSize, itemSize);
-            graphics.rotateX(30.0F);
-            graphics.rotateY(45.0F);
-            graphics.scale(-1.0F, -1.0F, 1.0F);
-
-            graphics.updateShaderMatrices();
-
-            graphics.setTexture(textureManager.terrainTexture);
-            t.init();
-            block.render(t, null, 0, 0, 0, EnumFacing.UP);
-            t.flush();
+            BlockPreviewRenderer.renderBlock(graphics, block, itemSize);
             graphics.popMatrix();
         }
 
