@@ -111,7 +111,7 @@ public class Font {
      * @param color           The color of the text (RGB format)
      */
     public void drawShadow(GraphicsAPI graphics, String text, int x, int y, int color) {
-        this.draw(graphics, text, x + 1, y + 1, color, true, false);
+        this.draw(graphics, text, x + 1, y + 1, color, true, true);
         this.draw(graphics, text, x, y, color);
     }
 
@@ -253,5 +253,9 @@ public class Font {
 
     public Texture getFontTexture() {
         return fontTexture;
+    }
+
+    public float getFontHeight() {
+        return CHAR_HEIGHT;
     }
 }

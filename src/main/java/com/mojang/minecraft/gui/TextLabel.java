@@ -12,6 +12,7 @@ public class TextLabel implements Disposable {
     private final boolean shadow;
 
     private String text = "";
+    private int width = -1;
 
     private IndexedMesh[] meshes = {null, null};
 
@@ -47,6 +48,7 @@ public class TextLabel implements Disposable {
     public void setText(String text) {
         if (!this.text.equals(text)) {
             this.text = text;
+            this.width = -1;
             this.meshes[0] = null;
             this.meshes[1] = null;
         }
@@ -64,5 +66,12 @@ public class TextLabel implements Disposable {
         if (this.meshes[1] != null) {
             this.meshes[1].dispose();
         }
+    }
+
+    public int getWidth() {
+        if (width == -1) {
+            width = this.font.width(this.text);
+        }
+        return width;
     }
 }

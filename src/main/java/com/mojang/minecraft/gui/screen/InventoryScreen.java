@@ -1,8 +1,12 @@
 package com.mojang.minecraft.gui.screen;
 
 import com.mojang.minecraft.entity.Player;
-import com.mojang.minecraft.item.Inventory;
-import com.mojang.minecraft.level.block.Block;
+import com.mojang.minecraft.gui.Font;
+import com.mojang.minecraft.gui.TextLabel;
+import com.mojang.minecraft.item.BlockItem;
+import com.mojang.minecraft.item.Item;
+import com.mojang.minecraft.item.ItemStack;
+import com.mojang.minecraft.item.inventory.Inventory;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.block.BlockPreviewRenderer;
@@ -15,16 +19,34 @@ public class InventoryScreen extends GuiScreen {
     private final Player player;
     private final Inventory inventory;
     private final TextureManager textureManager;
+    private final Font font;
 
     private float screenWidth;
     private float screenHeight;
     private float mouseX;
     private float mouseY;
 
-    public InventoryScreen(TextureManager textureManager, Player player, Inventory inventory) {
+    private final TextLabel[][] stackSizeMainInventoryLabels;
+    private final TextLabel[] stackSizeHotbarLabels;
+    private final TextLabel stackSizeSelectedItemLabel;
+
+    public InventoryScreen(TextureManager textureManager, Font font, Player player, Inventory inventory) {
         this.textureManager = textureManager;
+        this.font = font;
         this.player = player;
         this.inventory = inventory;
+        this.stackSizeMainInventoryLabels = new TextLabel[inventory.getMainInventoryRowCount()][inventory.getColumnCount()];
+
+        for (int row = 0; row < inventory.getMainInventoryRowCount(); row++) {
+            for (int column = 0; column < inventory.getColumnCount(); column++) {
+                this.stackSizeMainInventoryLabels[row][column] = new TextLabel(font, 0xFFFFFF, true);
+            }
+        }
+        this.stackSizeHotbarLabels = new TextLabel[inventory.getHotbarSize()];
+        for (int i = 0; i < inventory.getHotbarSize(); i++) {
+            this.stackSizeHotbarLabels[i] = new TextLabel(font, 0xFFFFFF, true);
+        }
+        this.stackSizeSelectedItemLabel = new TextLabel(font, 0xFFFFFF, true);
     }
 
     private IndexedMesh inventoryQuadMesh;
@@ -54,44 +76,110 @@ public class InventoryScreen extends GuiScreen {
             inventoryQuadMesh = t.createIndexedMesh(GraphicsEnums.BufferUsage.STATIC);
         }
 
+        // draw inventory background
         graphics.setTexture(textureManager.inventoryTexture);
         inventoryQuadMesh.draw(graphics);
 
-        // draw hot-bar items
-        graphics.setTexture(textureManager.terrainTexture);
-        for (int i = 0; i < inventory.getHotbarSize(); i++) {
-            Block block = inventory.getHotbarItem(i);
-            if (block == null) {
-                continue;
-            }
-            graphics.pushMatrix();
-            graphics.translate(centerX - INVENTORY_UI_WIDTH / 2f + 16 + ITEM_SLOT_SIZE * i, centerY + INVENTORY_UI_HEIGHT / 2f - ITEM_SLOT_SIZE + ITEM_SLOT_SIZE / 2f + 1, 0);
-            BlockPreviewRenderer.renderBlock(graphics, block, ITEM_SIZE);
-            graphics.popMatrix();
-        }
 
-        // draw main-inventory items
-        for (int row = 0; row < inventory.getMainInventoryRowCount(); row++) {
-            for (int column = 0; column < inventory.getColumnCount(); column++) {
-                Block block = inventory.getInventoryItem(row, column);
-                if (block == null) {
+        // draw items
+        {
+            // set terrain texture
+            graphics.setTexture(textureManager.terrainTexture);
+
+            // draw main-inventory items
+            for (int row = 0; row < inventory.getMainInventoryRowCount(); row++) {
+                for (int column = 0; column < inventory.getColumnCount(); column++) {
+                    ItemStack itemStack = inventory.getInventoryItem(row, column);
+                    if (itemStack == null) {
+                        continue;
+                    }
+                    Item item = itemStack.getItem();
+                    if (item instanceof BlockItem) {
+                        BlockItem blockItem = (BlockItem) item;
+                        graphics.pushMatrix();
+                        graphics.translate(centerX - INVENTORY_UI_WIDTH / 2f + 16 + ITEM_SLOT_SIZE * column, centerY + 7 + ITEM_SLOT_SIZE * row + ITEM_SLOT_SIZE / 2f + 1, 0);
+                        BlockPreviewRenderer.renderBlock(graphics, blockItem.getBlock(), ITEM_SIZE);
+                        graphics.popMatrix();
+                    }
+                }
+            }
+
+            // draw hot-bar items
+            for (int i = 0; i < inventory.getHotbarSize(); i++) {
+                ItemStack itemStack = inventory.getHotbarItem(i);
+                if (itemStack == null) {
                     continue;
                 }
-                graphics.pushMatrix();
-                graphics.translate(centerX - INVENTORY_UI_WIDTH / 2f + 16 + ITEM_SLOT_SIZE * column, centerY + 7 + ITEM_SLOT_SIZE * row + ITEM_SLOT_SIZE / 2f + 1, 0);
-                BlockPreviewRenderer.renderBlock(graphics, block, ITEM_SIZE);
-                graphics.popMatrix();
+                Item item = itemStack.getItem();
+                if (item instanceof BlockItem) {
+                    BlockItem blockItem = (BlockItem) item;
+                    graphics.pushMatrix();
+                    graphics.translate(centerX - INVENTORY_UI_WIDTH / 2f + 16 + ITEM_SLOT_SIZE * i, centerY + INVENTORY_UI_HEIGHT / 2f - ITEM_SLOT_SIZE + ITEM_SLOT_SIZE / 2f + 1, 0);
+                    BlockPreviewRenderer.renderBlock(graphics, blockItem.getBlock(), ITEM_SIZE);
+                    graphics.popMatrix();
+                }
             }
         }
+
+        // draw stack size labels
+        {
+            // draw main inventory stack size labels
+            for (int row = 0; row < inventory.getMainInventoryRowCount(); row++) {
+                for (int column = 0; column < inventory.getColumnCount(); column++) {
+                    ItemStack itemStack = inventory.getInventoryItem(row, column);
+                    if (itemStack == null) {
+                        continue;
+                    }
+                    String stackSizeText = String.valueOf(itemStack.getCount());
+                    int count = itemStack.getCount();
+                    if (count > 1) {
+                        this.stackSizeMainInventoryLabels[row][column].setText(stackSizeText);
+                        this.stackSizeMainInventoryLabels[row][column].render(graphics, centerX - INVENTORY_UI_WIDTH / 2f + ITEM_SLOT_SIZE * column + 7 + ITEM_SLOT_SIZE - this.stackSizeMainInventoryLabels[row][column].getWidth(), centerY + 10 + ITEM_SLOT_SIZE * row);
+                    }
+                }
+            }
+
+            // draw hotbar stack size labels
+            for (int i = 0; i < inventory.getHotbarSize(); i++) {
+                ItemStack itemStack = inventory.getHotbarItem(i);
+                if (itemStack == null) {
+                    continue;
+                }
+                String stackSizeText = String.valueOf(itemStack.getCount());
+                int count = itemStack.getCount();
+                if (count > 1) {
+                    this.stackSizeHotbarLabels[i].setText(stackSizeText);
+                    this.stackSizeHotbarLabels[i].render(graphics, centerX - INVENTORY_UI_WIDTH / 2f + ITEM_SLOT_SIZE * i + 7 + ITEM_SLOT_SIZE - this.stackSizeHotbarLabels[i].getWidth(), centerY + INVENTORY_UI_HEIGHT / 2f - this.font.getFontHeight() - 7);
+                }
+            }
+        }
+
 
         // draw selected item at cursor position
         {
-            Block selectedItem = inventory.getSelectedItem();
+            // set terrain texture again after drawing labels
+            graphics.setTexture(textureManager.terrainTexture);
+
+            ItemStack selectedItem = inventory.getSelectedItem();
             if (selectedItem != null) {
-                graphics.pushMatrix();
-                graphics.translate(mouseX, mouseY + ITEM_SLOT_SIZE / 2f, 0);
-                BlockPreviewRenderer.renderBlock(graphics, selectedItem, ITEM_SIZE);
-                graphics.popMatrix();
+                Item item = selectedItem.getItem();
+                if (item instanceof BlockItem) {
+                    BlockItem blockItem = (BlockItem) item;
+                    graphics.pushMatrix();
+                    graphics.translate(mouseX, mouseY + ITEM_SLOT_SIZE / 2f, 0);
+                    BlockPreviewRenderer.renderBlock(graphics, blockItem.getBlock(), ITEM_SIZE);
+                    graphics.popMatrix();
+                }
+            }
+
+            // draw selected item stack size label
+            if (selectedItem != null) {
+                String stackSizeText = String.valueOf(selectedItem.getCount());
+                int count = selectedItem.getCount();
+                if (count > 1) {
+                    this.stackSizeSelectedItemLabel.setText(stackSizeText);
+                    this.stackSizeSelectedItemLabel.render(graphics, mouseX + 9 - this.stackSizeSelectedItemLabel.getWidth(), mouseY + 2);
+                }
             }
         }
 

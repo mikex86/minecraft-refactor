@@ -9,10 +9,11 @@ import com.mojang.minecraft.gui.scaling.ScaledResolution;
 import com.mojang.minecraft.gui.screen.GuiScreen;
 import com.mojang.minecraft.gui.screen.InventoryScreen;
 import com.mojang.minecraft.input.GameInputHandler;
-import com.mojang.minecraft.item.Inventory;
+import com.mojang.minecraft.item.BlockItem;
+import com.mojang.minecraft.item.Item;
+import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
-import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.renderer.block.BlockPreviewRenderer;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
@@ -321,7 +322,7 @@ public class GameRenderer implements Disposable {
 
         if (player.isInventoryOpen()) {
             if (currentScreen == null) {
-                openScreen(new InventoryScreen(textureManager, player, player.getInventory()));
+                openScreen(new InventoryScreen(textureManager, font, player, player.getInventory()));
             }
         } else {
             if (currentScreen != null) {
@@ -376,6 +377,8 @@ public class GameRenderer implements Disposable {
     private static final int HOTBAR_SLOT_WIDTH = 20;
     private static final int ITEM_SIZE = 10;
 
+    private TextLabel[] stackSizeHotbarLabels;
+
     private void drawHotbar(GraphicsAPI graphics, float screenWidth, float screenHeight, int hotbarSlotIndex) {
         float centerX = screenWidth / 2f;
 
@@ -399,10 +402,10 @@ public class GameRenderer implements Disposable {
             t.color(1, 1, 1);
 
             // draw selector quad
-            t.vertexUV((float) HOTBAR_HEIGHT, 0, 0.0F, HOTBAR_SELECTOR_SIZE / 256f, HOTBAR_HEIGHT / 256f);
+            t.vertexUV((float) HOTBAR_SELECTOR_SIZE, 0, 0.0F, HOTBAR_SELECTOR_SIZE / 256f, HOTBAR_HEIGHT / 256f);
             t.vertexUV(0, 0, 0.0F, 0.0F, HOTBAR_HEIGHT / 256f);
-            t.vertexUV(0, (float) HOTBAR_SELECTOR_SIZE, 0.0F, 0.0F, (HOTBAR_HEIGHT + HOTBAR_SELECTOR_SIZE) / 256f);
-            t.vertexUV((float) HOTBAR_HEIGHT, (float) HOTBAR_SELECTOR_SIZE, 0.0F, HOTBAR_SELECTOR_SIZE / 256f, (HOTBAR_HEIGHT + HOTBAR_SELECTOR_SIZE) / 256f);
+            t.vertexUV(0, HOTBAR_SELECTOR_SIZE, 0.0F, 0.0F, (HOTBAR_HEIGHT + HOTBAR_SELECTOR_SIZE) / 256f);
+            t.vertexUV((float) HOTBAR_SELECTOR_SIZE, HOTBAR_SELECTOR_SIZE, 0.0F, HOTBAR_SELECTOR_SIZE / 256f, (HOTBAR_HEIGHT + HOTBAR_SELECTOR_SIZE) / 256f);
 
             hotbarSelectorMesh = t.createIndexedMesh(GraphicsEnums.BufferUsage.STATIC);
         }
@@ -416,23 +419,49 @@ public class GameRenderer implements Disposable {
         graphics.setTexture(textureManager.terrainTexture);
         int hotBarSize = player.getInventory().getHotbarSize();
         for (int i = 0; i < hotBarSize; i++) {
-            Block block = player.getInventory().getHotbarItem(i);
-            if (block == null) {
+            ItemStack itemStack = player.getInventory().getHotbarItem(i);
+            if (itemStack == null) {
                 continue;
             }
+            Item item = itemStack.getItem();
+            if (item instanceof BlockItem) {
+                BlockItem blockItem = (BlockItem)item;
+                graphics.pushMatrix();
+                graphics.translate(centerX - HOTBAR_WIDTH / 2f + (i * HOTBAR_SLOT_WIDTH) + HOTBAR_SLOT_WIDTH / 2f + 1, screenHeight - HOTBAR_SELECTOR_SIZE + ITEM_SIZE * 2 + 1, 0);
+                BlockPreviewRenderer.renderBlock(graphics, blockItem.getBlock(), ITEM_SIZE);
+                graphics.popMatrix();
+            }
+        }
+
+        // draw selector (selector is drawn before stack sizes)
+        {
             graphics.pushMatrix();
-            graphics.translate(centerX - HOTBAR_WIDTH / 2f + (i * HOTBAR_SLOT_WIDTH) + HOTBAR_SLOT_WIDTH / 2f + 1, screenHeight - HOTBAR_SELECTOR_SIZE + ITEM_SIZE * 2 + 1, 0);
-            BlockPreviewRenderer.renderBlock(graphics, block, ITEM_SIZE);
+            graphics.translate(centerX - HOTBAR_WIDTH / 2f + hotbarSlotIndex * HOTBAR_SLOT_WIDTH - 1, screenHeight - HOTBAR_SELECTOR_SIZE + 1, 0.0F);
+            graphics.updateShaderMatrices();
+            graphics.setTexture(textureManager.guiTexture);
+            hotbarSelectorMesh.draw(graphics);
             graphics.popMatrix();
         }
 
-        // draw selector
-        graphics.pushMatrix();
-        graphics.translate(centerX - HOTBAR_WIDTH / 2f + hotbarSlotIndex * HOTBAR_SLOT_WIDTH, screenHeight - HOTBAR_SELECTOR_SIZE + 1, 0.0F);
-        graphics.updateShaderMatrices();
-        graphics.setTexture(textureManager.guiTexture);
-        hotbarSelectorMesh.draw(graphics);
-        graphics.popMatrix();
+        // draw stack sizes
+        {
+            if (stackSizeHotbarLabels == null) {
+                stackSizeHotbarLabels = new TextLabel[player.getInventory().getHotbarSize()];
+                for (int i = 0; i < stackSizeHotbarLabels.length; i++) {
+                    stackSizeHotbarLabels[i] = new TextLabel(font, 0xFFFFFF, true);
+                }
+            }
+            for (int i = 0; i < stackSizeHotbarLabels.length; i++) {
+                ItemStack itemStack = player.getInventory().getHotbarItem(i);
+                if (itemStack == null) {
+                    continue;
+                }
+                if (itemStack.getCount() > 0) {
+                    stackSizeHotbarLabels[i].setText(String.valueOf(itemStack.getCount()));
+                    stackSizeHotbarLabels[i].render(graphics, centerX - HOTBAR_WIDTH / 2f + HOTBAR_SLOT_WIDTH + HOTBAR_SLOT_WIDTH * i - stackSizeHotbarLabels[i].getWidth(), screenHeight - font.getFontHeight() - 2);
+                }
+            }
+        }
     }
 
     private void drawDebugText(GraphicsAPI graphics, String fpsString) {
@@ -444,7 +473,6 @@ public class GameRenderer implements Disposable {
         this.fpsStringLabel.render(graphics, 2, 12);
         this.positionStringLabel.setText("x: " + player.x + ", y: " + player.y + ", z: " + player.z);
         this.positionStringLabel.render(graphics, 2, 22);
-
     }
 
     private IndexedMesh crosshairMesh;

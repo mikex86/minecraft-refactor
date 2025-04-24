@@ -1,6 +1,6 @@
 package com.mojang.minecraft.entity;
 
-import com.mojang.minecraft.item.Inventory;
+import com.mojang.minecraft.item.inventory.Inventory;
 import com.mojang.minecraft.level.Chunk;
 import com.mojang.minecraft.level.Level;
 

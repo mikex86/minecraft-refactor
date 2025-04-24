@@ -4,6 +4,9 @@ import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.gui.scaling.ScaledResolution;
 import com.mojang.minecraft.gui.screen.GuiScreen;
+import com.mojang.minecraft.item.BlockItem;
+import com.mojang.minecraft.item.Item;
+import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.level.block.Blocks;
@@ -264,9 +267,15 @@ public class GameInputHandler {
             // Check if we can place a block here
             BlockState blockState = this.level.getBlockState(x, y, z);
             AABB aabb = (blockState == null ? Blocks.rock : blockState.block).getAABB(x, y, z);
-            Block block = this.player.getInventory().getHotbarItem(this.hotbarSlotIndex);
-            if (block != null && this.isFree(aabb)) {
-                this.level.setBlockState(x, y, z, block.getBlockState(hitResult.facingDirection));
+            ItemStack itemStack = this.player.getInventory().getHotbarItem(this.hotbarSlotIndex);
+            if (itemStack != null) {
+                Item item = itemStack.getItem();
+                if (item instanceof BlockItem) {
+                    BlockItem blockItem = (BlockItem)item;
+                    if (this.isFree(aabb)) {
+                        this.level.setBlockState(x, y, z, blockItem.getBlock().getBlockState(hitResult.facingDirection));
+                    }
+                }
             }
         }
     }

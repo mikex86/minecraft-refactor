@@ -1,5 +1,7 @@
-package com.mojang.minecraft.item;
+package com.mojang.minecraft.item.inventory;
 
+import com.mojang.minecraft.item.BlockItem;
+import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.level.block.Blocks;
 
@@ -7,11 +9,11 @@ public class Inventory {
 
     private static final int HOTBAR_SIZE = 9;
 
-    private final Block[][] inventoryBlocks = new Block[4][9];
-    private Block selectedItem = null;
+    private final ItemStack[][] inventoryBlocks = new ItemStack[4][9];
+    private ItemStack selectedItem = null;
 
     {
-        Block[] hotbarBlocks = inventoryBlocks[3];
+        ItemStack[] hotbarBlocks = inventoryBlocks[3];
         Block[] defaultBlocks = new Block[]{
                 Blocks.grass,
                 Blocks.dirt,
@@ -22,22 +24,24 @@ public class Inventory {
                 Blocks.wood,
                 Blocks.leaves,
         };
-        System.arraycopy(defaultBlocks, 0, hotbarBlocks, 0, defaultBlocks.length);
+        for (int i = 0; i < defaultBlocks.length; i++) {
+            hotbarBlocks[i] = new ItemStack(new BlockItem(defaultBlocks[i]), 62);
+        }
 
-        inventoryBlocks[0][0] = Blocks.grass;
-        inventoryBlocks[1][1] = Blocks.stoneBrick;
-        inventoryBlocks[2][2] = Blocks.glass;
+        inventoryBlocks[0][0] = new ItemStack(new BlockItem(Blocks.grass), 4);
+        inventoryBlocks[1][1] = new ItemStack(new BlockItem(Blocks.stoneBrick), 2);
+        inventoryBlocks[2][2] = new ItemStack(new BlockItem(Blocks.glass), 2);
     }
 
-    public Block getHotbarItem(int slotIndex) {
+    public ItemStack getHotbarItem(int slotIndex) {
         if (slotIndex < 0 || slotIndex >= HOTBAR_SIZE) {
             throw new IndexOutOfBoundsException("Hotbar index " + slotIndex + " out of bounds");
         }
-        Block[] hotbarBlocks = inventoryBlocks[3];
+        ItemStack[] hotbarBlocks = inventoryBlocks[3];
         return hotbarBlocks[slotIndex];
     }
 
-    public Block getInventoryItem(int row, int column) {
+    public ItemStack getInventoryItem(int row, int column) {
         if (row < 0 || row >= inventoryBlocks.length || column < 0 || column >= inventoryBlocks[row].length) {
             throw new IndexOutOfBoundsException("Inventory index [" + row + "][" + column + "] out of bounds");
         }
@@ -57,12 +61,12 @@ public class Inventory {
     }
 
     public void selectItem(int row, int column) {
-        Block block = getInventoryItem(row, column);
+        ItemStack block = getInventoryItem(row, column);
         inventoryBlocks[row][column] = selectedItem;
         selectedItem = block;
     }
 
-    public Block getSelectedItem() {
+    public ItemStack getSelectedItem() {
         return selectedItem;
     }
 }
