@@ -1,6 +1,5 @@
 package com.mojang.minecraft.input;
 
-import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.gui.scaling.ScaledResolution;
 import com.mojang.minecraft.gui.screen.GuiScreen;
@@ -12,11 +11,7 @@ import com.mojang.minecraft.level.block.Blocks;
 import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.phys.AABB;
-import com.mojang.minecraft.util.math.CollisionUtils;
 import com.mojang.minecraft.world.HitResult;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Handles high-level game input processing and mapping to game actions.
@@ -266,7 +261,7 @@ public class GameInputHandler {
             if (itemStack != null) {
                 Item item = itemStack.getItem();
                 if (item instanceof BlockItem) {
-                    BlockItem blockItem = (BlockItem)item;
+                    BlockItem blockItem = (BlockItem) item;
                     if (this.level.isFree(aabb)) {
                         this.level.setBlockState(x, y, z, blockItem.getBlock().getBlockState(hitResult.facingDirection));
                     }
@@ -303,6 +298,15 @@ public class GameInputHandler {
             this.mouseGrabbed = false;
             inputHandler.setCursorCaptured(false);
         }
+    }
+
+    /**
+     * Sets the mouse position.
+     * @param x the x coordinate of the mouse
+     * @param y the y coordinate of the mouse
+     */
+    public void setMousePosition(float x, float y) {
+        this.inputHandler.setMousePosition(x, y);
     }
 
     public void setLockMouseReleased(boolean lockMouseReleased) {

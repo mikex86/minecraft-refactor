@@ -1,6 +1,5 @@
 package com.mojang.minecraft.renderer.shader.impl;
 
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.shader.Shader;
 
 import java.io.IOException;
@@ -9,7 +8,7 @@ import java.io.IOException;
  * Shader implementation for particle rendering.
  * Replaces fixed function particle rendering with a programmable pipeline.
  */
-public class ParticleShader extends AbstractFogShader {
+public class ParticleShader extends Shader implements FogShader {
 
     /**
      * Creates a new particle shader.

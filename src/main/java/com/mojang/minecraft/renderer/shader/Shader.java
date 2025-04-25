@@ -1,6 +1,5 @@
 package com.mojang.minecraft.renderer.shader;
 
-import com.mojang.minecraft.renderer.Disposable;
 import org.lwjgl.BufferUtils;
 
 import java.io.BufferedReader;
@@ -17,7 +16,7 @@ import static org.lwjgl.opengl.GL20.*;
  * Represents an OpenGL shader program.
  * Handles loading, compiling, and linking shader programs.
  */
-public class Shader implements Disposable {
+public class Shader implements IShader {
     private final int programId;
     private final int vertexShaderId;
     private final int fragmentShaderId;
@@ -88,16 +87,12 @@ public class Shader implements Disposable {
         }
     }
     
-    /**
-     * Uses this shader program.
-     */
+    @Override
     public void use() {
         glUseProgram(programId);
     }
     
-    /**
-     * Stops using this shader program.
-     */
+    @Override
     public void detach() {
         glUseProgram(0);
     }
@@ -118,88 +113,42 @@ public class Shader implements Disposable {
         return location;
     }
     
-    /**
-     * Sets a boolean uniform.
-     * 
-     * @param name The name of the uniform
-     * @param value The value to set
-     */
+    @Override
     public void setUniform(String name, boolean value) {
         glUniform1i(getUniformLocation(name), value ? 1 : 0);
     }
     
-    /**
-     * Sets an integer uniform.
-     * 
-     * @param name The name of the uniform
-     * @param value The value to set
-     */
+    @Override
     public void setUniform(String name, int value) {
         glUniform1i(getUniformLocation(name), value);
     }
     
-    /**
-     * Sets a float uniform.
-     * 
-     * @param name The name of the uniform
-     * @param value The value to set
-     */
+    @Override
     public void setUniform(String name, float value) {
         glUniform1f(getUniformLocation(name), value);
     }
     
-    /**
-     * Sets a vec2 uniform.
-     * 
-     * @param name The name of the uniform
-     * @param x The x value
-     * @param y The y value
-     */
+    @Override
     public void setUniform(String name, float x, float y) {
         glUniform2f(getUniformLocation(name), x, y);
     }
     
-    /**
-     * Sets a vec3 uniform.
-     * 
-     * @param name The name of the uniform
-     * @param x The x value
-     * @param y The y value
-     * @param z The z value
-     */
+    @Override
     public void setUniform(String name, float x, float y, float z) {
         glUniform3f(getUniformLocation(name), x, y, z);
     }
     
-    /**
-     * Sets a vec4 uniform.
-     * 
-     * @param name The name of the uniform
-     * @param x The x value
-     * @param y The y value
-     * @param z The z value
-     * @param w The w value
-     */
+    @Override
     public void setUniform(String name, float x, float y, float z, float w) {
         glUniform4f(getUniformLocation(name), x, y, z, w);
     }
     
-    /**
-     * Sets a vec4 uniform from a float buffer.
-     * 
-     * @param name The name of the uniform
-     * @param buffer The buffer containing the values
-     */
+    @Override
     public void setUniform4fv(String name, FloatBuffer buffer) {
         glUniform4fv(getUniformLocation(name), buffer);
     }
     
-    /**
-     * Sets a matrix4 uniform.
-     * 
-     * @param name The name of the uniform
-     * @param matrix The matrix
-     */
+    @Override
     public void setUniformMatrix4fv(String name, FloatBuffer matrix) {
         glUniformMatrix4fv(getUniformLocation(name), false, matrix);
     }

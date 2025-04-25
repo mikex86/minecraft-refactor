@@ -12,6 +12,12 @@ uniform float fogStart;
 uniform float fogEnd;
 uniform vec4 fogColor;
 
+// Directional lighting uniforms
+uniform vec3 lightDirection;  // normalized light direction in eye space
+uniform vec3 lightColor;      // directional light color/intensity
+uniform vec3 ambientColor;    // ambient light color
+uniform mat3 normalMatrix;    // normal matrix: transpose(inverse(mat3(modelViewMatrix)))
+
 // Vertex attributes (replace gl_Vertex, gl_Color, etc.)
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 color;
@@ -54,4 +60,4 @@ void main() {
         // Clamp fog factor between 0 and 1
         fogFactor = clamp(fogFactor, 0.0, 1.0);
     }
-} 
+}

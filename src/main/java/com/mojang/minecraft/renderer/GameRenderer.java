@@ -340,8 +340,11 @@ public class GameRenderer implements Disposable {
     }
 
     public void openScreen(GuiScreen screen) {
-        this.gameInputHandler.setLockMouseReleased(true);
-        this.gameInputHandler.releaseMouse();
+        if (this.currentScreen == null) {
+            this.gameInputHandler.setLockMouseReleased(true);
+            this.gameInputHandler.releaseMouse();
+            this.gameInputHandler.setMousePosition(this.width / 2f, this.height / 2f);
+        }
         this.gameInputHandler.setCurrentScreen(screen);
         this.currentScreen = screen;
         this.currentScreen.onResized(this.width, this.height);

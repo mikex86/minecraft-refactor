@@ -13,8 +13,10 @@ import com.mojang.minecraft.renderer.block.BlockPreviewRenderer;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
+import com.mojang.minecraft.renderer.shader.ShaderRegistry;
+import com.mojang.minecraft.renderer.shader.impl.EntityShader;
 
-import static com.mojang.minecraft.entity.EntityPlayer.*;
+import static com.mojang.minecraft.entity.EntityPlayer.PLAYER_MODEL;
 
 public class InventoryScreen extends GuiScreen {
 
@@ -25,12 +27,14 @@ public class InventoryScreen extends GuiScreen {
 
     private float screenWidth;
     private float screenHeight;
-    private float mouseX;
-    private float mouseY;
+    private float mouseX = -1;
+    private float mouseY = -1;
 
     private final TextLabel[][] stackSizeMainInventoryLabels;
     private final TextLabel[] stackSizeHotbarLabels;
     private final TextLabel stackSizeSelectedItemLabel;
+
+    private static final EntityShader ENTITY_SHADER = ShaderRegistry.getInstance().getEntityShader();
 
     public InventoryScreen(TextureManager textureManager, Font font, EntityPlayer player, Inventory inventory) {
         this.textureManager = textureManager;
@@ -67,6 +71,13 @@ public class InventoryScreen extends GuiScreen {
         float centerX = screenWidth / 2f;
         float centerY = screenHeight / 2f;
 
+        // if we have not received any mouse input yet, assume it is center of screen
+        // this is true because every time we un-grab the mouse, we reset the mouse position to center
+        if (mouseX == -1 || mouseY == -1) {
+            mouseX = centerX;
+            mouseY = centerY;
+        }
+
         if (inventoryQuadMesh == null) {
             Tesselator t = Tesselator.instance;
             t.init();
@@ -84,7 +95,6 @@ public class InventoryScreen extends GuiScreen {
         // draw inventory background
         graphics.setTexture(textureManager.inventoryTexture);
         inventoryQuadMesh.draw(graphics);
-
 
         // draw items
         {
@@ -159,10 +169,45 @@ public class InventoryScreen extends GuiScreen {
             }
         }
 
+        // draw player model
+        {
+            graphics.setTexture(textureManager.charTexture);
+            graphics.pushMatrix();
+
+            // Apply scaling and orientation
+            graphics.translate(centerX - INVENTORY_UI_WIDTH / 2f + 42 + 10, centerY - INVENTORY_UI_HEIGHT / 2f + 24 + 4, 0);
+            graphics.scale(1.85f, 1.85f, 1.85f);
+
+            // calculate angle to look at mouse position
+            float mouseYaw;
+            float mousePitch;
+            {
+                float eyePosX = centerX - INVENTORY_UI_WIDTH / 2f + 42 + 10;
+                float eyePosY = centerY - INVENTORY_UI_HEIGHT / 2f + 24 + 4;
+                float dx = mouseX - eyePosX;
+                float dy = mouseY - eyePosY;
+
+                mouseYaw = (float) Math.atan(dx / 40.0F) * 20f;
+                mousePitch = (float) Math.atan(dy / 40.0F) * 20f;
+
+                this.player.yaw = this.player.prevYaw = mouseYaw * 2 - 180;
+                this.player.bodyYaw = this.player.prevBodyYaw = mouseYaw - 180;
+                this.player.pitch = this.player.prevPitch = mousePitch;
+            }
+
+            graphics.rotateX(-mousePitch);
+
+            // Render the model
+            graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS);
+            PLAYER_MODEL.render(graphics, this.player, partialTicks);
+            graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
+
+            graphics.popMatrix();
+        }
 
         // draw selected item at cursor position
         {
-            // set terrain texture again after drawing labels
+            // set terrain texture again after drawing labels & the player
             graphics.setTexture(textureManager.terrainTexture);
 
             ItemStack selectedItem = inventory.getSelectedItem();
@@ -186,38 +231,6 @@ public class InventoryScreen extends GuiScreen {
                     this.stackSizeSelectedItemLabel.render(graphics, mouseX + 9 - this.stackSizeSelectedItemLabel.getWidth(), mouseY + 2);
                 }
             }
-        }
-
-        // draw player model
-        {
-            graphics.setTexture(textureManager.charTexture);
-            graphics.pushMatrix();
-
-            // Apply scaling and orientation
-            graphics.translate(centerX - INVENTORY_UI_WIDTH / 2f + 42 + 10, centerY - INVENTORY_UI_HEIGHT / 2f + 24 + 4, 0);
-            graphics.scale(1.85f, 1.85f, 1.85f);
-
-            // calculate angle to look at mouse position
-            {
-                float eyePosX = centerX - INVENTORY_UI_WIDTH / 2f + 42 + 10;
-                float eyePosY = centerY - INVENTORY_UI_HEIGHT / 2f + 24 + 4;
-                float dx = eyePosX - mouseX;
-                float dy = eyePosY - mouseY;
-
-                float mouseYaw = 180 - dx * 0.1f;
-                float mousePitch = -dy * 0.1f;
-
-                this.player.yaw = this.player.prevYaw = mouseYaw;
-                this.player.pitch = this.player.prevPitch = mousePitch;
-            }
-
-            this.player.bodyYaw = this.player.prevBodyYaw = this.player.yaw;
-
-            // Render the model
-            graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS);
-            PLAYER_MODEL.render(graphics, this.player, partialTicks);
-
-            graphics.popMatrix();
         }
 
         this.screenWidth = screenWidth;
