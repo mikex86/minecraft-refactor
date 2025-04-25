@@ -5,10 +5,10 @@ import com.mojang.minecraft.renderer.shape.Cube;
 import com.mojang.minecraft.renderer.model.Model;
 
 /**
- * Represents the 3D model of a zombie character.
+ * Represents the 3D model of a player model.
  * Consists of various cubes representing body parts that can be animated.
  */
-public class ZombieModel implements Model {
+public class PlayerModel implements Model {
     // Animation constants
     private static final float HEAD_SWING_FREQUENCY = 0.83F;
     private static final float HEAD_BOB_FREQUENCY = 1.0F;
@@ -30,7 +30,7 @@ public class ZombieModel implements Model {
     /**
      * Creates a new zombie model with properly positioned body parts.
      */
-    public ZombieModel() {
+    public PlayerModel() {
         // Create the head (8x8x8 cube)
         this.head.addBox(-4.0F, -8.0F, -4.0F, 8, 8, 8);
 

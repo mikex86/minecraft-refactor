@@ -233,7 +233,7 @@ public class GameRenderer implements Disposable {
         }
     }
 
-    private void render(float partialTick) {
+    private void render(float partialTicks) {
         Frustum frustum = Frustum.getFrustum(graphics);
 
         // generate chunks around the player
@@ -252,7 +252,7 @@ public class GameRenderer implements Disposable {
             graphics.updateShaderMatrices();
             setupFog(worldShader);
 
-            this.levelRenderer.render();
+            this.levelRenderer.render(partialTicks);
         }
 
         // render entities
@@ -262,8 +262,8 @@ public class GameRenderer implements Disposable {
             setupFog(entityShader);
 
             for (Entity entity : this.entities) {
-                if (frustum.isVisible(entity.bb)) {
-                    entity.render(this.graphics, partialTick);
+                if (frustum.isVisible(entity.boundingBox)) {
+                    entity.render(this.graphics, this.textureManager, partialTicks);
                 }
             }
         }
@@ -273,7 +273,7 @@ public class GameRenderer implements Disposable {
             graphics.setShader(particleShader);
             graphics.updateShaderMatrices();
             setupFog(particleShader);
-            this.particleEngine.render(this.graphics, this.player, partialTick);
+            this.particleEngine.render(this.graphics, this.player, partialTicks);
         }
     }
 

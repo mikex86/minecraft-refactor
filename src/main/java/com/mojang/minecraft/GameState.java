@@ -1,6 +1,5 @@
 package com.mojang.minecraft;
 
-import com.mojang.minecraft.character.Zombie;
 import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.level.Level;

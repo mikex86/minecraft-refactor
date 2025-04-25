@@ -4,7 +4,6 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.level.block.Blocks;
 import com.mojang.minecraft.level.block.state.BlockState;
-import jdk.internal.vm.annotation.ForceInline;
 
 public class GlassBlock extends Block {
 
@@ -13,19 +12,16 @@ public class GlassBlock extends Block {
     }
 
     @Override
-    @ForceInline
     public boolean isTransparent() {
         return true;
     }
 
     @Override
-    @ForceInline
     public boolean isLightBlocker() {
         return false;
     }
 
     @Override
-    @ForceInline
     protected boolean shouldRenderFace(Level level, int x, int y, int z) {
         if (level == null) {
             return true;

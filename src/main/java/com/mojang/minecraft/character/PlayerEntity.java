@@ -4,15 +4,14 @@ import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
-import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.model.Model;
 import com.mojang.minecraft.renderer.model.ModelRegistry;
-import com.mojang.minecraft.renderer.model.impl.ZombieModel;
+import com.mojang.minecraft.renderer.model.impl.PlayerModel;
 
 /**
- * Represents a zombie entity in the game world.
+ * Represents a player entity in the game world.
  */
-public class Zombie extends Entity {
+public class PlayerEntity extends Entity {
 
     // Movement and physics constants
     private static final float GRAVITY = 0.08F;
@@ -39,28 +38,25 @@ public class Zombie extends Entity {
     public float timeOffs;     // Time offset for animation
     public float speed;        // Movement speed
     public float rotA;         // Rotation acceleration/velocity
-    private final Texture texture;
 
-    private static final Model ZOMBIE_MODEL = ModelRegistry.getInstance().getModel("zombie", ZombieModel::new);
+    private static final Model PLAYER_MODEL = ModelRegistry.getInstance().getModel("player", PlayerModel::new);
 
 
     /**
      * Creates a new zombie entity at the specified position.
      *
-     * @param level    The game level
-     * @param textureManager The texture manager
-     * @param x        X coordinate
-     * @param y        Y coordinate
-     * @param z        Z coordinate
+     * @param level The game level
+     * @param x     X coordinate
+     * @param y     Y coordinate
+     * @param z     Z coordinate
      */
-    public Zombie(Level level, TextureManager textureManager, float x, float y, float z) {
+    public PlayerEntity(Level level, float x, float y, float z) {
         super(level);
         this.rotA = (float) (Math.random() + 1.0F) * 0.01F;
         this.setPos(x, y, z);
         this.timeOffs = (float) Math.random() * 1239813.0F;
         this.rot = (float) (Math.random() * Math.PI * 2.0F);
         this.speed = 1.0F;
-        this.texture = textureManager.charTexture;
     }
 
     /**
@@ -117,16 +113,13 @@ public class Zombie extends Entity {
      * @param partialTick Partial tick time for smooth animation
      */
     @Override
-    public void render(GraphicsAPI graphics, float partialTick) {
-        graphics.setTexture(texture);
+    public void render(GraphicsAPI graphics, TextureManager textureManager, float partialTick) {
+        graphics.setTexture(textureManager.charTexture);
 
         graphics.pushMatrix();
-        
+
         // Calculate animation time
         double time = (double) System.nanoTime() / SECONDS_TO_NANOS * ANIMATION_SPEED * this.speed + this.timeOffs;
-
-        // Calculate vertical bobbing
-        float yOffset = (float) (-Math.abs(Math.sin(time * 0.6662)) * 5.0F + MODEL_Y_OFFSET);
 
         // Position at interpolated location
         graphics.translate(
@@ -138,13 +131,13 @@ public class Zombie extends Entity {
         // Apply scaling and orientation
         graphics.scale(1.0F, -1.0F, 1.0F);  // Flip model vertically
         graphics.scale(MODEL_SIZE, MODEL_SIZE, MODEL_SIZE);
-        graphics.translate(0.0F, yOffset, 0.0F);
+        graphics.translate(0.0F, MODEL_Y_OFFSET, 0.0F);
 
         // Rotate to face direction
         graphics.rotateY(this.rot * DEGREES_TO_RADIANS + 180.0F);
 
         // Render the model
-        ZOMBIE_MODEL.render(graphics, (float) time);
+        PLAYER_MODEL.render(graphics, (float) time);
 
         graphics.popMatrix();
     }

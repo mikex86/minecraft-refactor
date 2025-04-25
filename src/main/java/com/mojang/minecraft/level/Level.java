@@ -1,5 +1,6 @@
 package com.mojang.minecraft.level;
 
+import com.mojang.minecraft.character.PlayerEntity;
 import com.mojang.minecraft.crash.CrashReporter;
 import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.level.block.state.BlockState;
@@ -10,12 +11,10 @@ import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.util.LongHashMap;
 import com.mojang.minecraft.util.math.RayCaster;
 import com.mojang.minecraft.world.HitResult;
-import jdk.internal.vm.annotation.ForceInline;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 import static com.mojang.minecraft.util.math.MathUtils.ceilFloor;
 
@@ -27,7 +26,6 @@ public class Level {
     private static final String LEVEL_FILE_NAME = "world";
 
     private final List<LevelListener> levelListeners = new ArrayList<>();
-    private final Random random = new Random();
 
     private final LongHashMap<Chunk> chunkMap = new LongHashMap<>();
     private final List<Chunk> fullyLoadedChunks = new ArrayList<>();
@@ -36,12 +34,15 @@ public class Level {
     private final LevelSaver levelSaver = new LevelSaver(new File(LEVEL_FILE_NAME));
     private final LevelLoader levelLoader = new LevelLoader(new File(LEVEL_FILE_NAME), levelSaver.getSavingLevelMutex());
 
+    private final List<Entity> entities = new ArrayList<>();
+
     private final int seed = 42; // TODO: Make seeds configurable
 
     /**
      * Creates a new level with the specified dimensions.
      */
     public Level() {
+        this.entities.add(new PlayerEntity(this, 0, 120, 0));
     }
 
     /**
@@ -190,7 +191,6 @@ public class Level {
     /**
      * Gets the block at the specified coordinates.
      */
-    @ForceInline
     public BlockState getBlockState(int x, int y, int z) {
         Chunk chunk = getChunk(x, z);
         if (chunk == null) {
@@ -202,7 +202,6 @@ public class Level {
     private long lastChunkKey = 0;
     private Chunk lastChunk = null;
 
-    @ForceInline
     public Chunk getChunk(int x, int z) {
         int cx = x >> Chunk.CHUNK_SIZE_LG2;
         int cz = z >> Chunk.CHUNK_SIZE_LG2;
@@ -225,7 +224,6 @@ public class Level {
     /**
      * Checks if a tile is solid at the specified coordinates.
      */
-    @ForceInline
     public boolean isSolidTile(int x, int y, int z) {
         BlockState blockState = this.getBlockState(x, y, z);
         return blockState != null && blockState.block.isSolid() && !blockState.block.isTransparent();
@@ -235,7 +233,10 @@ public class Level {
      * Updates the level, ticking random tiles.
      */
     public void tick() {
-        // TODO
+        // TODO: MULTI-THREADED TICKING
+        for (Entity entity : this.entities) {
+            entity.tick();
+        }
     }
 
     public HitResult raycast(Entity entity, float partialTick) {
@@ -336,5 +337,9 @@ public class Level {
 
     private void generateChunk(Chunk chunk) {
         worldGenerator.generate(chunk);
+    }
+
+    public List<Entity> getEntities() {
+        return this.entities;
     }
 }

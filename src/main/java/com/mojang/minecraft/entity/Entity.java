@@ -2,6 +2,7 @@ package com.mojang.minecraft.entity;
 
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.phys.AABB;
+import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.util.math.CollisionUtils;
 
@@ -69,7 +70,7 @@ public class Entity {
     /**
      * Collision bounding box
      */
-    public AABB bb;
+    public AABB boundingBox;
 
     /**
      * Whether the entity is on the ground
@@ -152,7 +153,7 @@ public class Entity {
         this.z = z;
         float halfWidth = this.bbWidth / 2.0F;
         float halfHeight = this.bbHeight / 2.0F;
-        this.bb = new AABB(x - halfWidth, y - halfHeight, z - halfWidth,
+        this.boundingBox = new AABB(x - halfWidth, y - halfHeight, z - halfWidth,
                 x + halfWidth, y + halfHeight, z + halfWidth);
     }
 
@@ -199,7 +200,7 @@ public class Entity {
             float dZ = za;
             final float limit = 0.05f;
             // X-axis safe walk
-            while (dX != 0.0D && this.level.getCubes(this.bb.offset(dX, -1.0f, 0.0f)).isEmpty()) {
+            while (dX != 0.0D && this.level.getCubes(this.boundingBox.offset(dX, -1.0f, 0.0f)).isEmpty()) {
                 if (dX > 0.0D) {
                     dX = Math.max(dX - limit, 0.0f);
                 } else {
@@ -207,7 +208,7 @@ public class Entity {
                 }
             }
             // Z-axis safe walk
-            while (dZ != 0.0f && this.level.getCubes(this.bb.offset(0.0f, -1.0f, dZ)).isEmpty()) {
+            while (dZ != 0.0f && this.level.getCubes(this.boundingBox.offset(0.0f, -1.0f, dZ)).isEmpty()) {
                 if (dZ > 0.0f) {
                     dZ = Math.max(dZ - limit, 0.0f);
                 } else {
@@ -215,7 +216,7 @@ public class Entity {
                 }
             }
             // Diagonal safe walk
-            while (dX != 0.0f && dZ != 0.0f && this.level.getCubes(this.bb.offset(dX, -1.0f, dZ)).isEmpty()) {
+            while (dX != 0.0f && dZ != 0.0f && this.level.getCubes(this.boundingBox.offset(dX, -1.0f, dZ)).isEmpty()) {
                 if (dX > 0.0f) {
                     dX = Math.max(dX - limit, 0.0f);
                 } else {
@@ -236,27 +237,27 @@ public class Entity {
         float originalZa = za;
 
         // Handle Y-axis collisions first
-        List<AABB> collisionBoxes = new ArrayList<>(this.level.getCubes(this.bb.expand(0, ya, 0)));
+        List<AABB> collisionBoxes = new ArrayList<>(this.level.getCubes(this.boundingBox.expand(0, ya, 0)));
         for (AABB collisionBox : collisionBoxes) {
-            ya = CollisionUtils.clipYCollide(collisionBox, this.bb, ya);
+            ya = CollisionUtils.clipYCollide(collisionBox, this.boundingBox, ya);
         }
-        this.bb.move(0.0F, ya, 0.0F);
+        this.boundingBox.move(0.0F, ya, 0.0F);
 
         // Handle X-axis collisions
         collisionBoxes.clear();
-        collisionBoxes.addAll(this.level.getCubes(this.bb.expand(xa, 0, 0)));
+        collisionBoxes.addAll(this.level.getCubes(this.boundingBox.expand(xa, 0, 0)));
         for (AABB box : collisionBoxes) {
-            xa = CollisionUtils.clipXCollide(box, this.bb, xa);
+            xa = CollisionUtils.clipXCollide(box, this.boundingBox, xa);
         }
-        this.bb.move(xa, 0.0F, 0.0F);
+        this.boundingBox.move(xa, 0.0F, 0.0F);
 
         // Handle Z-axis collisions
         collisionBoxes.clear();
-        collisionBoxes.addAll(this.level.getCubes(this.bb.expand(0, 0, za)));
+        collisionBoxes.addAll(this.level.getCubes(this.boundingBox.expand(0, 0, za)));
         for (AABB collisionBox : collisionBoxes) {
-            za = CollisionUtils.clipZCollide(collisionBox, this.bb, za);
+            za = CollisionUtils.clipZCollide(collisionBox, this.boundingBox, za);
         }
-        this.bb.move(0.0F, 0.0F, za);
+        this.boundingBox.move(0.0F, 0.0F, za);
 
         // Update onGround status (true if we hit something below us)
         this.onGround = originalYa != ya && originalYa < 0.0F;
@@ -276,9 +277,9 @@ public class Entity {
         }
 
         // Update position based on bounding box position
-        this.x = (this.bb.x0 + this.bb.x1) / 2.0F;
-        this.y = this.bb.y0;
-        this.z = (this.bb.z0 + this.bb.z1) / 2.0F;
+        this.x = (this.boundingBox.x0 + this.boundingBox.x1) / 2.0F;
+        this.y = this.boundingBox.y0;
+        this.z = (this.boundingBox.z0 + this.boundingBox.z1) / 2.0F;
     }
 
     /**
@@ -326,7 +327,7 @@ public class Entity {
      * @param graphics The graphics api
      * @param partialTick Partial tick time for smooth animation
      */
-    public void render(GraphicsAPI graphics, float partialTick) {
+    public void render(GraphicsAPI graphics, TextureManager textureManager, float partialTick) {
         // Default implementation does nothing
     }
-} 
+}

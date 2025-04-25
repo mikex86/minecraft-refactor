@@ -28,14 +28,16 @@ dependencies {
     implementation("org.lwjgl:lwjgl")
     implementation("org.lwjgl:lwjgl-glfw")
     implementation("org.lwjgl:lwjgl-opengl")
-    implementation("org.lwjgl:lwjgl-stb")     // For image loading and text rendering
-    
+    implementation("org.lwjgl:lwjgl-stb")
+    implementation("org.lwjgl:lwjgl-jemalloc")
+
     // Runtime natives
     runtimeOnly("org.lwjgl:lwjgl::$lwjglNatives")
     runtimeOnly("org.lwjgl:lwjgl-glfw::$lwjglNatives")
     runtimeOnly("org.lwjgl:lwjgl-opengl::$lwjglNatives")
     runtimeOnly("org.lwjgl:lwjgl-stb::$lwjglNatives")
-    
+    runtimeOnly("org.lwjgl:lwjgl-jemalloc::$lwjglNatives")
+
     // Additional Java libraries
     implementation("javax.vecmath:vecmath:1.5.2")
 
@@ -55,7 +57,7 @@ application {
 // Set the working directory for the run task
 tasks.named<JavaExec>("run") {
     workingDir = file("${projectDir}/working_dir")
-    
+
     // Add macOS-specific JVM args
     if (System.getProperty("os.name").contains("Mac")) {
         jvmArgs = jvmArgs!! + listOf("-XstartOnFirstThread")

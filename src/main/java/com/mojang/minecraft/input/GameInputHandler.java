@@ -8,7 +8,6 @@ import com.mojang.minecraft.item.BlockItem;
 import com.mojang.minecraft.item.Item;
 import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.level.Level;
-import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.level.block.Blocks;
 import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.particle.ParticleEngine;
@@ -288,13 +287,13 @@ public class GameInputHandler {
      */
     private boolean isFree(AABB aabb) {
         // Check for collision with player
-        if (CollisionUtils.intersects(this.player.bb, aabb)) {
+        if (CollisionUtils.intersects(this.player.boundingBox, aabb)) {
             return false;
         }
 
         // Check for collision with any entity
         for (Entity entity : this.entities) {
-            if (CollisionUtils.intersects(entity.bb, aabb)) {
+            if (CollisionUtils.intersects(entity.boundingBox, aabb)) {
                 return false;
             }
         }

@@ -1,5 +1,6 @@
 package com.mojang.minecraft.level;
 
+import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.entity.Player;
 import com.mojang.minecraft.renderer.Disposable;
 import com.mojang.minecraft.renderer.Frustum;
@@ -64,7 +65,7 @@ public class LevelRenderer implements LevelListener, Disposable {
     /**
      * Renders the level
      */
-    public void render() {
+    public void render(float partialTicks) {
         // Enable texturing and bind the terrain texture
         Texture texture = textureManager.terrainTexture;
         graphics.setTexture(texture);
@@ -77,6 +78,13 @@ public class LevelRenderer implements LevelListener, Disposable {
         for (Chunk chunk : this.level.getLoadedChunks()) {
             if (frustum.isVisible(chunk.aabb)) {
                 numSectionDrawCalls += chunk.render(graphics, frustum);
+            }
+        }
+
+        // Render entities
+        for (Entity entity : this.level.getEntities()) {
+            if (frustum.isVisible(entity.boundingBox)) {
+                entity.render(graphics, textureManager, partialTicks);
             }
         }
     }

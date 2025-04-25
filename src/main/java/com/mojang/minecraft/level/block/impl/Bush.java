@@ -7,7 +7,6 @@ import com.mojang.minecraft.level.block.EnumFacing;
 import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.Tesselator;
-import jdk.internal.vm.annotation.ForceInline;
 
 import java.util.Random;
 
@@ -114,7 +113,6 @@ public class Bush extends Block {
      * @return false as bushes don't block light
      */
     @Override
-    @ForceInline
     public boolean isLightBlocker() {
         return false;
     }
@@ -125,7 +123,6 @@ public class Bush extends Block {
      * @return false as bushes aren't solid
      */
     @Override
-    @ForceInline
     public boolean isSolid() {
         return false;
     }
