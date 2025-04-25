@@ -5,8 +5,7 @@ import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 
 public class GuiScreen implements Disposable {
 
-    public void drawScreen(GraphicsAPI graphics, float screenWidth, float screenHeight) {
-
+    public void drawScreen(GraphicsAPI graphics, float screenWidth, float screenHeight, float partialTicks) {
     }
 
     public void onResized(float screenWidth, float screenHeight) {

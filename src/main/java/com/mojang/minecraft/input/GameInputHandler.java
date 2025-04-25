@@ -1,7 +1,7 @@
 package com.mojang.minecraft.input;
 
 import com.mojang.minecraft.entity.Entity;
-import com.mojang.minecraft.entity.Player;
+import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.gui.scaling.ScaledResolution;
 import com.mojang.minecraft.gui.screen.GuiScreen;
 import com.mojang.minecraft.item.BlockItem;
@@ -33,10 +33,9 @@ public class GameInputHandler {
     private int hotbarSlotIndex = 0;
 
     // Game references needed for input processing
-    private final Player player;
+    private final EntityPlayer player;
     private final Level level;
     private final ParticleEngine particleEngine;
-    private final ArrayList<Entity> entities;
     private final boolean fullscreen;
 
     // Currently open GUI screen (if any)
@@ -49,21 +48,18 @@ public class GameInputHandler {
      * @param player         The player entity
      * @param level          The game level
      * @param particleEngine The particle engine
-     * @param entities       List of game entities
      * @param fullscreen     Whether the game is in fullscreen mode
      */
     public GameInputHandler(
             InputHandler inputHandler,
-            Player player,
+            EntityPlayer player,
             Level level,
             ParticleEngine particleEngine,
-            List<Entity> entities,
             boolean fullscreen) {
         this.inputHandler = inputHandler;
         this.player = player;
         this.level = level;
         this.particleEngine = particleEngine;
-        this.entities = new ArrayList<>(entities);
         this.fullscreen = fullscreen;
 
         // Initially grab the mouse
@@ -271,34 +267,12 @@ public class GameInputHandler {
                 Item item = itemStack.getItem();
                 if (item instanceof BlockItem) {
                     BlockItem blockItem = (BlockItem)item;
-                    if (this.isFree(aabb)) {
+                    if (this.level.isFree(aabb)) {
                         this.level.setBlockState(x, y, z, blockItem.getBlock().getBlockState(hitResult.facingDirection));
                     }
                 }
             }
         }
-    }
-
-    /**
-     * Checks if a bounding box is free from collisions with entities and the player.
-     *
-     * @param aabb The bounding box to check
-     * @return true if the area is free, false if there's a collision
-     */
-    private boolean isFree(AABB aabb) {
-        // Check for collision with player
-        if (CollisionUtils.intersects(this.player.boundingBox, aabb)) {
-            return false;
-        }
-
-        // Check for collision with any entity
-        for (Entity entity : this.entities) {
-            if (CollisionUtils.intersects(entity.boundingBox, aabb)) {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     /**

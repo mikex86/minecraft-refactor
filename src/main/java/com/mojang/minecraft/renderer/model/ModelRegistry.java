@@ -34,7 +34,7 @@ public class ModelRegistry {
      * @return The model instance
      */
     @SuppressWarnings("unchecked")
-    public <T> T getModel(String modelId, ModelCreator<? extends Model> modelCreator) {
+    public <T, D> T getModel(String modelId, ModelCreator<? extends Model<D>> modelCreator) {
         if (!models.containsKey(modelId)) {
             models.put(modelId, modelCreator.create());
         }

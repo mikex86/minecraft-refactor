@@ -1,14 +1,15 @@
 package com.mojang.minecraft.level;
 
-import com.mojang.minecraft.character.PlayerEntity;
 import com.mojang.minecraft.crash.CrashReporter;
 import com.mojang.minecraft.entity.Entity;
+import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.level.generation.WorldGenerator;
 import com.mojang.minecraft.level.save.LevelLoader;
 import com.mojang.minecraft.level.save.LevelSaver;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.util.LongHashMap;
+import com.mojang.minecraft.util.math.CollisionUtils;
 import com.mojang.minecraft.util.math.RayCaster;
 import com.mojang.minecraft.world.HitResult;
 
@@ -42,7 +43,6 @@ public class Level {
      * Creates a new level with the specified dimensions.
      */
     public Level() {
-        this.entities.add(new PlayerEntity(this, 0, 120, 0));
     }
 
     /**
@@ -243,6 +243,24 @@ public class Level {
         return RayCaster.raycast(entity, this, partialTick);
     }
 
+
+    /**
+     * Checks if a bounding box is free from collisions with entities and the player.
+     *
+     * @param aabb The bounding box to check
+     * @return true if the area is free, false if there's a collision
+     */
+    public boolean isFree(AABB aabb) {
+        // Check for collision with any entity
+        for (Entity entity : this.entities) {
+            if (CollisionUtils.intersects(entity.boundingBox, aabb)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /**
      * Temporary variable returned by {@link #getLoadedChunks()} to avoid allocating a new list each time.
      * Serves as a thread-safe copy of {@link #fullyLoadedChunks} for iteration.
@@ -341,5 +359,9 @@ public class Level {
 
     public List<Entity> getEntities() {
         return this.entities;
+    }
+
+    public void spawnEntity(Entity player) {
+        this.entities.add(player);
     }
 }

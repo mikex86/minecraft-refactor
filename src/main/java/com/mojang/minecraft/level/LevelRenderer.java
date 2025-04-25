@@ -1,7 +1,7 @@
 package com.mojang.minecraft.level;
 
 import com.mojang.minecraft.entity.Entity;
-import com.mojang.minecraft.entity.Player;
+import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.renderer.Disposable;
 import com.mojang.minecraft.renderer.Frustum;
 import com.mojang.minecraft.renderer.TextureManager;
@@ -80,9 +80,20 @@ public class LevelRenderer implements LevelListener, Disposable {
                 numSectionDrawCalls += chunk.render(graphics, frustum);
             }
         }
+    }
+
+    public void renderEntities(float partialTicks) {
+        // Get the current view frustum
+        Frustum frustum = Frustum.getFrustum(graphics);
 
         // Render entities
         for (Entity entity : this.level.getEntities()) {
+            if (entity instanceof EntityPlayer) {
+                EntityPlayer player = (EntityPlayer) entity;
+                if (player.isThePlayer()) {
+                    continue;
+                }
+            }
             if (frustum.isVisible(entity.boundingBox)) {
                 entity.render(graphics, textureManager, partialTicks);
             }
@@ -92,7 +103,7 @@ public class LevelRenderer implements LevelListener, Disposable {
     /**
      * Updates chunks that need to be rebuilt.
      */
-    public void updateDirtyChunks(Player player) {
+    public void updateDirtyChunks(EntityPlayer player) {
         List<Chunk> dirtyChunks = this.getAllDirtyChunks();
         if (dirtyChunks != null && !dirtyChunks.isEmpty()) {
             Frustum frustum = Frustum.getFrustum(graphics);

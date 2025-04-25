@@ -1,8 +1,7 @@
 package com.mojang.minecraft.renderer;
 
 import com.mojang.minecraft.Minecraft;
-import com.mojang.minecraft.entity.Entity;
-import com.mojang.minecraft.entity.Player;
+import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.gui.Font;
 import com.mojang.minecraft.gui.TextLabel;
 import com.mojang.minecraft.gui.scaling.ScaledResolution;
@@ -26,7 +25,6 @@ import com.mojang.minecraft.world.HitResult;
 import org.lwjgl.BufferUtils;
 
 import java.nio.FloatBuffer;
-import java.util.List;
 
 /**
  * Handles all rendering operations for Minecraft.
@@ -59,8 +57,7 @@ public class GameRenderer implements Disposable {
     private final LevelRenderer levelRenderer;
     private final ParticleEngine particleEngine;
     private final GameInputHandler gameInputHandler;
-    private final Player player;
-    private final List<Entity> entities;
+    private final EntityPlayer player;
 
     // Window dimensions
     private int width;
@@ -83,14 +80,12 @@ public class GameRenderer implements Disposable {
      * @param levelRenderer    The level renderer
      * @param particleEngine   The particle engine
      * @param player           The player
-     * @param entities         The entity list
      * @param width            The initial window width
      * @param height           The initial window height
      */
     public GameRenderer(TextureManager textureManager, ShaderRegistry shaderRegistry, GameInputHandler gameInputHandler,
                         Level level, LevelRenderer levelRenderer,
-                        ParticleEngine particleEngine, Player player,
-                        List<Entity> entities, int width, int height) {
+                        ParticleEngine particleEngine, EntityPlayer player, int width, int height) {
         // Get graphics API instance
         this.graphics = GraphicsFactory.getGraphicsAPI();
 
@@ -99,7 +94,6 @@ public class GameRenderer implements Disposable {
         this.gameInputHandler = gameInputHandler;
         this.particleEngine = particleEngine;
         this.player = player;
-        this.entities = entities;
         this.width = width;
         this.height = height;
 
@@ -193,25 +187,25 @@ public class GameRenderer implements Disposable {
         float playerZ = player.zo + (player.z - player.zo) * partialTick;
 
         // Apply camera transforms
-        graphics.rotateX(player.xRot);          // Pitch
-        graphics.rotateY(player.yRot);          // Yaw
+        graphics.rotateX(player.cameraPitch);          // Pitch
+        graphics.rotateY(player.cameraYaw);          // Yaw
         graphics.translate(-playerX, -playerY - player.getInterpolatedEyeHeight(partialTick), -playerZ);
     }
 
     /**
      * Renders a single frame of the game.
      *
-     * @param partialTick Interpolation factor between ticks (0.0-1.0)
-     * @param hitResult   The current hit result (block selection)
-     * @param fpsString   String containing FPS information to display
+     * @param partialTicks Interpolation factor between ticks (0.0-1.0)
+     * @param hitResult    The current hit result (block selection)
+     * @param fpsString    String containing FPS information to display
      */
-    public void render(float partialTick, HitResult hitResult, String fpsString) {
+    public void render(float partialTicks, HitResult hitResult, String fpsString) {
         // Set viewport and clear buffers
         graphics.setViewport(0, 0, this.width, this.height);
         graphics.clear(true, true, 0.5F, 0.8F, 1.0F, 0.0F);
 
         // Set up the 3D camera
-        this.setupCamera(partialTick);
+        this.setupCamera(partialTicks);
 
         // Enable face culling for performance
         graphics.setRasterizerState(GraphicsEnums.CullMode.BACK, GraphicsEnums.FillMode.SOLID);
@@ -220,7 +214,7 @@ public class GameRenderer implements Disposable {
         // Update chunks that have changed
         this.levelRenderer.updateDirtyChunks(this.player);
 
-        render(partialTick);
+        render(partialTicks);
 
         // Render block selection highlight
         if (hitResult != null) {
@@ -229,13 +223,11 @@ public class GameRenderer implements Disposable {
 
         // Render HUD elements
         {
-            drawUI(graphics, fpsString, gameInputHandler);
+            drawUI(graphics, fpsString, gameInputHandler, partialTicks);
         }
     }
 
     private void render(float partialTicks) {
-        Frustum frustum = Frustum.getFrustum(graphics);
-
         // generate chunks around the player
         // NOTE: This will be a NO-OP most of the time
         // as it checks if the player has moved.
@@ -261,11 +253,7 @@ public class GameRenderer implements Disposable {
             // cannot set matrices "globally" because entities transform themselves
             setupFog(entityShader);
 
-            for (Entity entity : this.entities) {
-                if (frustum.isVisible(entity.boundingBox)) {
-                    entity.render(this.graphics, this.textureManager, partialTicks);
-                }
-            }
+            this.levelRenderer.renderEntities(partialTicks);
         }
 
         // render particles
@@ -298,8 +286,9 @@ public class GameRenderer implements Disposable {
      * @param graphics         The graphics api
      * @param fpsString        The FPS string to display
      * @param gameInputHandler The game input handler
+     * @param partialTicks     The partial ticks for animation
      */
-    private void drawUI(GraphicsAPI graphics, String fpsString, GameInputHandler gameInputHandler) {
+    private void drawUI(GraphicsAPI graphics, String fpsString, GameInputHandler gameInputHandler, float partialTicks) {
         graphics.setShader(hudShader);
 
         // disable depth test
@@ -346,7 +335,7 @@ public class GameRenderer implements Disposable {
 
         // Draw current screen if it exists
         if (currentScreen != null) {
-            currentScreen.drawScreen(graphics, scaledWidth, scaledHeight);
+            currentScreen.drawScreen(graphics, scaledWidth, scaledHeight, partialTicks);
         }
     }
 
@@ -425,7 +414,7 @@ public class GameRenderer implements Disposable {
             }
             Item item = itemStack.getItem();
             if (item instanceof BlockItem) {
-                BlockItem blockItem = (BlockItem)item;
+                BlockItem blockItem = (BlockItem) item;
                 graphics.pushMatrix();
                 graphics.translate(centerX - HOTBAR_WIDTH / 2f + (i * HOTBAR_SLOT_WIDTH) + HOTBAR_SLOT_WIDTH / 2f + 1, screenHeight - HOTBAR_SELECTOR_SIZE + ITEM_SIZE * 2 + 1, 0);
                 BlockPreviewRenderer.renderBlock(graphics, blockItem.getBlock(), ITEM_SIZE);

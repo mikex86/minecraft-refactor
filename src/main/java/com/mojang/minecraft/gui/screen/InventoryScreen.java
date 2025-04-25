@@ -1,6 +1,6 @@
 package com.mojang.minecraft.gui.screen;
 
-import com.mojang.minecraft.entity.Player;
+import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.gui.Font;
 import com.mojang.minecraft.gui.TextLabel;
 import com.mojang.minecraft.item.BlockItem;
@@ -14,9 +14,11 @@ import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 
+import static com.mojang.minecraft.entity.EntityPlayer.*;
+
 public class InventoryScreen extends GuiScreen {
 
-    private final Player player;
+    private final EntityPlayer player;
     private final Inventory inventory;
     private final TextureManager textureManager;
     private final Font font;
@@ -30,10 +32,13 @@ public class InventoryScreen extends GuiScreen {
     private final TextLabel[] stackSizeHotbarLabels;
     private final TextLabel stackSizeSelectedItemLabel;
 
-    public InventoryScreen(TextureManager textureManager, Font font, Player player, Inventory inventory) {
+    public InventoryScreen(TextureManager textureManager, Font font, EntityPlayer player, Inventory inventory) {
         this.textureManager = textureManager;
         this.font = font;
-        this.player = player;
+
+        this.player = new EntityPlayer(null, false);
+        // TODO: transfer skin here
+
         this.inventory = inventory;
         this.stackSizeMainInventoryLabels = new TextLabel[inventory.getMainInventoryRowCount()][inventory.getColumnCount()];
 
@@ -58,7 +63,7 @@ public class InventoryScreen extends GuiScreen {
     private static final int ITEM_SLOT_SIZE = 18;
 
     @Override
-    public void drawScreen(GraphicsAPI graphics, float screenWidth, float screenHeight) {
+    public void drawScreen(GraphicsAPI graphics, float screenWidth, float screenHeight, float partialTicks) {
         float centerX = screenWidth / 2f;
         float centerY = screenHeight / 2f;
 
@@ -181,6 +186,38 @@ public class InventoryScreen extends GuiScreen {
                     this.stackSizeSelectedItemLabel.render(graphics, mouseX + 9 - this.stackSizeSelectedItemLabel.getWidth(), mouseY + 2);
                 }
             }
+        }
+
+        // draw player model
+        {
+            graphics.setTexture(textureManager.charTexture);
+            graphics.pushMatrix();
+
+            // Apply scaling and orientation
+            graphics.translate(centerX - INVENTORY_UI_WIDTH / 2f + 42 + 10, centerY - INVENTORY_UI_HEIGHT / 2f + 24 + 4, 0);
+            graphics.scale(1.85f, 1.85f, 1.85f);
+
+            // calculate angle to look at mouse position
+            {
+                float eyePosX = centerX - INVENTORY_UI_WIDTH / 2f + 42 + 10;
+                float eyePosY = centerY - INVENTORY_UI_HEIGHT / 2f + 24 + 4;
+                float dx = eyePosX - mouseX;
+                float dy = eyePosY - mouseY;
+
+                float mouseYaw = 180 - dx * 0.1f;
+                float mousePitch = -dy * 0.1f;
+
+                this.player.yaw = this.player.prevYaw = mouseYaw;
+                this.player.pitch = this.player.prevPitch = mousePitch;
+            }
+
+            this.player.bodyYaw = this.player.prevBodyYaw = this.player.yaw;
+
+            // Render the model
+            graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS);
+            PLAYER_MODEL.render(graphics, this.player, partialTicks);
+
+            graphics.popMatrix();
         }
 
         this.screenWidth = screenWidth;

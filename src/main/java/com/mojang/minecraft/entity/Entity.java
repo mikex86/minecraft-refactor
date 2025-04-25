@@ -61,11 +61,21 @@ public class Entity {
     /**
      * Rotation around y axis (yaw) in degrees
      */
-    public float yRot;
+    public float yaw;
     /**
      * Rotation around x axis (pitch) in degrees
      */
-    public float xRot;
+    public float pitch;
+
+    /**
+     * Rotation yaw of the previous tick for interpolation
+     */
+    public float prevYaw;
+
+    /**
+     * Rotation pitch of the previous tick for interpolation
+     */
+    public float prevPitch;
 
     /**
      * Collision bounding box
@@ -103,6 +113,11 @@ public class Entity {
      * Whether the entity has collided horizontally
      */
     protected boolean isCollidedHorizontally;
+
+    /**
+     * The number of ticks performed on the entity.
+     */
+    public int ticksPerformed = 0;
 
     /**
      * Creates a new entity in the specified level.
@@ -158,25 +173,6 @@ public class Entity {
     }
 
     /**
-     * Rotates the entity.
-     *
-     * @param yawRotation   Change in yaw rotation
-     * @param pitchRotation Change in pitch rotation
-     */
-    public void turn(float yawRotation, float pitchRotation) {
-        this.yRot = (float) ((double) this.yRot + (double) yawRotation * 0.15);
-        this.xRot = (float) ((double) this.xRot + (double) pitchRotation * 0.15);
-
-        // Clamp pitch to prevent camera flipping
-        if (this.xRot < -90.0F) {
-            this.xRot = -90.0F;
-        }
-        if (this.xRot > 90.0F) {
-            this.xRot = 90.0F;
-        }
-    }
-
-    /**
      * Called every game tick to update the entity.
      * Override this in subclasses to add specific behavior.
      */
@@ -185,6 +181,11 @@ public class Entity {
         this.xo = this.x;
         this.yo = this.y;
         this.zo = this.z;
+
+        this.prevYaw = this.yaw;
+        this.prevPitch = this.pitch;
+
+        this.ticksPerformed++;
     }
 
     /**
@@ -301,8 +302,8 @@ public class Entity {
         za *= speedFactor;
 
         // Convert movement to global coordinates based on rotation
-        float sin = (float) Math.sin(this.yRot * Math.PI / 180.0F);
-        float cos = (float) Math.cos(this.yRot * Math.PI / 180.0F);
+        float sin = (float) Math.sin(this.yaw * Math.PI / 180.0F);
+        float cos = (float) Math.cos(this.yaw * Math.PI / 180.0F);
 
         // Apply rotation matrix
         this.xd += xa * cos - za * sin;

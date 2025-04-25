@@ -72,7 +72,6 @@ public class Minecraft implements Runnable {
                     gameState.getPlayer(),
                     gameState.getLevel(),
                     gameState.getParticleEngine(),
-                    gameState.getEntities(),
                     engine.isFullscreen()
             );
 
@@ -85,7 +84,6 @@ public class Minecraft implements Runnable {
                     gameState.getLevelRenderer(),
                     gameState.getParticleEngine(),
                     gameState.getPlayer(),
-                    gameState.getEntities(),
                     engine.getWidth(),
                     engine.getHeight()
             );

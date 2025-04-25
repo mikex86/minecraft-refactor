@@ -1,7 +1,6 @@
 package com.mojang.minecraft.level;
 
-import com.mojang.minecraft.Minecraft;
-import com.mojang.minecraft.entity.Player;
+import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.level.block.Blocks;
 import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.phys.AABB;
@@ -244,7 +243,7 @@ public class Chunk implements Disposable {
     /**
      * Calculates the squared distance from this chunk to the player.
      */
-    public float distanceToSqr(Player player) {
+    public float distanceToSqr(EntityPlayer player) {
         float xDistance = player.x - this.centerX;
         float zDistance = player.z - this.centerZ;
         return xDistance * xDistance + zDistance * zDistance;

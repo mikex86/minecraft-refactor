@@ -1,23 +1,18 @@
 package com.mojang.minecraft.renderer.model.impl;
 
+import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
-import com.mojang.minecraft.renderer.shape.Cube;
 import com.mojang.minecraft.renderer.model.Model;
+import com.mojang.minecraft.renderer.shape.Cube;
+
+import static java.lang.Math.PI;
+import static java.lang.Math.cos;
 
 /**
  * Represents the 3D model of a player model.
  * Consists of various cubes representing body parts that can be animated.
  */
-public class PlayerModel implements Model {
-    // Animation constants
-    private static final float HEAD_SWING_FREQUENCY = 0.83F;
-    private static final float HEAD_BOB_FREQUENCY = 1.0F;
-    private static final float HEAD_BOB_AMPLITUDE = 0.8F;
-    private static final float ARM_SWING_FREQUENCY = 0.6662F;
-    private static final float ARM_SWING_AMPLITUDE = 2.0F;
-    private static final float ARM0_ROTATE_FREQUENCY = 0.2312F;
-    private static final float ARM1_ROTATE_FREQUENCY = 0.2812F;
-    private static final float LEG_SWING_AMPLITUDE = 1.4F;
+public class PlayerModel implements Model<EntityPlayer> {
 
     // Body parts
     public Cube head = new Cube(0, 0);
@@ -60,35 +55,52 @@ public class PlayerModel implements Model {
     }
 
     /**
-     * Renders the zombie model with animations based on the current time.
-     *
-     * @param time Current animation time
+     * Renders the player model
      */
     @Override
-    public void render(GraphicsAPI graphics, float time) {
-        // Animate the head
-        this.head.yRot = (float) Math.sin(time * HEAD_SWING_FREQUENCY);
-        this.head.xRot = (float) Math.sin(time * HEAD_BOB_FREQUENCY) * HEAD_BOB_AMPLITUDE;
+    public void render(GraphicsAPI graphics, EntityPlayer player, float partialTicks) {
+        float limbSwingAmount = player.prevLimbSwingAmount + (player.limbSwingAmount - player.prevLimbSwingAmount) * partialTicks;
+        float limbSwing = player.limbSwing + (player.limbSwing - player.prevLimbSwing) * partialTicks;
 
-        // Animate the arms
-        this.rightArm.xRot = (float) Math.sin(time * ARM_SWING_FREQUENCY + Math.PI) * ARM_SWING_AMPLITUDE;
-        this.rightArm.zRot = (float) (Math.sin(time * ARM0_ROTATE_FREQUENCY) + 1.0F);
-        this.leftArm.xRot = (float) Math.sin(time * ARM_SWING_FREQUENCY) * ARM_SWING_AMPLITUDE;
-        this.leftArm.zRot = (float) (Math.sin(time * ARM1_ROTATE_FREQUENCY) - 1.0F);
+        float headYaw = player.prevYaw + (player.yaw - player.prevYaw) * partialTicks;
+        float headPitch = player.prevPitch + (player.pitch - player.prevPitch) * partialTicks;
 
-        // Animate the legs
-        this.rightLeg.xRot = (float) Math.sin(time * ARM_SWING_FREQUENCY) * LEG_SWING_AMPLITUDE;
-        this.leftLeg.xRot = (float) Math.sin(time * ARM_SWING_FREQUENCY + Math.PI) * LEG_SWING_AMPLITUDE;
+        // Interpolate the smoothed body yaw from the player
+        float bodyYaw = player.prevBodyYaw
+            + (player.bodyYaw - player.prevBodyYaw) * partialTicks;
+
+        setRotationAngles(limbSwing, limbSwingAmount, headYaw, headPitch);
 
         // Render all body parts
         this.head.render(graphics);
+
+        graphics.rotateY(bodyYaw);
         this.body.render(graphics);
         this.rightArm.render(graphics);
         this.leftArm.render(graphics);
         this.rightLeg.render(graphics);
         this.leftLeg.render(graphics);
     }
-    
+
+    protected void setRotationAngles(float limbSwing, float limbSwingAmount, float netHeadYaw, float headPitch) {
+
+        // head rotations
+        this.head.yRot = (float) (netHeadYaw * (PI / 180F));
+        this.head.xRot = (float) (headPitch * (PI / 180F));
+
+        // arms swing
+        this.rightArm.xRot = (float) cos(limbSwing * 0.6662F + PI) * 2.0F * limbSwingAmount * 0.5F;
+        this.leftArm.xRot = (float) cos(limbSwing * 0.6662F) * 2.0F * limbSwingAmount * 0.5F;
+        this.rightArm.zRot = 0.0F;
+        this.leftArm.zRot = 0.0F;
+
+        // legs swing
+        this.rightLeg.xRot = (float) cos(limbSwing * 0.6662F) * 1.4F * limbSwingAmount;
+        this.leftLeg.xRot = (float) cos(limbSwing * 0.6662F + PI) * 1.4F * limbSwingAmount;
+        this.rightLeg.yRot = 0.0F;
+        this.leftLeg.yRot = 0.0F;
+    }
+
     /**
      * Disposes of all resources used by this model.
      * Called by the ModelRegistry when the model is no longer needed.

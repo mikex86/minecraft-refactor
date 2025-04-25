@@ -1,15 +1,12 @@
 package com.mojang.minecraft;
 
 import com.mojang.minecraft.entity.Entity;
-import com.mojang.minecraft.entity.Player;
+import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.model.ModelRegistry;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Manages the game state including level, player, entities, and other game objects.
@@ -21,8 +18,7 @@ public class GameState {
     private LevelRenderer levelRenderer;
 
     // Entities
-    private Player player;
-    private final List<Entity> entities = new ArrayList<>();
+    private EntityPlayer player;
 
     // Effects
     private ParticleEngine particleEngine;
@@ -51,19 +47,13 @@ public class GameState {
         this.levelRenderer = new LevelRenderer(this.level, this.textureManager);
 
         // Create player
-        this.player = new Player(this.level);
+        this.player = new EntityPlayer(this.level, true);
         this.player.setPos(0.0F, 100, 0.0F);
+        this.level.spawnEntity(this.player);
 
         // Create particle engine
         this.particleEngine = new ParticleEngine(this.level, this.textureManager);
 
-        // Add initial entities (zombies)
-        // TODO
-        /*for (int i = 0; i < 10; ++i) {
-            Zombie zombie = new Zombie(this.level, this.textureManager, 128.0F, 0.0F, 128.0F);
-            zombie.resetPos();
-            this.entities.add(zombie);
-        }*/
     }
 
     /**
@@ -71,18 +61,6 @@ public class GameState {
      * Updates all entities, the player, particle effects, and the level.
      */
     public void tick() {
-        // Update all game entities
-        for (int i = 0; i < this.entities.size(); ++i) {
-            Entity entity = this.entities.get(i);
-            entity.tick();
-            if (entity.removed) {
-                this.entities.remove(i--);
-            }
-        }
-
-        // Update the player
-        this.player.tick();
-
         // Update particle engine
         this.particleEngine.tick();
 
@@ -122,17 +100,8 @@ public class GameState {
      *
      * @return The player
      */
-    public Player getPlayer() {
+    public EntityPlayer getPlayer() {
         return player;
-    }
-
-    /**
-     * Gets the list of entities.
-     *
-     * @return The entity list
-     */
-    public List<Entity> getEntities() {
-        return entities;
     }
 
     /**
@@ -156,8 +125,6 @@ public class GameState {
         if (this.levelRenderer != null) {
             this.levelRenderer.dispose();
         }
-        // Clear entity lists
-        this.entities.clear();
 
         this.modelRegistry.disposeAll();
     }

@@ -1,6 +1,6 @@
 package com.mojang.minecraft.level;
 
-import com.mojang.minecraft.entity.Player;
+import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.renderer.Frustum;
 
 import java.util.Comparator;
@@ -13,7 +13,7 @@ public class DirtyChunkSorter implements Comparator<Chunk> {
 
     private static final long AGE_BUCKET_SIZE = 2000L;
 
-    private final Player player;
+    private final EntityPlayer player;
     private final Frustum frustum;
     private final long currentTime = System.currentTimeMillis();
 
@@ -23,7 +23,7 @@ public class DirtyChunkSorter implements Comparator<Chunk> {
      * @param player  The player to calculate distances from
      * @param frustum The view frustum for visibility testing
      */
-    public DirtyChunkSorter(Player player, Frustum frustum) {
+    public DirtyChunkSorter(EntityPlayer player, Frustum frustum) {
         this.player = player;
         this.frustum = frustum;
     }

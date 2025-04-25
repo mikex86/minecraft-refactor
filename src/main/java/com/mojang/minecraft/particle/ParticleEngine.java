@@ -1,6 +1,6 @@
 package com.mojang.minecraft.particle;
 
-import com.mojang.minecraft.entity.Player;
+import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
@@ -65,7 +65,7 @@ public class ParticleEngine {
      * @param player      The player (for camera-relative positioning)
      * @param partialTick Partial tick time
      */
-    public void render(GraphicsAPI graphics, Player player, float partialTick) {
+    public void render(GraphicsAPI graphics, EntityPlayer player, float partialTick) {
         if (this.particles.isEmpty()) {
             return;
         }
@@ -78,11 +78,11 @@ public class ParticleEngine {
         graphics.setBlendState(true, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
 
         // Calculate view vectors based on player rotation
-        float xa = -((float) Math.cos(player.yRot * DEG_TO_RAD));
-        float za = -((float) Math.sin(player.yRot * DEG_TO_RAD));
-        float xa2 = -za * (float) Math.sin(player.xRot * DEG_TO_RAD);
-        float za2 = xa * (float) Math.sin(player.xRot * DEG_TO_RAD);
-        float ya = (float) Math.cos(player.xRot * DEG_TO_RAD);
+        float xa = -((float) Math.cos(player.yaw * DEG_TO_RAD));
+        float za = -((float) Math.sin(player.yaw * DEG_TO_RAD));
+        float xa2 = -za * (float) Math.sin(player.pitch * DEG_TO_RAD);
+        float za2 = xa * (float) Math.sin(player.pitch * DEG_TO_RAD);
+        float ya = (float) Math.cos(player.pitch * DEG_TO_RAD);
 
         // Setup rendering
         Tesselator tesselator = Tesselator.instance;

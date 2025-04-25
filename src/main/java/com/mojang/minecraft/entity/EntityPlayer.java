@@ -3,16 +3,23 @@ package com.mojang.minecraft.entity;
 import com.mojang.minecraft.item.inventory.Inventory;
 import com.mojang.minecraft.level.Chunk;
 import com.mojang.minecraft.level.Level;
+import com.mojang.minecraft.renderer.TextureManager;
+import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.model.Model;
+import com.mojang.minecraft.renderer.model.ModelRegistry;
+import com.mojang.minecraft.renderer.model.impl.PlayerModel;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+import static java.lang.Math.abs;
+
 /**
  * Represents the player entity in the game.
  * Handles player movement, input, and interaction with the world.
  */
-public class Player extends Entity {
+public class EntityPlayer extends EntityLiving {
 
     // Input state
     private boolean forward = false;
@@ -23,6 +30,14 @@ public class Player extends Entity {
     private boolean sneak = false;
     private boolean sprinting = false;
 
+    /**
+     * State whether this player instance is the local input-controlled player.
+     */
+    private boolean isThePlayer = false;
+
+    public float cameraYaw = 0.0F; // Camera yaw
+    public float cameraPitch = 0.0F; // Camera pitch
+
     // Remaining ticks before sprint expires (600 ticks = 30s)
     private int sprintingTicksLeft = 0;
 
@@ -30,22 +45,33 @@ public class Player extends Entity {
     private float fovModifier = 1.0F;
     private float prevFovModifier = 1.0F;
 
+    // Body rotation smoothing fields
+    public float bodyYaw = 0.0F;
+    public float prevBodyYaw = 0.0F;
+
     // Eye‐height interpolation fields
     private float prevHeightOffset;
 
     private final Inventory inventory = new Inventory();
-
     private boolean wasSprintKeyPressed;
+
+    // Animation constants
+    public static final float MODEL_SIZE = 0.058333334F;
+    public static final float MODEL_Y_OFFSET = -23.0F;
+    private static final float DEGREES_TO_RADIANS = (float) (180.0F / Math.PI);
+
+    public static final Model<EntityPlayer> PLAYER_MODEL = ModelRegistry.getInstance().getModel("player", PlayerModel::new);
 
     /**
      * Creates a new Player instance.
      *
      * @param level The level in which the player exists
      */
-    public Player(Level level) {
+    public EntityPlayer(Level level, boolean isThePlayer) {
         super(level);
         this.heightOffset = 1.62F; // Eye height offset
         this.prevHeightOffset = this.heightOffset;
+        this.isThePlayer = isThePlayer;
     }
 
     /**
@@ -87,10 +113,10 @@ public class Player extends Entity {
      */
     @Override
     public void tick() {
-        // Store previous position
-        this.xo = this.x;
-        this.yo = this.y;
-        this.zo = this.z;
+        super.tick();
+
+        this.pitch = this.cameraPitch;
+        this.yaw = this.cameraYaw;
 
         float xa = 0.0F; // X movement input
         float ya = 0.0F; // Z movement input (forward/backward)
@@ -187,6 +213,57 @@ public class Player extends Entity {
                 this.sprinting = false;
             }
         }
+
+        // --- Body rotation smoothing ---
+        this.prevBodyYaw = this.bodyYaw;
+        double dx = this.x - this.xo;
+        double dz = this.z - this.zo;
+        float movementThreshold = 0.001F;
+        if (abs(dx) > movementThreshold || abs(dz) > movementThreshold) {
+            float movementYaw = (float) (Math.atan2(dz, dx) * (180.0 / Math.PI)) - 90.0F;
+            float angleDiff = wrapDegrees(this.yaw - movementYaw);
+            if (angleDiff > 95.0F || angleDiff < -95.0F) {
+                movementYaw -= 180.0F;
+            }
+
+            this.bodyYaw += wrapDegrees(movementYaw - this.bodyYaw) * 0.3F;
+        }
+
+        // Clamp head‐to‐body angle to ±50°
+        float headDiff = wrapDegrees(this.yaw - this.bodyYaw);
+        if (headDiff < -50) headDiff = -50f;
+        else if (headDiff > 50) headDiff = 50f;
+        this.bodyYaw = this.yaw - headDiff;
+
+        updateAnimations();
+    }
+
+    /**
+     * Renders the zombie entity.
+     *
+     * @param partialTicks Partial tick time for smooth animation
+     */
+    @Override
+    public void render(GraphicsAPI graphics, TextureManager textureManager, float partialTicks) {
+        graphics.setTexture(textureManager.charTexture);
+
+        graphics.pushMatrix();
+
+        // Position at interpolated location
+        graphics.translate(
+                this.xo + (this.x - this.xo) * partialTicks + 4,
+                this.yo + (this.y - this.yo) * partialTicks,
+                this.zo + (this.z - this.zo) * partialTicks
+        );
+
+        // Apply scaling and orientation
+        graphics.scale(-MODEL_SIZE, -MODEL_SIZE, -MODEL_SIZE);
+        graphics.translate(0.0F, MODEL_Y_OFFSET, 0.0F);
+
+        // Render the model
+        PLAYER_MODEL.render(graphics, this, partialTicks);
+
+        graphics.popMatrix();
     }
 
     private float lastGeneratedPosX = 0;
@@ -197,7 +274,7 @@ public class Player extends Entity {
     public void loadAndUnloadChunksAroundPlayer(int renderDistance) {
         if (generateDelay != -1) {
             // Check if the player has moved significantly
-            if (Math.abs(this.x - lastGeneratedPosX) < 4 || Math.abs(this.z - lastGeneratedPosZ) < 4) {
+            if (abs(this.x - lastGeneratedPosX) < 4 || abs(this.z - lastGeneratedPosZ) < 4) {
                 return; // No significant movement, no need to generate chunks
             } else {
                 // still delay the generation for a few more frames
@@ -255,6 +332,25 @@ public class Player extends Entity {
         this.generateDelay = random.nextInt(10) + 5; // Random delay for chunk generation
     }
 
+    /**
+     * Rotates the entity.
+     *
+     * @param yawRotation   Change in yaw rotation
+     * @param pitchRotation Change in pitch rotation
+     */
+    public void turn(float yawRotation, float pitchRotation) {
+        this.cameraYaw = (float) ((double) this.cameraYaw + (double) yawRotation * 0.15);
+        this.cameraPitch = (float) ((double) this.cameraPitch + (double) pitchRotation * 0.15);
+
+        // Clamp pitch to prevent camera flipping
+        if (this.cameraPitch < -90.0F) {
+            this.cameraPitch = -90.0F;
+        }
+        if (this.cameraPitch > 90.0F) {
+            this.cameraPitch = 90.0F;
+        }
+    }
+
     public float getFOVMultiplier() {
         float baseSpeed = this.onGround ? 0.1f : 0.02f;
         float currentSpeed = this.sprinting ? baseSpeed * 1.3f : baseSpeed;
@@ -308,5 +404,29 @@ public class Player extends Entity {
 
     public boolean isInventoryOpen() {
         return inventoryOpen;
+    }
+
+    /**
+     * Wraps an angle to the [-180,180) range.
+     */
+    private static float wrapDegrees(float angle) {
+        angle %= 360.0F;
+        if (angle >= 180.0F) angle -= 360.0F;
+        if (angle < -180.0F) angle += 360.0F;
+        return angle;
+    }
+
+    /**
+     * Clamps the change from current toward target to at most maxDelta.
+     */
+    private static float clampAngle(float current, float target, float maxDelta) {
+        float delta = wrapDegrees(target - current);
+        if (delta > maxDelta) delta = maxDelta;
+        if (delta < -maxDelta) delta = -maxDelta;
+        return current + delta;
+    }
+
+    public boolean isThePlayer() {
+        return isThePlayer;
     }
 }

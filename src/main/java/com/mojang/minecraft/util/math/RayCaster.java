@@ -2,7 +2,6 @@ package com.mojang.minecraft.util.math;
 
 import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.level.Level;
-import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.world.HitResult;
 
@@ -34,8 +33,8 @@ public class RayCaster {
         float rayStartZ = entity.zo + (entity.z - entity.zo) * partialTick;
 
         // Calculate ray direction from player's rotation
-        float yaw = entity.yRot;
-        float pitch = entity.xRot;
+        float yaw = entity.yaw;
+        float pitch = entity.pitch;
 
         // Convert rotation angles to direction vector
         // Yaw: 0 is south (+Z), 90 is west (-X), 180 is north (-Z), 270 is east (+X)
