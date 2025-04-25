@@ -1,0 +1,15 @@
+-XstartOnFirstThread
+-Djava.library.path=natives/macos/arm64
+--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED
+-XX:+TieredCompilation
+-XX:+UseSuperWord
+-XX:CompileThreshold=1000
+-XX:InlineSmallCode=200
+-XX:MaxInlineLevel=20
+-Xms512m
+-Xmx512m
+-XX:+UseZGC
+-XX:ZCollectionInterval=5
+-XX:ZUncommitDelay=5m
+-XX:+DisableExplicitGC
+-Xlog:gc+phases*=debug:file=gc-zgc.log:time,level,tags

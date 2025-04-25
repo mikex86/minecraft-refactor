@@ -1,7 +1,7 @@
 package com.mojang.minecraft.engine;
 
 import com.mojang.minecraft.crash.CrashReporter;
-import com.mojang.minecraft.level.Chunk;
+import com.mojang.minecraft.level.chunk.Chunk;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.renderer.GameWindow;
 import com.mojang.minecraft.util.time.Timer;

@@ -1,6 +1,7 @@
 package com.mojang.minecraft.util.nio;
 
 import com.mojang.minecraft.Minecraft;
+import com.mojang.minecraft.profiler.NativeMemoryTracker;
 import org.lwjgl.system.jemalloc.JEmalloc;
 
 import java.nio.ByteBuffer;
@@ -15,6 +16,7 @@ public class NativeByteArray {
 
     public NativeByteArray(int size) {
         this.buffer = JEmalloc.je_calloc(size, 1);
+        NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.addAndGet(size);
         this.size = size;
     }
 
@@ -45,6 +47,7 @@ public class NativeByteArray {
     public void dispose() {
         this.disposed = true;
         JEmalloc.je_free(this.buffer);
+        NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.addAndGet(-size);
     }
 
     public void setContents(byte[] data) {

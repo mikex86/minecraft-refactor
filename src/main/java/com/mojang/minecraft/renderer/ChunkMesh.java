@@ -23,16 +23,14 @@ public class ChunkMesh implements Disposable {
     }
 
     /**
-     * Rebuilds the mesh with the latest vertex data.
+     * Uploads the mesh with the latest vertex data to the GPU.
      */
-    public void rebuild() {
+    public void upload(Tesselator tesselator) {
         // Clean up existing mesh if needed
         if (mesh != null) {
             mesh.dispose();
             mesh = null;
         }
-
-        Tesselator tesselator = Tesselator.instance;
 
         int vertexCount = tesselator.getVertexCount();
         int indexCount = tesselator.getIndexCount();
@@ -53,13 +51,6 @@ public class ChunkMesh implements Disposable {
             return 1;
         }
         return 0;
-    }
-
-    /**
-     * Clears the vertex data but keeps the buffer allocated.
-     */
-    public void clear() {
-        Tesselator.instance.init();
     }
 
     /**

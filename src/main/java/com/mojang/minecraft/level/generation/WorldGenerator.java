@@ -1,6 +1,6 @@
 package com.mojang.minecraft.level.generation;
 
-import com.mojang.minecraft.level.Chunk;
+import com.mojang.minecraft.level.chunk.Chunk;
 import com.mojang.minecraft.level.generation.noise.SimplexNoise;
 import com.mojang.minecraft.level.generation.structure.StructurePlacer;
 

@@ -2,8 +2,8 @@ package com.mojang.minecraft.level;
 
 import com.mojang.minecraft.crash.CrashReporter;
 import com.mojang.minecraft.entity.Entity;
-import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.level.block.state.BlockState;
+import com.mojang.minecraft.level.chunk.Chunk;
 import com.mojang.minecraft.level.generation.WorldGenerator;
 import com.mojang.minecraft.level.save.LevelLoader;
 import com.mojang.minecraft.level.save.LevelSaver;
@@ -199,20 +199,22 @@ public class Level {
         return chunk.getBlockState(x & Chunk.CHUNK_SIZE_MINUS_ONE, y, z & Chunk.CHUNK_SIZE_MINUS_ONE);
     }
 
-    private long lastChunkKey = 0;
-    private Chunk lastChunk = null;
+    private final ThreadLocal<Long> lastChunkKey = new ThreadLocal<>();
+    private final ThreadLocal<Chunk> lastChunk = new ThreadLocal<>();
+
 
     public Chunk getChunk(int x, int z) {
         int cx = x >> Chunk.CHUNK_SIZE_LG2;
         int cz = z >> Chunk.CHUNK_SIZE_LG2;
         long chunkKey = makeChunkKey(cx, cz);
-        if (chunkKey == lastChunkKey) {
-            return lastChunk;
+        Long lastKey = lastChunkKey.get();
+        if (lastKey != null && chunkKey == lastKey) {
+            return lastChunk.get();
         }
         synchronized (this.chunkLoadMutex) {
             Chunk chunk = this.chunkMap.get(chunkKey);
-            lastChunk = chunk;
-            lastChunkKey = chunkKey;
+            lastChunk.set(chunk);
+            lastChunkKey.set(chunkKey);
             return chunk;
         }
     }

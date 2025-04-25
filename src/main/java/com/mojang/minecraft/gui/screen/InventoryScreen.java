@@ -7,6 +7,7 @@ import com.mojang.minecraft.item.BlockItem;
 import com.mojang.minecraft.item.Item;
 import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.item.inventory.Inventory;
+import com.mojang.minecraft.optim.pools.StackCountStringPool;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.block.BlockPreviewRenderer;
@@ -145,10 +146,9 @@ public class InventoryScreen extends GuiScreen {
                     if (itemStack == null) {
                         continue;
                     }
-                    String stackSizeText = String.valueOf(itemStack.getCount());
                     int count = itemStack.getCount();
                     if (count > 1) {
-                        this.stackSizeMainInventoryLabels[row][column].setText(stackSizeText);
+                        this.stackSizeMainInventoryLabels[row][column].setText(StackCountStringPool.valueOf(count));
                         this.stackSizeMainInventoryLabels[row][column].render(graphics, centerX - INVENTORY_UI_WIDTH / 2f + ITEM_SLOT_SIZE * column + 7 + ITEM_SLOT_SIZE - this.stackSizeMainInventoryLabels[row][column].getWidth(), centerY + 10 + ITEM_SLOT_SIZE * row);
                     }
                 }
@@ -160,10 +160,9 @@ public class InventoryScreen extends GuiScreen {
                 if (itemStack == null) {
                     continue;
                 }
-                String stackSizeText = String.valueOf(itemStack.getCount());
                 int count = itemStack.getCount();
                 if (count > 1) {
-                    this.stackSizeHotbarLabels[i].setText(stackSizeText);
+                    this.stackSizeHotbarLabels[i].setText(StackCountStringPool.valueOf(count));
                     this.stackSizeHotbarLabels[i].render(graphics, centerX - INVENTORY_UI_WIDTH / 2f + ITEM_SLOT_SIZE * i + 7 + ITEM_SLOT_SIZE - this.stackSizeHotbarLabels[i].getWidth(), centerY + INVENTORY_UI_HEIGHT / 2f - this.font.getFontHeight() - 7);
                 }
             }
@@ -224,10 +223,9 @@ public class InventoryScreen extends GuiScreen {
 
             // draw selected item stack size label
             if (selectedItem != null) {
-                String stackSizeText = String.valueOf(selectedItem.getCount());
                 int count = selectedItem.getCount();
                 if (count > 1) {
-                    this.stackSizeSelectedItemLabel.setText(stackSizeText);
+                    this.stackSizeSelectedItemLabel.setText(StackCountStringPool.valueOf(count));
                     this.stackSizeSelectedItemLabel.render(graphics, mouseX + 9 - this.stackSizeSelectedItemLabel.getWidth(), mouseY + 2);
                 }
             }

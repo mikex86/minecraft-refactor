@@ -200,19 +200,6 @@ public interface GraphicsAPI {
     void setMatrixMode(MatrixMode mode);
 
     /**
-     * Draws indexed primitives from a vertex buffer and an index buffer.
-     * 
-     * @param vertexBuffer The vertex buffer
-     * @param indexBuffer  The index buffer
-     * @param type   The primitive type
-     * @param start  The start index
-     * @param count  The number of indices to draw
-     * @deprecated Use {@link #drawPrimitives(VertexArrayObject, PrimitiveType, int, int)} instead
-     */
-    @Deprecated
-    void drawIndexedPrimitives(VertexBuffer vertexBuffer, IndexBuffer indexBuffer, PrimitiveType type, int start, int count);
-
-    /**
      * Draws primitives using a vertex array object.
      * 
      * @param vao    The vertex array object

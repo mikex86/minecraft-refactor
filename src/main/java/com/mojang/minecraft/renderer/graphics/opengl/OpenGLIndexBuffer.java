@@ -1,5 +1,6 @@
 package com.mojang.minecraft.renderer.graphics.opengl;
 
+import com.mojang.minecraft.profiler.GpuMemoryTracker;
 import com.mojang.minecraft.renderer.graphics.IndexBuffer;
 
 import java.nio.IntBuffer;
@@ -55,9 +56,14 @@ public class OpenGLIndexBuffer implements IndexBuffer {
         if (isDisposed()) {
             throw new IllegalStateException("Cannot use a disposed index buffer");
         }
-        
+
+        // subtract previous size from allocated memory
+        GpuMemoryTracker.ALLOCATED_GPU_MEMORY -= this.sizeInBytes;
         this.sizeInBytes = sizeInBytes;
-        
+
+        // Add the size to allocated memory
+        GpuMemoryTracker.ALLOCATED_GPU_MEMORY += sizeInBytes;
+
         // Calculate index count
         this.indexCount = sizeInBytes / 4; // 4 bytes per int
         
@@ -99,6 +105,7 @@ public class OpenGLIndexBuffer implements IndexBuffer {
         if (!disposed) {
             glDeleteBuffers(iboId);
             disposed = true;
+            GpuMemoryTracker.ALLOCATED_GPU_MEMORY -= sizeInBytes;
         }
     }
 } 

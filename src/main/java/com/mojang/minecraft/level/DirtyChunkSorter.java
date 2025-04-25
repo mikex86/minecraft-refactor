@@ -1,6 +1,7 @@
 package com.mojang.minecraft.level;
 
 import com.mojang.minecraft.entity.EntityPlayer;
+import com.mojang.minecraft.level.chunk.Chunk;
 import com.mojang.minecraft.renderer.Frustum;
 
 import java.util.Comparator;
@@ -46,17 +47,7 @@ public class DirtyChunkSorter implements Comparator<Chunk> {
             return 1;
         }
 
-        // Second priority: age of dirt state (in time buckets)
-        int ageBucket1 = (int) ((this.currentTime - chunk1.dirtiedTime) / AGE_BUCKET_SIZE);
-        int ageBucket2 = (int) ((this.currentTime - chunk2.dirtiedTime) / AGE_BUCKET_SIZE);
-
-        if (ageBucket1 < ageBucket2) {
-            return -1;
-        } else if (ageBucket1 > ageBucket2) {
-            return 1;
-        }
-
-        // Third priority: distance to player
+        // Second priority: distance to player
         float distance1 = chunk1.distanceToSqr(this.player);
         float distance2 = chunk2.distanceToSqr(this.player);
         return Float.compare(distance1, distance2);

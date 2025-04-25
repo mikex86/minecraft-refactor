@@ -1,7 +1,7 @@
 package com.mojang.minecraft.level.save;
 
 import com.mojang.minecraft.crash.CrashReporter;
-import com.mojang.minecraft.level.Chunk;
+import com.mojang.minecraft.level.chunk.Chunk;
 
 import java.io.File;
 import java.io.IOException;

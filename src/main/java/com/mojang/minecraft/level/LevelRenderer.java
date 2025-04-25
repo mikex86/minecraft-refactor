@@ -1,7 +1,9 @@
 package com.mojang.minecraft.level;
 
+import com.mojang.minecraft.crash.CrashReporter;
 import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.entity.EntityPlayer;
+import com.mojang.minecraft.level.chunk.Chunk;
 import com.mojang.minecraft.renderer.Disposable;
 import com.mojang.minecraft.renderer.Frustum;
 import com.mojang.minecraft.renderer.TextureManager;
@@ -11,14 +13,15 @@ import com.mojang.minecraft.renderer.graphics.Texture;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.PriorityQueue;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.PriorityBlockingQueue;
 
 /**
  * Handles rendering of the Minecraft level.
  */
 public class LevelRenderer implements LevelListener, Disposable {
-    // Constants
-    public static final int MAX_REBUILDS_PER_FRAME = 4;
-
     // Level data
     private final Level level;
 
@@ -42,7 +45,7 @@ public class LevelRenderer implements LevelListener, Disposable {
     }
 
     /**
-     * Instance to return in {@link #getAllDirtyChunks()};
+     * Instance to return in {@link #getAllPendingDirtyChunks()};
      * This makes the function not thread-safe, but this reduces allocation rate
      */
     private final ArrayList<Chunk> dirtyChunks = new ArrayList<>();
@@ -51,14 +54,13 @@ public class LevelRenderer implements LevelListener, Disposable {
      * Gets all chunks that need to be rebuilt.
      * This function is not thread-safe and should only be called from the main thread.
      */
-    public List<Chunk> getAllDirtyChunks() {
+    public List<Chunk> getAllPendingDirtyChunks() {
         dirtyChunks.clear();
         for (Chunk chunk : this.level.getLoadedChunks()) {
-            if (chunk.isDirty()) {
+            if (chunk.isDirty() && !chunk.isRebuildScheduled()) {
                 dirtyChunks.add(chunk);
             }
         }
-
         return dirtyChunks;
     }
 
@@ -100,27 +102,78 @@ public class LevelRenderer implements LevelListener, Disposable {
         }
     }
 
+    private PriorityBlockingQueue<Chunk> rebuildQueue;
+    private PriorityBlockingQueue<Chunk> uploadQueue;
+
+    private static final int REBUILD_THREADS = 16;
+
+    private final Thread[] rebuildThreads = new Thread[REBUILD_THREADS];
+
+    {
+        for (int i = 0; i < REBUILD_THREADS; i++) {
+            rebuildThreads[i] = new Thread("ChunkRebuildThread-" + i) {
+                @Override
+                public void run() {
+                    while (true) {
+                        if (rebuildQueue == null) {
+                            Thread.yield();
+                            continue;
+                        }
+                        // process rebuild queue
+                        try {
+                            Chunk chunk = rebuildQueue.take();
+                            try {
+                                chunk.dataMutex.readLock().lock();
+                                chunk.rebuild();
+                            } finally {
+                                chunk.dataMutex.readLock().unlock();
+                            }
+                            chunk.setRebuildScheduled(false);
+                            uploadQueue.add(chunk);
+                        } catch (InterruptedException e) {
+                            // Handle interruption
+                            Thread.currentThread().interrupt();
+                            break;
+                        } catch (Exception e) {
+                            CrashReporter.logException("Failed to rebuild chunk", e);
+                        }
+                    }
+                }
+            };
+            rebuildThreads[i].setDaemon(true);
+            rebuildThreads[i].start();
+        }
+    }
+
     /**
-     * Updates chunks that need to be rebuilt.
+     * Update chunks that need to be rebuilt.
      */
     public void updateDirtyChunks(EntityPlayer player) {
-        List<Chunk> dirtyChunks = this.getAllDirtyChunks();
-        if (dirtyChunks != null && !dirtyChunks.isEmpty()) {
-            Frustum frustum = Frustum.getFrustum(graphics);
-            dirtyChunks.sort(new DirtyChunkSorter(player, frustum));
+        Frustum frustum = Frustum.getFrustum(graphics);
+        if (rebuildQueue == null) {
+            rebuildQueue = new PriorityBlockingQueue<>(100, new DirtyChunkSorter(player, frustum));
+        }
+        if (uploadQueue == null) {
+            uploadQueue = new PriorityBlockingQueue<>(100, new DirtyChunkSorter(player, frustum));
+        }
 
-            // Rebuild at most MAX_REBUILDS_PER_FRAME chunks per frame
-            int rebuildCount = Math.min(MAX_REBUILDS_PER_FRAME, dirtyChunks.size());
-            int numRebuilt = 0;
-            for (Chunk dirtyChunk : dirtyChunks) {
-                if (!frustum.isVisible(dirtyChunk.aabb)) {
-                    continue;
+        // schedule rebuild for all dirty chunks
+        {
+            List<Chunk> dirtyChunks = this.getAllPendingDirtyChunks();
+            if (dirtyChunks != null && !dirtyChunks.isEmpty()) {
+                dirtyChunks.sort(new DirtyChunkSorter(player, frustum));
+                for (Chunk dirtyChunk : dirtyChunks) {
+                    rebuildQueue.add(dirtyChunk);
+                    dirtyChunk.setRebuildScheduled(true);
                 }
-                dirtyChunk.rebuild();
-                numRebuilt++;
-                if (numRebuilt >= rebuildCount) {
-                    break;
-                }
+            }
+        }
+
+        // upload all pending chunks
+        while (!uploadQueue.isEmpty()) {
+            Chunk chunk = uploadQueue.poll();
+            if (chunk != null) {
+                chunk.uploadPendingMeshes();
             }
         }
     }

@@ -13,6 +13,7 @@ import com.mojang.minecraft.item.Item;
 import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
+import com.mojang.minecraft.optim.pools.StackCountStringPool;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.renderer.block.BlockPreviewRenderer;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
@@ -69,6 +70,8 @@ public class GameRenderer implements Disposable {
     private final TextLabel versionStringLabel;
     private final TextLabel fpsStringLabel;
     private final TextLabel positionStringLabel;
+    private final TextLabel memoryStringLabel;
+    private final String[] debugStrings = new String[3];
 
     /**
      * Creates a new graphics renderer.
@@ -122,6 +125,7 @@ public class GameRenderer implements Disposable {
         this.versionStringLabel = new TextLabel(font, 0xFFFFFF, true);
         this.fpsStringLabel = new TextLabel(font, 0xFFFFFF, true);
         this.positionStringLabel = new TextLabel(font, 0xFFFFFF, true);
+        this.memoryStringLabel = new TextLabel(font, 0xFFFFFF, true);
     }
 
     /**
@@ -197,9 +201,8 @@ public class GameRenderer implements Disposable {
      *
      * @param partialTicks Interpolation factor between ticks (0.0-1.0)
      * @param hitResult    The current hit result (block selection)
-     * @param fpsString    String containing FPS information to display
      */
-    public void render(float partialTicks, HitResult hitResult, String fpsString) {
+    public void render(float partialTicks, HitResult hitResult) {
         // Set viewport and clear buffers
         graphics.setViewport(0, 0, this.width, this.height);
         graphics.clear(true, true, 0.5F, 0.8F, 1.0F, 0.0F);
@@ -223,8 +226,20 @@ public class GameRenderer implements Disposable {
 
         // Render HUD elements
         {
-            drawUI(graphics, fpsString, gameInputHandler, partialTicks);
+            drawUI(graphics, debugStrings, gameInputHandler, partialTicks);
         }
+    }
+
+    public void setFpsDebugString(String fpsString) {
+        this.debugStrings[0] = fpsString;
+    }
+
+    public void setPositionString(String positionString) {
+        this.debugStrings[1] = positionString;
+    }
+
+    public void setMemoryString(String memoryString) {
+        this.debugStrings[2] = memoryString;
     }
 
     private void render(float partialTicks) {
@@ -284,11 +299,11 @@ public class GameRenderer implements Disposable {
      * Draws all UI elements, including the hotbar and crosshair.
      *
      * @param graphics         The graphics api
-     * @param fpsString        The FPS string to display
+     * @param debugStrings     the debug strings to display
      * @param gameInputHandler The game input handler
      * @param partialTicks     The partial ticks for animation
      */
-    private void drawUI(GraphicsAPI graphics, String fpsString, GameInputHandler gameInputHandler, float partialTicks) {
+    private void drawUI(GraphicsAPI graphics, String[] debugStrings, GameInputHandler gameInputHandler, float partialTicks) {
         graphics.setShader(hudShader);
 
         // disable depth test
@@ -307,7 +322,7 @@ public class GameRenderer implements Disposable {
         // Render debug string
         graphics.setBlendState(true, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
 
-        drawDebugText(graphics, fpsString);
+        drawDebugText(graphics, debugStrings);
 
         if (player.isInventoryOpen()) {
             if (currentScreen == null) {
@@ -448,23 +463,29 @@ public class GameRenderer implements Disposable {
                 if (itemStack == null) {
                     continue;
                 }
-                if (itemStack.getCount() > 0) {
-                    stackSizeHotbarLabels[i].setText(String.valueOf(itemStack.getCount()));
+                int count = itemStack.getCount();
+                if (count > 0) {
+                    stackSizeHotbarLabels[i].setText(StackCountStringPool.valueOf(count));
                     stackSizeHotbarLabels[i].render(graphics, centerX - HOTBAR_WIDTH / 2f + HOTBAR_SLOT_WIDTH + HOTBAR_SLOT_WIDTH * i - stackSizeHotbarLabels[i].getWidth(), screenHeight - font.getFontHeight() - 2);
                 }
             }
         }
     }
 
-    private void drawDebugText(GraphicsAPI graphics, String fpsString) {
+    private void drawDebugText(GraphicsAPI graphics, String[] debugStrings) {
+        String fpsString = debugStrings[0];
+        String positionString = debugStrings[1];
+
         graphics.updateShaderMatrices();
 
         this.versionStringLabel.setText(Minecraft.MINECRAFT_VERSION_STRING);
         this.versionStringLabel.render(graphics, 2, 2);
         this.fpsStringLabel.setText(fpsString);
         this.fpsStringLabel.render(graphics, 2, 12);
-        this.positionStringLabel.setText("x: " + player.x + ", y: " + player.y + ", z: " + player.z);
+        this.positionStringLabel.setText(positionString);
         this.positionStringLabel.render(graphics, 2, 22);
+        this.memoryStringLabel.setText(debugStrings[2]);
+        this.memoryStringLabel.render(graphics, 2, 32);
     }
 
     private IndexedMesh crosshairMesh;

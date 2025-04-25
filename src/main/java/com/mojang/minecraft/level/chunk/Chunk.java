@@ -1,8 +1,10 @@
-package com.mojang.minecraft.level;
+package com.mojang.minecraft.level.chunk;
 
 import com.mojang.minecraft.entity.EntityPlayer;
+import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.Blocks;
 import com.mojang.minecraft.level.block.state.BlockState;
+import com.mojang.minecraft.optim.pools.ChunkBuildTesselatorPool;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.ChunkMesh;
 import com.mojang.minecraft.renderer.Disposable;
@@ -14,6 +16,8 @@ import com.mojang.minecraft.util.nio.NativeByteArray;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Represents a chunk of the world that can be rendered independently.
@@ -50,8 +54,12 @@ public class Chunk implements Disposable {
     // Chunk sections
     private final List<ChunkSection> sections = new ArrayList<>();
 
+    // Mutex for thread-safe access to chunk data
+    public final ReadWriteLock dataMutex = new ReentrantReadWriteLock();
+
     // Status tracking
     private boolean dirty = true;
+    private boolean rebuildScheduled = false;
     public long dirtiedTime = 0L;
 
     // Static rendering stats
@@ -186,9 +194,11 @@ public class Chunk implements Disposable {
     /**
      * Renders the given chunk
      */
+    @SuppressWarnings("ForLoopReplaceableByForEach")
     public int render(GraphicsAPI graphics, Frustum frustum) {
         int numSectionDrawCalls = 0;
-        for (ChunkSection section : sections) {
+        for (int i = 0, sectionsSize = sections.size(); i < sectionsSize; i++) {
+            ChunkSection section = sections.get(i);
             if (section.hasMesh() && frustum.isVisible(section.getAABB())) {
                 numSectionDrawCalls += section.render(graphics);
             }
@@ -240,13 +250,21 @@ public class Chunk implements Disposable {
         return this.dirty;
     }
 
+    public boolean isRebuildScheduled() {
+        return rebuildScheduled;
+    }
+
+    public void setRebuildScheduled(boolean rebuildScheduled) {
+        this.rebuildScheduled = rebuildScheduled;
+    }
+
     /**
      * Calculates the squared distance from this chunk to the player.
      */
     public float distanceToSqr(EntityPlayer player) {
         float xDistance = player.x - this.centerX;
         float zDistance = player.z - this.centerZ;
-        return xDistance * xDistance + zDistance * zDistance;
+        return (xDistance * xDistance) + (zDistance * zDistance);
     }
 
     /**
@@ -263,13 +281,26 @@ public class Chunk implements Disposable {
     }
 
     public void load(byte[] newBlocks) {
-        this.blockStateIds.setContents(newBlocks);
-        setFullChunkDirty();
+        try {
+            dataMutex.writeLock().lock();
+            this.blockStateIds.setContents(newBlocks);
+            setFullChunkDirty();
+        } finally {
+            dataMutex.writeLock().unlock();
+        }
     }
 
     public byte[] getBlockStateIds() {
-        return blockStateIds.getAsBytes();
-
+        byte[] blockStateIdsCopy;
+        try {
+            dataMutex.readLock().lock();
+            byte[] bytes = blockStateIds.getAsBytes();
+            blockStateIdsCopy = new byte[bytes.length];
+            System.arraycopy(bytes, 0, blockStateIdsCopy, 0, bytes.length);
+        } finally {
+            dataMutex.readLock().unlock();
+        }
+        return blockStateIdsCopy;
     }
 
     public boolean isSkyLit(int localX, int y, int localZ) {
@@ -298,6 +329,12 @@ public class Chunk implements Disposable {
         }
     }
 
+    public void uploadPendingMeshes() {
+        for (ChunkSection section : sections) {
+            section.uploadPendingSection();
+        }
+    }
+
     /**
      * Represents a 16x16x16 section of a chunk that can be rendered independently.
      */
@@ -311,9 +348,21 @@ public class Chunk implements Disposable {
 
         // Rendering state
         private boolean dirty = true;
+        private volatile boolean pendingUpload = false;
         private final ChunkMesh chunkMesh;
         private int renderedTiles = 0;
         private boolean empty = true;
+
+        private final Object uploadMutex = new Object();
+
+
+        /**
+         * Current tesselator in use for chunk rebuilding.
+         * This is only non-null if there is a pending upload.
+         * This will be cleared once the mesh has been uploaded.
+         * The tesselator stores the mesh data until it is uploaded.
+         */
+        private Tesselator currentTesselator = null;
 
         /**
          * Creates a new chunk section with the specified boundaries.
@@ -361,11 +410,11 @@ public class Chunk implements Disposable {
                 return;
             }
 
-            Tesselator tesselator = Tesselator.instance;
-            tesselator.init();
+            this.currentTesselator = ChunkBuildTesselatorPool.obtain();
+            this.currentTesselator.init();
 
-            renderedTiles = 0;
-            empty = true;
+            this.renderedTiles = 0;
+            this.empty = true;
 
             // Render all visible tiles in the section
             for (int x = this.x0; x < this.x1; ++x) {
@@ -373,20 +422,32 @@ public class Chunk implements Disposable {
                     for (int z = this.z0; z < this.z1; ++z) {
                         BlockState blockState = level.getBlockState(x, y, z);
                         if (blockState != null) {
-                            blockState.block.render(tesselator, level, x, y, z, blockState.facing);
-                            ++renderedTiles;
-                            empty = false;
+                            blockState.block.render(this.currentTesselator, level, x, y, z, blockState.facing);
+                            ++this.renderedTiles;
+                            this.empty = false;
                         }
                     }
                 }
             }
 
-            // Only rebuild the mesh if there are actual tiles in this section
-            if (!empty) {
-                chunkMesh.rebuild();
+            if (!this.empty) {
+                this.pendingUpload = true;
             }
-
             this.dirty = false;
+        }
+
+        public void uploadPendingSection() {
+            assert this.currentTesselator != null;
+            if (this.pendingUpload) {
+                synchronized (this.uploadMutex) {
+                    this.chunkMesh.upload(this.currentTesselator);
+                    this.pendingUpload = false;
+                }
+            }
+            if (this.currentTesselator != null) {
+                ChunkBuildTesselatorPool.release(this.currentTesselator);
+                this.currentTesselator = null;
+            }
         }
 
         /**
@@ -434,6 +495,10 @@ public class Chunk implements Disposable {
          */
         @Override
         public void dispose() {
+            if (currentTesselator != null) {
+                ChunkBuildTesselatorPool.release(currentTesselator);
+                currentTesselator = null;
+            }
             chunkMesh.dispose();
         }
     }

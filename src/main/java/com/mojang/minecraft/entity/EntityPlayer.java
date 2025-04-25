@@ -1,8 +1,8 @@
 package com.mojang.minecraft.entity;
 
 import com.mojang.minecraft.item.inventory.Inventory;
-import com.mojang.minecraft.level.Chunk;
 import com.mojang.minecraft.level.Level;
+import com.mojang.minecraft.level.chunk.Chunk;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.model.Model;

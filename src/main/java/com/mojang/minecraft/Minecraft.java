@@ -2,11 +2,15 @@ package com.mojang.minecraft;
 
 import com.mojang.minecraft.crash.CrashReporter;
 import com.mojang.minecraft.engine.GameEngine;
+import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.input.GameInputHandler;
+import com.mojang.minecraft.profiler.GpuMemoryTracker;
+import com.mojang.minecraft.profiler.NativeMemoryTracker;
 import com.mojang.minecraft.renderer.GameRenderer;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.shader.ShaderRegistry;
 import com.mojang.minecraft.util.logging.LoggingUtils;
+import com.mojang.minecraft.util.math.MathUtils;
 import com.mojang.minecraft.world.HitResult;
 
 import java.io.IOException;
@@ -147,7 +151,7 @@ public class Minecraft implements Runnable {
 
                     // Process game ticks
                     for (int i = 0; i < ticksToProcess; ++i) {
-                        gameState.tick();
+                        tick();
                     }
 
                     // Handle mouse look
@@ -157,8 +161,7 @@ public class Minecraft implements Runnable {
                     // Render the frame
                     this.renderer.render(
                             partialTick,
-                            hitResult,
-                            engine.getFpsString()
+                            hitResult
                     );
 
                     // Check for window size changes
@@ -180,6 +183,18 @@ public class Minecraft implements Runnable {
             // Clean up resources
             this.destroy();
         }
+    }
+
+    private void tick() {
+        this.gameState.tick();
+        this.updateDebugStrings();
+    }
+
+    private void updateDebugStrings() {
+        EntityPlayer player = this.gameState.getPlayer();
+        this.renderer.setPositionString("x: " + player.x + " y: " + player.y + " z: " + player.z);
+        this.renderer.setFpsDebugString(this.engine.getFpsString());
+        this.renderer.setMemoryString("Native memory: " + MathUtils.humanReadableByteCountSI(NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.get()) + ", GPU memory: " + MathUtils.humanReadableByteCountSI(GpuMemoryTracker.ALLOCATED_GPU_MEMORY));
     }
 
     /**

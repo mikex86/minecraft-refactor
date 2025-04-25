@@ -1,5 +1,6 @@
 package com.mojang.minecraft.renderer.graphics.opengl;
 
+import com.mojang.minecraft.profiler.GpuMemoryTracker;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 
 import java.nio.FloatBuffer;
@@ -39,7 +40,10 @@ public class OpenGLVertexBuffer implements VertexBuffer {
         if (isDisposed()) {
             throw new IllegalStateException("Cannot use a disposed vertex buffer");
         }
-        
+
+        // subtract previous size from allocated memory
+        GpuMemoryTracker.ALLOCATED_GPU_MEMORY -= this.sizeInBytes;
+
         this.sizeInBytes = sizeInBytes;
         
         // Calculate vertex count based on format stride
@@ -49,6 +53,9 @@ public class OpenGLVertexBuffer implements VertexBuffer {
         glBindBuffer(GL_ARRAY_BUFFER, vboId);
         glBufferData(GL_ARRAY_BUFFER, data, usage);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        // Add the size to allocated memory
+        GpuMemoryTracker.ALLOCATED_GPU_MEMORY += sizeInBytes;
     }
     
     @Override
@@ -95,6 +102,9 @@ public class OpenGLVertexBuffer implements VertexBuffer {
     @Override
     public void dispose() {
         if (!disposed) {
+            // Subtract the size from allocated memory
+            GpuMemoryTracker.ALLOCATED_GPU_MEMORY -= this.sizeInBytes;
+
             glDeleteBuffers(vboId);
             vboId = 0;
             disposed = true;

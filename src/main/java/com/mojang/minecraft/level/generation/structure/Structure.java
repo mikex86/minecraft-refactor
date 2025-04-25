@@ -1,6 +1,6 @@
 package com.mojang.minecraft.level.generation.structure;
 
-import com.mojang.minecraft.level.Chunk;
+import com.mojang.minecraft.level.chunk.Chunk;
 import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.util.math.MathUtils;
 

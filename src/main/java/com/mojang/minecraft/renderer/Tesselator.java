@@ -1,12 +1,15 @@
 package com.mojang.minecraft.renderer;
 
+import com.mojang.minecraft.profiler.GpuMemoryTracker;
+import com.mojang.minecraft.profiler.NativeMemoryTracker;
 import com.mojang.minecraft.renderer.graphics.*;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BufferUsage;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.PrimitiveType;
-import org.lwjgl.BufferUtils;
+import org.lwjgl.system.jemalloc.JEmalloc;
 
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.util.Objects;
 
 /**
  * Tesselator implementation that uses the GraphicsAPI.
@@ -17,12 +20,12 @@ import java.nio.IntBuffer;
  * It also uses Vertex Array Objects (VAOs) for improved rendering performance.
  */
 public class Tesselator implements Disposable {
-    private static final int MAX_FLOATS = 524288;
-    private static final int MAX_INDICES = 524288;
+    private static final int MAX_FLOATS = 262144;
+    private static final int MAX_INDICES = 262144;
 
     // CPU-side data storage
-    private final FloatBuffer cpuVertexBuffer = BufferUtils.createFloatBuffer(MAX_FLOATS);
-    private final IntBuffer cpuIndexBuffer = BufferUtils.createIntBuffer(MAX_INDICES);
+    private final FloatBuffer cpuVertexBuffer = Objects.requireNonNull(JEmalloc.je_calloc(MAX_FLOATS, Float.BYTES), "Failed to allocate cpu vertex buffer").asFloatBuffer();
+    private final IntBuffer cpuIndexBuffer = Objects.requireNonNull(JEmalloc.je_calloc(MAX_INDICES, Integer.BYTES), "Failed to allocate cpu index buffer").asIntBuffer();
 
     // State tracking
     private int vertexCount = 0;
@@ -49,17 +52,30 @@ public class Tesselator implements Disposable {
     private VertexArrayObject vao;
     private VertexBuffer.VertexFormat format;
 
+    /**
+     * Tesselator to use for everything else.
+     */
     public static Tesselator instance = new Tesselator();
 
     /**
      * Creates a new tesselator
      */
     public Tesselator() {
+        NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.addAndGet(cpuVertexBuffer.capacity());
+        NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.addAndGet(cpuIndexBuffer.capacity());
         this.graphics = GraphicsFactory.getGraphicsAPI();
+        this.vertexBuffer = null;
+        this.indexBuffer = null;
+        clear();
+    }
+
+    private void ensureVAOInitialized() {
+        if (this.vertexBuffer != null) {
+            return;
+        }
         this.vertexBuffer = graphics.createVertexBuffer(BufferUsage.DYNAMIC);
         this.indexBuffer = graphics.createIndexBuffer(BufferUsage.DYNAMIC);
         this.vao = graphics.createVertexArrayObject();
-        clear();
     }
 
     /**
@@ -116,6 +132,8 @@ public class Tesselator implements Disposable {
      */
     public void flush() {
         if (this.vertexCount > 0) {
+            ensureVAOInitialized();
+
             // Update format
             format = new VertexBuffer.VertexFormat(
                     true,                 // Always has positions
@@ -149,6 +167,8 @@ public class Tesselator implements Disposable {
      * @return The created indexed mesh
      */
     public IndexedMesh createIndexedMesh(BufferUsage bufferUsage) {
+        ensureVAOInitialized();
+
         // Set up vertex format based on tesselator state
         VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
                 true,                 // Always has positions
@@ -164,7 +184,7 @@ public class Tesselator implements Disposable {
         vertexBuffer.setFormat(format);
 
         // Upload data
-        vertexBuffer.setData(cpuVertexBuffer, dataIndex * 4); // 4 bytes per float
+        vertexBuffer.setData(cpuVertexBuffer, dataIndex * Float.BYTES); // 4 bytes per float
         indexBuffer.setData(cpuIndexBuffer, indexCount * 4); // 4 bytes per int
         
         // Create mesh with VAO
@@ -174,7 +194,7 @@ public class Tesselator implements Disposable {
     /**
      * Resets the tesselator state
      */
-    private void clear() {
+    public void clear() {
         this.vertexCount = 0;
         this.indexCount = 0;
         this.cpuVertexBuffer.clear();
@@ -314,6 +334,10 @@ public class Tesselator implements Disposable {
      */
     @Override
     public void dispose() {
+        // free the CPU-side buffers
+        JEmalloc.je_free(cpuVertexBuffer);
+        JEmalloc.je_free(cpuIndexBuffer);
+
         if (vertexBuffer != null) {
             vertexBuffer.dispose();
             vertexBuffer = null;
