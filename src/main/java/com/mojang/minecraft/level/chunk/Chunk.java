@@ -208,13 +208,13 @@ public class Chunk implements Disposable {
         }
         this.dirty = true;
 
+        // Rebuild light depth information
+        rebuildSkylight();
+
         // Mark all sections as dirty
         for (ChunkSection section : sections) {
             section.setDirty();
         }
-
-        // Rebuild light depth information
-        rebuildSkylight();
     }
 
     /**
@@ -233,7 +233,9 @@ public class Chunk implements Disposable {
         }
 
         // Rebuild light depth information
-        rebuildSkylight();
+        if (rebuildSkylight()) {
+            setFullChunkDirty();
+        }
     }
 
     /**
@@ -306,7 +308,8 @@ public class Chunk implements Disposable {
         }
     }
 
-    private void rebuildSkylight() {
+    private boolean rebuildSkylight() {
+        boolean changed = false;
         for (int x = 0; x < CHUNK_SIZE; ++x) {
             for (int z = 0; z < CHUNK_SIZE; ++z) {
                 // Find the highest light-blocking block
@@ -319,9 +322,14 @@ public class Chunk implements Disposable {
                     }
                     --y;
                 }
+                int oldDepth = this.skyLightDepths.getByte(x + z * CHUNK_SIZE);
+                if (oldDepth != y) {
+                    changed = true;
+                }
                 this.skyLightDepths.setByte(x + z * CHUNK_SIZE, (byte) y);
             }
         }
+        return changed;
     }
 
     public void uploadPendingMeshes() {

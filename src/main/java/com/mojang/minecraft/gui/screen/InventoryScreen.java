@@ -244,7 +244,7 @@ public class InventoryScreen extends GuiScreen {
 
     @Override
     public void onMouseClicked(float mouseX, float mouseY, int button, boolean pressed) {
-        if (button != 0 || !pressed) {
+        if (button != 0 || pressed) { // only handle mouse 0 release
             return;
         }
 
