@@ -75,6 +75,7 @@ public class GpuMemoryTracker {
      * This should be called when creating or disposing a buffer pool.
      * Asserts the buffer is currently bound.
      *
+     * @param bufferType  the type of buffer (GL_ARRAY_BUFFER or GL_ELEMENT_ARRAY_BUFFER)
      * @param sizeInBytes the total size of the pool
      * @param dispose     true if the pool is being disposed, false if it is being created
      */
@@ -88,10 +89,12 @@ public class GpuMemoryTracker {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             LongBuffer buffer = stack.mallocLong(1);
             glGetBufferParameteri64v(bufferType, GL_BUFFER_SIZE, buffer);
+            long actualSize = buffer.get(0);
+            
             if (dispose) {
-                TOTAL_GPU_MEMORY -= buffer.get(0);
+                TOTAL_GPU_MEMORY -= actualSize;
             } else {
-                TOTAL_GPU_MEMORY += buffer.get(0);
+                TOTAL_GPU_MEMORY += actualSize;
             }
         }
     }

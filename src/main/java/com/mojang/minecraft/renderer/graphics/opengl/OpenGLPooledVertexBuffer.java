@@ -1,12 +1,13 @@
 package com.mojang.minecraft.renderer.graphics.opengl;
 
-import com.mojang.minecraft.profiler.GpuMemoryTracker;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 import com.mojang.minecraft.renderer.graphics.opengl.OpenGLBufferPool.BufferRegion;
+import org.lwjgl.BufferUtils;
+import org.lwjgl.system.jemalloc.JEmalloc;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
-import org.lwjgl.BufferUtils;
+import java.util.Objects;
 
 import static org.lwjgl.opengl.GL15.*;
 
@@ -46,10 +47,10 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
         }
         
         // Calculate vertex count based on format stride
-        this.vertexCount = sizeInBytes / (format.getStride() * 4); // 4 bytes per float
-        
-        // Create a ByteBuffer using LWJGL's BufferUtils to ensure direct allocation
-        ByteBuffer byteBuffer = BufferUtils.createByteBuffer(sizeInBytes);
+        this.vertexCount = sizeInBytes / (format.getStride() * 4L); // 4 bytes per float
+
+        ByteBuffer byteBuffer = JEmalloc.je_malloc(sizeInBytes);
+        Objects.requireNonNull(byteBuffer, "Failed to allocate ByteBuffer via JEmalloc");
         
         // Save the buffer's position and limit
         int originalPosition = data.position();
@@ -76,6 +77,9 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
         glBindBuffer(GL_ARRAY_BUFFER, region.getBufferId());
         glBufferSubData(GL_ARRAY_BUFFER, region.getOffset(), byteBuffer);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        // Free the cpu buffer
+        JEmalloc.je_free(byteBuffer);
     }
     
     @Override

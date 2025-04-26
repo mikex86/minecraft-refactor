@@ -8,9 +8,11 @@ import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 import com.mojang.minecraft.renderer.graphics.IndexBuffer;
 import com.mojang.minecraft.renderer.shader.Shader;
 import com.mojang.minecraft.renderer.graphics.VertexArrayObject;
+import com.mojang.minecraft.profiler.GpuMemoryTracker;
 
 import java.nio.ByteBuffer;
 import java.util.Objects;
+import java.util.logging.Logger;
 
 import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL30.*;
@@ -20,6 +22,7 @@ import static org.lwjgl.opengl.GL30.*;
  * This implementation uses LWJGL to interact with OpenGL.
  */
 public class OpenGLGraphicsAPI implements GraphicsAPI {
+    private static final Logger LOGGER = Logger.getLogger(OpenGLGraphicsAPI.class.getName());
 
     // Matrix stack for emulating OpenGL's matrix functionality
     private final MatrixStack matrixStack;
@@ -31,9 +34,14 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     private int defaultVaoId;
 
     // Buffer pools for vertex and index buffers
-    private static final long DEFAULT_POOL_SIZE = 1024L * 1024L * 1024L; // 1 GiB
+    private static final long DEFAULT_POOL_SIZE = 128L * 1024L * 1024L; // 128 MB starting size
     private OpenGLBufferPool vertexBufferPool;
     private OpenGLBufferPool indexBufferPool;
+    
+    // Logging intervals
+    private static final long LOG_INTERVAL_MS = 10000; // Log every 10 seconds
+    private long lastLogTime = 0;
+    private int allocCount = 0;
 
     /**
      * Creates a new OpenGL graphics API implementation.
@@ -64,6 +72,8 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
         // Initialize buffer pools
         vertexBufferPool = new OpenGLBufferPool(GL_ARRAY_BUFFER, DEFAULT_POOL_SIZE);
         indexBufferPool = new OpenGLBufferPool(GL_ELEMENT_ARRAY_BUFFER, DEFAULT_POOL_SIZE);
+        
+        LOGGER.info("Initialized buffer pools with " + (DEFAULT_POOL_SIZE / (1024 * 1024)) + " MB each");
     }
 
     @Override
@@ -73,11 +83,13 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
 
         // Clean up buffer pools
         if (vertexBufferPool != null) {
+            LOGGER.info("Disposing vertex buffer pool: " + vertexBufferPool.getStats());
             vertexBufferPool.dispose();
             vertexBufferPool = null;
         }
 
         if (indexBufferPool != null) {
+            LOGGER.info("Disposing index buffer pool: " + indexBufferPool.getStats());
             indexBufferPool.dispose();
             indexBufferPool = null;
         }
@@ -90,8 +102,19 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
 
     @Override
     public VertexBuffer createPooledVertexBuffer(int sizeInBytes) {
+        allocCount++;
+        
+        // Periodically log stats
+        long now = System.currentTimeMillis();
+        if (now - lastLogTime > LOG_INTERVAL_MS) {
+            LOGGER.info("VBO Pool: " + vertexBufferPool.getStats());
+            LOGGER.info("IBO Pool: " + indexBufferPool.getStats());
+            lastLogTime = now;
+        }
+        
         OpenGLBufferPool.BufferRegion region = vertexBufferPool.allocate(sizeInBytes);
         if (region == null) {
+            LOGGER.warning("Failed to allocate pooled vertex buffer of size " + sizeInBytes + " bytes");
             return null;
         }
         return new OpenGLPooledVertexBuffer(region);
@@ -104,8 +127,13 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
 
     @Override
     public IndexBuffer createPooledIndexBuffer(int sizeInBytes) {
+        allocCount++;
+        
+        // Only log stats in createPooledVertexBuffer to avoid duplicate logs
+        
         OpenGLBufferPool.BufferRegion region = indexBufferPool.allocate(sizeInBytes);
         if (region == null) {
+            LOGGER.warning("Failed to allocate pooled index buffer of size " + sizeInBytes + " bytes");
             return null;
         }
         return new OpenGLPooledIndexBuffer(region);
@@ -252,7 +280,7 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
             glVao.bind();
 
             // Determine if we're using a pooled index buffer
-            long indexOffset = start * 4; // 4 bytes per int (default)
+            long indexOffset = start * 4L; // 4 bytes per int (default)
 
             // If using a pooled index buffer, add its base offset to the start
             IndexBuffer indexBuffer = glVao.getIndexBuffer();
