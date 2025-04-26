@@ -436,6 +436,10 @@ public class GameRenderer implements Disposable {
 
         // draw hot-bar items
         graphics.setTexture(textureManager.terrainTexture);
+        graphics.setShader(worldShader);
+        worldShader.setFogUniforms(false, GraphicsAPI.FogMode.EXP, 0.0F, 0.0F, 10.0F,
+                0.5F, 0.8F, 1.0F, 1.0F);
+
         int hotBarSize = player.getInventory().getHotbarSize();
         for (int i = 0; i < hotBarSize; i++) {
             ItemStack itemStack = player.getInventory().getHotbarItem(i);
@@ -453,6 +457,7 @@ public class GameRenderer implements Disposable {
         }
 
         // draw selector (selector is drawn before stack sizes)
+        graphics.setShader(hudShader);
         {
             graphics.pushMatrix();
             graphics.translate(centerX - HOTBAR_WIDTH / 2f + hotbarSlotIndex * HOTBAR_SLOT_WIDTH - 1, screenHeight - HOTBAR_SELECTOR_SIZE + 1, 0.0F);

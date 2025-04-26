@@ -1,11 +1,9 @@
 package com.mojang.minecraft.renderer;
 
-import com.mojang.minecraft.profiler.GpuMemoryTracker;
 import com.mojang.minecraft.profiler.NativeMemoryTracker;
 import com.mojang.minecraft.renderer.graphics.*;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BufferUsage;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.PrimitiveType;
-import com.mojang.minecraft.renderer.graphics.opengl.OpenGLGraphicsAPI;
 import org.lwjgl.system.jemalloc.JEmalloc;
 
 import java.nio.FloatBuffer;
@@ -16,7 +14,7 @@ import java.util.Objects;
  * Tesselator implementation that uses the GraphicsAPI.
  * This provides the same functionality as the original Tesselator, but
  * uses the abstracted graphics API instead of direct OpenGL calls.
- * 
+ * <p>
  * This version uses indexed triangles instead of direct quads for modern GPU compatibility.
  * It also uses Vertex Array Objects (VAOs) for improved rendering performance.
  */
@@ -40,9 +38,11 @@ public class Tesselator implements Disposable {
     private float colorR;
     private float colorG;
     private float colorB;
+    private float grayScale;
 
     // Feature flags
     private boolean hasColor = false;
+    private boolean hasGrayScale = false;
     private boolean hasTexture = false;
     private boolean disableColors = false;
 
@@ -85,7 +85,7 @@ public class Tesselator implements Disposable {
     public FloatBuffer getBuffer() {
         return cpuVertexBuffer;
     }
-    
+
     /**
      * Gets the index buffer with accumulated index data
      */
@@ -99,7 +99,7 @@ public class Tesselator implements Disposable {
     public int getVertexCount() {
         return vertexCount;
     }
-    
+
     /**
      * Gets the current index count
      */
@@ -129,6 +129,13 @@ public class Tesselator implements Disposable {
     }
 
     /**
+     * Returns whether this tesselator has grayscale data
+     */
+    public boolean hasGrayScale() {
+        return hasGrayScale;
+    }
+
+    /**
      * Sends all accumulated vertices to the GPU and renders them directly
      */
     public void flush() {
@@ -137,8 +144,9 @@ public class Tesselator implements Disposable {
 
             // Update format
             format = new VertexBuffer.VertexFormat(
-                    true,                 // Always has positions
+                    true,      // Always has positions
                     this.hasColor,        // May have colors
+                    this.hasGrayScale,    // May have grayscale
                     this.hasTexture,      // May have textures
                     false                 // No normals
             );
@@ -160,7 +168,7 @@ public class Tesselator implements Disposable {
         // Reset state
         clear();
     }
-    
+
     /**
      * Creates an indexed mesh from the current tesselator state
      *
@@ -170,12 +178,12 @@ public class Tesselator implements Disposable {
     public IndexedMesh createIndexedMesh(BufferUsage bufferUsage) {
         return createIndexedMesh(bufferUsage, false);
     }
-    
+
     /**
      * Creates an indexed mesh from the current tesselator state
      *
      * @param bufferUsage The buffer usage hint
-     * @param pooled Whether to use pooled buffers
+     * @param pooled      Whether to use pooled buffers
      * @return The created indexed mesh
      */
     public IndexedMesh createIndexedMesh(BufferUsage bufferUsage, boolean pooled) {
@@ -185,6 +193,7 @@ public class Tesselator implements Disposable {
         VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
                 true,                // Always has positions
                 hasColor(),           // May have colors
+                hasGrayScale(),       // May have grayscale
                 hasTexture(),         // May have texture coords
                 false                 // No normals
         );
@@ -192,11 +201,11 @@ public class Tesselator implements Disposable {
         // Create buffers
         VertexBuffer vertexBuffer;
         IndexBuffer indexBuffer;
-        
+
         // Size calculations
         int vertexDataSizeInBytes = dataIndex * Float.BYTES; // 4 bytes per float
         int indexDataSizeInBytes = indexCount * Integer.BYTES; // 4 bytes per int
-        
+
         if (pooled) {
             vertexBuffer = graphics.createPooledVertexBuffer(vertexDataSizeInBytes);
             if (vertexBuffer == null) {
@@ -213,7 +222,7 @@ public class Tesselator implements Disposable {
             vertexBuffer = graphics.createVertexBuffer(bufferUsage);
             indexBuffer = graphics.createIndexBuffer(bufferUsage);
         }
-        
+
         vertexBuffer.setFormat(format);
 
         // Upload data
@@ -243,6 +252,7 @@ public class Tesselator implements Disposable {
         this.hasColor = false;
         this.hasTexture = false;
         this.disableColors = false;
+        this.hasGrayScale = false;
         this.vertexSize = 3; // Start with just xyz
     }
 
@@ -285,6 +295,28 @@ public class Tesselator implements Disposable {
     }
 
     /**
+     * Set grayscale for the next vertex
+     *
+     * @param gray Grayscale value (0.0-1.0)
+     */
+    public void grayScale(float gray) {
+        if (this.disableColors) {
+            return;
+        }
+
+        if (this.hasColor) {
+            throw new IllegalStateException("Cannot set grayscale when color is already set");
+        }
+
+        if (!this.hasGrayScale) {
+            this.vertexSize += 1; // Add space for grayscale
+        }
+
+        this.hasGrayScale = true;
+        this.grayScale = gray;
+    }
+
+    /**
      * Add a vertex with texture coordinates
      *
      * @param x X coordinate
@@ -321,6 +353,10 @@ public class Tesselator implements Disposable {
             this.cpuVertexBuffer.put(currentIndex++, this.colorG);
             this.cpuVertexBuffer.put(currentIndex++, this.colorB);
         }
+        // Add grayscale if enabled
+        else if (this.hasGrayScale) {
+            this.cpuVertexBuffer.put(currentIndex++, this.grayScale);
+        }
 
         // Add position (always present)
         this.cpuVertexBuffer.put(currentIndex++, x);
@@ -337,12 +373,12 @@ public class Tesselator implements Disposable {
         if (this.vertexCount % 4 == 0) {
             // For each quad, generate two triangles
             int baseIndex = this.vertexCount - 4;
-            
+
             // First triangle (0, 1, 2)
             this.cpuIndexBuffer.put(this.indexCount++, baseIndex);
             this.cpuIndexBuffer.put(this.indexCount++, baseIndex + 1);
             this.cpuIndexBuffer.put(this.indexCount++, baseIndex + 2);
-            
+
             // Second triangle (0, 2, 3)
             this.cpuIndexBuffer.put(this.indexCount++, baseIndex);
             this.cpuIndexBuffer.put(this.indexCount++, baseIndex + 2);
@@ -375,12 +411,12 @@ public class Tesselator implements Disposable {
             vertexBuffer.dispose();
             vertexBuffer = null;
         }
-        
+
         if (indexBuffer != null) {
             indexBuffer.dispose();
             indexBuffer = null;
         }
-        
+
         if (vao != null) {
             vao.dispose();
             vao = null;

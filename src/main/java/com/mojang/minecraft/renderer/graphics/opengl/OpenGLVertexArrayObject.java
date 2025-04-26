@@ -106,6 +106,10 @@ public class OpenGLVertexArrayObject implements VertexArrayObject {
             glEnableVertexAttribArray(1);
             glVertexAttribPointer(1, 3, GL_FLOAT, false, stride, offset);
             offset += 3 * 4; // 3 floats * 4 bytes
+        } else if (format.hasGrayScale()) {
+            glEnableVertexAttribArray(1);
+            glVertexAttribPointer(1, 1, GL_FLOAT, false, stride, offset);
+            offset += 4; // 1 float
         }
         
         // Normals (attribute location 3)

@@ -63,7 +63,7 @@ public class Bush extends Block {
         float v1 = v0 + 0.0624375F;
         int rotations = 2; // Number of crossed planes
 
-        t.color(1.0F, 1.0F, 1.0F);
+        t.grayScale(1.0F);
 
         // Render crossed planes
         for (int r = 0; r < rotations; ++r) {

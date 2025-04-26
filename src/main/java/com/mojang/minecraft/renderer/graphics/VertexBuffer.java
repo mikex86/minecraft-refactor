@@ -59,6 +59,7 @@ public interface VertexBuffer extends GraphicsResource {
     class VertexFormat {
         private final boolean hasPositions;
         private final boolean hasColors;
+        private final boolean hasGrayScale;
         private final boolean hasTexCoords;
         private final boolean hasNormals;
         private final int stride;
@@ -68,12 +69,14 @@ public interface VertexBuffer extends GraphicsResource {
          * 
          * @param hasPositions  Whether vertices have positions
          * @param hasColors     Whether vertices have colors
+         * @param hasGrayScale Whether vertices have grayscale colors
          * @param hasTexCoords  Whether vertices have texture coordinates
          * @param hasNormals    Whether vertices have normal vectors
          */
-        public VertexFormat(boolean hasPositions, boolean hasColors, boolean hasTexCoords, boolean hasNormals) {
+        public VertexFormat(boolean hasPositions, boolean hasColors, boolean hasGrayScale, boolean hasTexCoords, boolean hasNormals) {
             this.hasPositions = hasPositions;
             this.hasColors = hasColors;
+            this.hasGrayScale = hasGrayScale;
             this.hasTexCoords = hasTexCoords;
             this.hasNormals = hasNormals;
             
@@ -86,6 +89,10 @@ public interface VertexBuffer extends GraphicsResource {
             
             if (hasColors) {
                 stride += 3; // RGB
+            }
+
+            if (hasGrayScale) {
+                stride += 1; // Grayscale
             }
             
             if (hasTexCoords) {
@@ -116,7 +123,16 @@ public interface VertexBuffer extends GraphicsResource {
         public boolean hasColors() {
             return hasColors;
         }
-        
+
+        /**
+         * Gets whether this format includes grayscale colors.
+         *
+         * @return true if this format includes grayscale colors
+         */
+        public boolean hasGrayScale() {
+            return hasGrayScale;
+        }
+
         /**
          * Gets whether this format includes texture coordinates.
          * 

@@ -32,7 +32,7 @@ public class OpenGLVertexBuffer implements VertexBuffer {
     public OpenGLVertexBuffer(int usage) {
         this.vboId = glGenBuffers();
         this.usage = usage;
-        this.format = new VertexFormat(true, false, false, false);
+        this.format = new VertexFormat(true, false, false, false, false);
     }
 
     @Override

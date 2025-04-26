@@ -16,6 +16,7 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 import com.mojang.minecraft.renderer.shader.ShaderRegistry;
 import com.mojang.minecraft.renderer.shader.impl.EntityShader;
+import com.mojang.minecraft.renderer.shader.impl.WorldShader;
 
 import static com.mojang.minecraft.entity.EntityPlayer.PLAYER_MODEL;
 
@@ -67,6 +68,8 @@ public class InventoryScreen extends GuiScreen {
 
     private static final int ITEM_SLOT_SIZE = 18;
 
+    private static final WorldShader WORLD_SHADER = ShaderRegistry.getInstance().getWorldShader();
+
     @Override
     public void drawScreen(GraphicsAPI graphics, float screenWidth, float screenHeight, float partialTicks) {
         float centerX = screenWidth / 2f;
@@ -99,6 +102,10 @@ public class InventoryScreen extends GuiScreen {
 
         // draw items
         {
+            // set world shader
+            graphics.setShader(WORLD_SHADER);
+            WORLD_SHADER.setFogUniforms(false, GraphicsAPI.FogMode.LINEAR, 0f, 0f, 0f, 0f, 0f, 0f, 0f);
+
             // set terrain texture
             graphics.setTexture(textureManager.terrainTexture);
 

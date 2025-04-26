@@ -95,37 +95,37 @@ public class Block {
 
         // Bottom face
         if (shouldRenderFace(level, x, y - 1, z)) {
-            t.color(bottomColor, bottomColor, bottomColor);
+            t.grayScale(bottomColor);
             renderFace(t, x, y, z, 0, facing);
         }
 
         // Top face
         if (shouldRenderFace(level, x, y + 1, z)) {
-            t.color(topColor, topColor, topColor);
+            t.grayScale(topColor);
             renderFace(t, x, y, z, 1, facing);
         }
 
         // North face
         if (shouldRenderFace(level, x, y, z - 1)) {
-            t.color(northColor, northColor, northColor);
+            t.grayScale(northColor);
             renderFace(t, x, y, z, 2, facing);
         }
 
         // South face
         if (shouldRenderFace(level, x, y, z + 1)) {
-            t.color(southColor, southColor, southColor);
+            t.grayScale(southColor);
             renderFace(t, x, y, z, 3, facing);
         }
 
         // West face
         if (shouldRenderFace(level, x - 1, y, z)) {
-            t.color(westColor, westColor, westColor);
+            t.grayScale(westColor);
             renderFace(t, x, y, z, 4, facing);
         }
 
         // East face
         if (shouldRenderFace(level, x + 1, y, z)) {
-            t.color(eastColor, eastColor, eastColor);
+            t.grayScale(eastColor);
             renderFace(t, x, y, z, 5, facing);
         }
     }
