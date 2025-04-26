@@ -134,7 +134,7 @@ public class OpenGLPooledIndexBuffer implements IndexBuffer {
     }
     
     @Override
-    public int getSizeInBytes() {
+    public long getSizeInBytes() {
         return region.getSize();
     }
     
@@ -171,7 +171,7 @@ public class OpenGLPooledIndexBuffer implements IndexBuffer {
      *
      * @return The offset in bytes
      */
-    int getOffset() {
+    long getOffset() {
         return region.getOffset();
     }
 } 

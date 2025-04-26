@@ -200,11 +200,13 @@ public class Tesselator implements Disposable {
         if (pooled) {
             vertexBuffer = graphics.createPooledVertexBuffer(vertexDataSizeInBytes);
             if (vertexBuffer == null) {
+                System.out.println("Failed to create pooled vertex buffer, falling back to dynamic allocation");
                 vertexBuffer = graphics.createVertexBuffer(bufferUsage);
             }
 
             indexBuffer = graphics.createPooledIndexBuffer(indexDataSizeInBytes);
             if (indexBuffer == null) {
+                System.out.println("Failed to create pooled index buffer, falling back to dynamic allocation");
                 indexBuffer = graphics.createIndexBuffer(bufferUsage);
             }
         } else {

@@ -40,12 +40,12 @@ public interface VertexArrayObject extends GraphicsResource {
      * 
      * @return The vertex count
      */
-    int getVertexCount();
+    long getVertexCount();
     
     /**
      * Gets the index count of the bound index buffer.
      * 
      * @return The index count
      */
-    int getIndexCount();
+    long getIndexCount();
 } 

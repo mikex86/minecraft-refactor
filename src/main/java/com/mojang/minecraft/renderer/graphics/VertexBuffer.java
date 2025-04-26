@@ -43,14 +43,14 @@ public interface VertexBuffer extends GraphicsResource {
      * 
      * @return The size in bytes
      */
-    int getSizeInBytes();
+    long getSizeInBytes();
     
     /**
      * Gets the number of vertices in this buffer.
      * 
      * @return The number of vertices
      */
-    int getVertexCount();
+    long getVertexCount();
     
     /**
      * A format descriptor for vertex data.

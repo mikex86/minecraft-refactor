@@ -94,12 +94,12 @@ public class OpenGLVertexBuffer implements VertexBuffer {
     }
 
     @Override
-    public int getSizeInBytes() {
+    public long getSizeInBytes() {
         return sizeInBytes;
     }
 
     @Override
-    public int getVertexCount() {
+    public long getVertexCount() {
         return vertexCount;
     }
 

@@ -91,7 +91,7 @@ public class OpenGLIndexBuffer implements IndexBuffer {
     }
     
     @Override
-    public int getSizeInBytes() {
+    public long getSizeInBytes() {
         return sizeInBytes;
     }
     

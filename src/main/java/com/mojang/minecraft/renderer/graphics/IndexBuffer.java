@@ -29,7 +29,7 @@ public interface IndexBuffer extends GraphicsResource {
      * 
      * @return The size in bytes
      */
-    int getSizeInBytes();
+    long getSizeInBytes();
     
     /**
      * Gets the number of indices in this buffer.

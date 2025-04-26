@@ -165,12 +165,12 @@ public class OpenGLVertexArrayObject implements VertexArrayObject {
     }
     
     @Override
-    public int getVertexCount() {
+    public long getVertexCount() {
         return vertexBuffer != null ? vertexBuffer.getVertexCount() : 0;
     }
     
     @Override
-    public int getIndexCount() {
+    public long getIndexCount() {
         return indexBuffer != null ? indexBuffer.getIndexCount() : 0;
     }
     

@@ -72,7 +72,8 @@ public class GameRenderer implements Disposable {
     private final TextLabel positionStringLabel;
     private final TextLabel memoryStringLabel1;
     private final TextLabel memoryStringLabel2;
-    private final String[] debugStrings = new String[4];
+    private final TextLabel memoryStringLabel3;
+    private final String[] debugStrings = new String[5];
 
     /**
      * Creates a new graphics renderer.
@@ -128,6 +129,7 @@ public class GameRenderer implements Disposable {
         this.positionStringLabel = new TextLabel(font, 0xFFFFFF, true);
         this.memoryStringLabel1 = new TextLabel(font, 0xFFFFFF, true);
         this.memoryStringLabel2 = new TextLabel(font, 0xFFFFFF, true);
+        this.memoryStringLabel3 = new TextLabel(font, 0xFFFFFF, true);
     }
 
     /**
@@ -246,6 +248,10 @@ public class GameRenderer implements Disposable {
 
     public void setMemoryString2(String memoryString) {
         this.debugStrings[3] = memoryString;
+    }
+
+    public void setMemoryString3(String memoryString) {
+        this.debugStrings[4] = memoryString;
     }
 
     private void render(float partialTicks) {
@@ -481,6 +487,9 @@ public class GameRenderer implements Disposable {
     private void drawDebugText(GraphicsAPI graphics, String[] debugStrings) {
         String fpsString = debugStrings[0];
         String positionString = debugStrings[1];
+        String memoryString1 = debugStrings[2];
+        String memoryString2 = debugStrings[3];
+        String memoryString3 = debugStrings[4];
 
         graphics.updateShaderMatrices();
 
@@ -490,10 +499,12 @@ public class GameRenderer implements Disposable {
         this.fpsStringLabel.render(graphics, 2, 12);
         this.positionStringLabel.setText(positionString);
         this.positionStringLabel.render(graphics, 2, 22);
-        this.memoryStringLabel1.setText(debugStrings[2]);
+        this.memoryStringLabel1.setText(memoryString1);
         this.memoryStringLabel1.render(graphics, 2, 32);
-        this.memoryStringLabel2.setText(debugStrings[3]);
+        this.memoryStringLabel2.setText(memoryString2);
         this.memoryStringLabel2.render(graphics, 2, 42);
+        this.memoryStringLabel3.setText(memoryString3);
+        this.memoryStringLabel3.render(graphics, 2, 52);
     }
 
     private IndexedMesh crosshairMesh;

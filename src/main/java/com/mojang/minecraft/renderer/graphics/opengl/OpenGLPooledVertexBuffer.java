@@ -20,7 +20,7 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
     
     // Buffer state
     private VertexFormat format;
-    private int vertexCount;
+    private long vertexCount;
     
     // State tracking
     private boolean disposed = false;
@@ -134,12 +134,12 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
     }
     
     @Override
-    public int getSizeInBytes() {
+    public long getSizeInBytes() {
         return region.getSize();
     }
     
     @Override
-    public int getVertexCount() {
+    public long getVertexCount() {
         return vertexCount;
     }
     
@@ -191,7 +191,7 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
      *
      * @return The offset in bytes
      */
-    int getOffset() {
+    long getOffset() {
         return region.getOffset();
     }
 } 
