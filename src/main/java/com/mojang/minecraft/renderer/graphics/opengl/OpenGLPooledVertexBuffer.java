@@ -1,5 +1,6 @@
 package com.mojang.minecraft.renderer.graphics.opengl;
 
+import com.mojang.minecraft.profiler.NativeMemoryTracker;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 import com.mojang.minecraft.renderer.graphics.opengl.OpenGLBufferPool.BufferRegion;
 import org.lwjgl.BufferUtils;
@@ -51,6 +52,7 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
 
         ByteBuffer byteBuffer = JEmalloc.je_malloc(sizeInBytes);
         Objects.requireNonNull(byteBuffer, "Failed to allocate ByteBuffer via JEmalloc");
+        NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.addAndGet(sizeInBytes);
 
         // Save the buffer's position and limit
         int originalPosition = data.position();
@@ -80,6 +82,7 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
 
         // Free the cpu buffer
         JEmalloc.je_free(byteBuffer);
+        NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.addAndGet(-sizeInBytes);
     }
 
     @Override
@@ -92,8 +95,9 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
             throw new IllegalArgumentException("Update range exceeds buffer region size");
         }
 
-        // Create a ByteBuffer using LWJGL's BufferUtils to ensure direct allocation
-        ByteBuffer byteBuffer = BufferUtils.createByteBuffer(sizeInBytes);
+        ByteBuffer byteBuffer = JEmalloc.je_malloc(sizeInBytes);
+        Objects.requireNonNull(byteBuffer, "Failed to allocate ByteBuffer via JEmalloc");
+        NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.addAndGet(sizeInBytes);
 
         // Save the buffer's position and limit
         int originalPosition = data.position();
@@ -120,6 +124,10 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
         glBindBuffer(GL_ARRAY_BUFFER, region.getBufferId());
         glBufferSubData(GL_ARRAY_BUFFER, region.getOffset() + offsetInBytes, byteBuffer);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        // Free the cpu buffer
+        JEmalloc.je_free(byteBuffer);
+        NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.addAndGet(-sizeInBytes);
     }
 
     @Override
@@ -133,7 +141,7 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
 
         // Recalculate vertex count if the buffer has data
         if (region.getSize() > 0) {
-            this.vertexCount = region.getSize() / (format.getStride() * 4); // 4 bytes per float
+            this.vertexCount = region.getSize() / (format.getStride() * 4L); // 4 bytes per float
         }
     }
 

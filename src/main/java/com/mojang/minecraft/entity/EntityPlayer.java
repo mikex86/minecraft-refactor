@@ -273,6 +273,16 @@ public class EntityPlayer extends EntityLiving {
     private int generateDelay = -1;
     private final Random random = new Random();
 
+    private static class ChunkPos {
+        public int x;
+        public int z;
+
+        public ChunkPos(int x, int z) {
+            this.x = x;
+            this.z = z;
+        }
+    }
+
     public void loadAndUnloadChunksAroundPlayer(int renderDistance) {
         if (generateDelay != -1) {
             // Check if the player has moved significantly
@@ -297,6 +307,7 @@ public class EntityPlayer extends EntityLiving {
         int chunkZ = (int) this.z >> Chunk.CHUNK_SIZE_LG2;
 
         // Load chunks around the player
+        List<ChunkPos> toGenerate = new ArrayList<>();
         for (int x = -renderDistance; x <= renderDistance; ++x) {
             for (int z = -renderDistance; z <= renderDistance; ++z) {
                 int cx = chunkX + x;
@@ -309,8 +320,25 @@ public class EntityPlayer extends EntityLiving {
 
                 // Load the chunk if it's not already loaded
                 if (!this.level.isChunkLoaded(cx, cz)) {
-                    this.level.loadChunk(cx, cz);
+                    toGenerate.add(new ChunkPos(cx, cz));
                 }
+            }
+        }
+
+        // Load the chunks
+        if (!toGenerate.isEmpty()) {
+            toGenerate.sort((c1, c2) -> {
+                // compare by sq distance to the player
+                int dx1 = c1.x - chunkX;
+                int dz1 = c1.z - chunkZ;
+                int dx2 = c2.x - chunkX;
+                int dz2 = c2.z - chunkZ;
+                int dist1 = dx1 * dx1 + dz1 * dz1;
+                int dist2 = dx2 * dx2 + dz2 * dz2;
+                return Integer.compare(dist1, dist2);
+            });
+            for (ChunkPos pos : toGenerate) {
+                this.level.loadChunk(pos.x, pos.z);
             }
         }
 

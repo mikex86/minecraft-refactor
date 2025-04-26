@@ -175,7 +175,7 @@ public class GameRenderer implements Disposable {
         graphics.setViewport(0, 0, this.width, this.height);
 
         // Set up projection matrix
-        graphics.setPerspectiveProjection(70.0F * player.getInterpolatedFOV(partialTick), aspectRatio, 0.05F, 1000.0F);
+        graphics.setPerspectiveProjection(70.0F * player.getInterpolatedFOV(partialTick), aspectRatio, 0.05F, 4096.0F);
 
         // Set up camera transformation
         graphics.setMatrixMode(GraphicsAPI.MatrixMode.MODELVIEW);
@@ -293,7 +293,7 @@ public class GameRenderer implements Disposable {
     }
 
     private void setupFog(FogShader fogShader) {
-        fogShader.setFogUniforms(true, GraphicsAPI.FogMode.EXP, 0.001F, 0.0F, 10.0F,
+        fogShader.setFogUniforms(0.001F, 0.0F, 10.0F,
                 0.5F, 0.8F, 1.0F, 1.0F);
 
     }
@@ -437,7 +437,7 @@ public class GameRenderer implements Disposable {
         // draw hot-bar items
         graphics.setTexture(textureManager.terrainTexture);
         graphics.setShader(worldShader);
-        worldShader.setFogUniforms(false, GraphicsAPI.FogMode.EXP, 0.0F, 0.0F, 10.0F,
+        worldShader.setFogUniforms(0.0F, 0.0F, 10.0F,
                 0.5F, 0.8F, 1.0F, 1.0F);
 
         int hotBarSize = player.getInventory().getHotbarSize();

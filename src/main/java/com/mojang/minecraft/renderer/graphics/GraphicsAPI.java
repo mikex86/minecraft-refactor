@@ -263,8 +263,6 @@ public interface GraphicsAPI {
      * Fog modes for the graphics API.
      */
     enum FogMode {
-        LINEAR,
-        EXP,
-        EXP2
+        EXP
     }
 } 

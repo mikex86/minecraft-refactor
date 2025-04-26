@@ -104,7 +104,7 @@ public class InventoryScreen extends GuiScreen {
         {
             // set world shader
             graphics.setShader(WORLD_SHADER);
-            WORLD_SHADER.setFogUniforms(false, GraphicsAPI.FogMode.LINEAR, 0f, 0f, 0f, 0f, 0f, 0f, 0f);
+            WORLD_SHADER.setFogUniforms(0f, 0f, 0f, 0f, 0f, 0f, 0f);
 
             // set terrain texture
             graphics.setTexture(textureManager.terrainTexture);

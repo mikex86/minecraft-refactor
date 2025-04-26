@@ -161,7 +161,6 @@ public class LevelRenderer implements LevelListener, Disposable {
         {
             List<Chunk> dirtyChunks = this.getAllPendingDirtyChunks();
             if (dirtyChunks != null && !dirtyChunks.isEmpty()) {
-                dirtyChunks.sort(new DirtyChunkSorter(player, frustum));
                 for (Chunk dirtyChunk : dirtyChunks) {
                     if (!frustum.isVisible(dirtyChunk.aabb)) {
                         continue;
