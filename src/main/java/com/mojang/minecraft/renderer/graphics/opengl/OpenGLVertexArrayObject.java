@@ -56,8 +56,9 @@ public class OpenGLVertexArrayObject implements VertexArrayObject {
             throw new IllegalStateException("Cannot use a disposed vertex array object");
         }
         
-        if (!(vertexBuffer instanceof OpenGLVertexBuffer)) {
-            throw new IllegalArgumentException("VertexBuffer must be an OpenGLVertexBuffer");
+        if (!(vertexBuffer instanceof OpenGLVertexBuffer) && 
+            !(vertexBuffer instanceof OpenGLPooledVertexBuffer)) {
+            throw new IllegalArgumentException("VertexBuffer must be an OpenGL vertex buffer");
         }
         
         // Store the vertex buffer
@@ -67,12 +68,27 @@ public class OpenGLVertexArrayObject implements VertexArrayObject {
         // Bind this VAO
         bind();
         
-        // Bind the vertex buffer
-        ((OpenGLVertexBuffer) vertexBuffer).bind();
+        // Determine buffer ID and offset
+        int bufferId;
+        long bufferOffset = 0;
+        
+        if (vertexBuffer instanceof OpenGLVertexBuffer) {
+            // Standard vertex buffer
+            bufferId = ((OpenGLVertexBuffer) vertexBuffer).getBufferId();
+            // Bind the vertex buffer
+            ((OpenGLVertexBuffer) vertexBuffer).bind();
+        } else {
+            // Pooled vertex buffer
+            OpenGLPooledVertexBuffer pooledBuffer = (OpenGLPooledVertexBuffer) vertexBuffer;
+            bufferId = pooledBuffer.getBufferId();
+            bufferOffset = pooledBuffer.getOffset();
+            // Bind the vertex buffer
+            pooledBuffer.bind();
+        }
         
         // Set up vertex attribute pointers
         int stride = format.getStrideInBytes();
-        int offset = 0;
+        long offset = bufferOffset;
         
         // Note: The attribute locations must match the 'in' declarations in our shaders
         // In our updated shaders, they're:
@@ -116,8 +132,9 @@ public class OpenGLVertexArrayObject implements VertexArrayObject {
             throw new IllegalStateException("Cannot use a disposed vertex array object");
         }
         
-        if (!(indexBuffer instanceof OpenGLIndexBuffer)) {
-            throw new IllegalArgumentException("IndexBuffer must be an OpenGLIndexBuffer");
+        if (!(indexBuffer instanceof OpenGLIndexBuffer) && 
+            !(indexBuffer instanceof OpenGLPooledIndexBuffer)) {
+            throw new IllegalArgumentException("IndexBuffer must be an OpenGL index buffer");
         }
         
         // Store the index buffer
@@ -127,7 +144,11 @@ public class OpenGLVertexArrayObject implements VertexArrayObject {
         bind();
         
         // Bind the index buffer
-        ((OpenGLIndexBuffer) indexBuffer).bind();
+        if (indexBuffer instanceof OpenGLIndexBuffer) {
+            ((OpenGLIndexBuffer) indexBuffer).bind();
+        } else {
+            ((OpenGLPooledIndexBuffer) indexBuffer).bind();
+        }
         
         // Unbind this VAO
         unbind();

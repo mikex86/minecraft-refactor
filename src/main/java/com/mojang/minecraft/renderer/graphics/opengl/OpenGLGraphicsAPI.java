@@ -29,6 +29,11 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     
     // Default VAO (required for OpenGL core profile)
     private int defaultVaoId;
+    
+    // Buffer pools for vertex and index buffers
+    private static final int DEFAULT_POOL_SIZE = 128 * 1024 * 1024; // 128 MB
+    private OpenGLBufferPool vertexBufferPool;
+    private OpenGLBufferPool indexBufferPool;
 
     /**
      * Creates a new OpenGL graphics API implementation.
@@ -55,22 +60,55 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
         loadIdentity();
         setMatrixMode(MatrixMode.MODELVIEW);
         loadIdentity();
+        
+        // Initialize buffer pools
+        vertexBufferPool = new OpenGLBufferPool(GL_ARRAY_BUFFER, DEFAULT_POOL_SIZE);
+        indexBufferPool = new OpenGLBufferPool(GL_ELEMENT_ARRAY_BUFFER, DEFAULT_POOL_SIZE);
     }
 
     @Override
     public void shutdown() {
         // Clean up the default VAO
         glDeleteVertexArrays(defaultVaoId);
+        
+        // Clean up buffer pools
+        if (vertexBufferPool != null) {
+            vertexBufferPool.dispose();
+            vertexBufferPool = null;
+        }
+        
+        if (indexBufferPool != null) {
+            indexBufferPool.dispose();
+            indexBufferPool = null;
+        }
     }
 
     @Override
     public VertexBuffer createVertexBuffer(BufferUsage usage) {
         return new OpenGLVertexBuffer(translateBufferUsage(usage));
     }
+    
+    @Override
+    public VertexBuffer createPooledVertexBuffer(int sizeInBytes) {
+        OpenGLBufferPool.BufferRegion region = vertexBufferPool.allocate(sizeInBytes);
+        if (region == null) {
+            return null;
+        }
+        return new OpenGLPooledVertexBuffer(region);
+    }
 
     @Override
     public IndexBuffer createIndexBuffer(BufferUsage usage) {
         return new OpenGLIndexBuffer(translateBufferUsage(usage));
+    }
+    
+    @Override
+    public IndexBuffer createPooledIndexBuffer(int sizeInBytes) {
+        OpenGLBufferPool.BufferRegion region = indexBufferPool.allocate(sizeInBytes);
+        if (region == null) {
+            return null;
+        }
+        return new OpenGLPooledIndexBuffer(region);
     }
 
     @Override
@@ -213,8 +251,18 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
             // Bind the VAO
             glVao.bind();
             
+            // Determine if we're using a pooled index buffer
+            long indexOffset = start * 4; // 4 bytes per int (default)
+            
+            // If using a pooled index buffer, add its base offset to the start
+            IndexBuffer indexBuffer = glVao.getIndexBuffer();
+            if (indexBuffer instanceof OpenGLPooledIndexBuffer) {
+                OpenGLPooledIndexBuffer pooledIndexBuffer = (OpenGLPooledIndexBuffer) indexBuffer;
+                indexOffset += pooledIndexBuffer.getOffset();
+            }
+            
             // Draw the indexed primitives
-            glDrawElements(translatePrimitiveType(type), count, GL_UNSIGNED_INT, start * 4); // 4 bytes per int
+            glDrawElements(translatePrimitiveType(type), count, GL_UNSIGNED_INT, indexOffset);
             
             // Unbind the VAO
             glVao.unbind();
@@ -396,5 +444,4 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
                 return GL_TRIANGLES;
         }
     }
-
 }

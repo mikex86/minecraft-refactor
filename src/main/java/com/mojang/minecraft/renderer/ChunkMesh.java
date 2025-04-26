@@ -36,7 +36,7 @@ public class ChunkMesh implements Disposable {
         int indexCount = tesselator.getIndexCount();
 
         if (vertexCount > 0 && indexCount > 0) {
-            mesh = tesselator.createIndexedMesh(GraphicsEnums.BufferUsage.STATIC);
+            mesh = tesselator.createIndexedMesh(GraphicsEnums.BufferUsage.STATIC, true);
         }
     }
 

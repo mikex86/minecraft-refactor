@@ -5,6 +5,7 @@ import com.mojang.minecraft.profiler.NativeMemoryTracker;
 import com.mojang.minecraft.renderer.graphics.*;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BufferUsage;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.PrimitiveType;
+import com.mojang.minecraft.renderer.graphics.opengl.OpenGLGraphicsAPI;
 import org.lwjgl.system.jemalloc.JEmalloc;
 
 import java.nio.FloatBuffer;
@@ -167,25 +168,55 @@ public class Tesselator implements Disposable {
      * @return The created indexed mesh
      */
     public IndexedMesh createIndexedMesh(BufferUsage bufferUsage) {
+        return createIndexedMesh(bufferUsage, false);
+    }
+    
+    /**
+     * Creates an indexed mesh from the current tesselator state
+     *
+     * @param bufferUsage The buffer usage hint
+     * @param pooled Whether to use pooled buffers
+     * @return The created indexed mesh
+     */
+    public IndexedMesh createIndexedMesh(BufferUsage bufferUsage, boolean pooled) {
         ensureVAOInitialized();
 
         // Set up vertex format based on tesselator state
         VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
-                true,      // Always has positions
+                true,                // Always has positions
                 hasColor(),           // May have colors
                 hasTexture(),         // May have texture coords
                 false                 // No normals
         );
 
         // Create buffers
-        VertexBuffer vertexBuffer = graphics.createVertexBuffer(bufferUsage);
-        IndexBuffer indexBuffer = graphics.createIndexBuffer(bufferUsage);
+        VertexBuffer vertexBuffer;
+        IndexBuffer indexBuffer;
+        
+        // Size calculations
+        int vertexDataSizeInBytes = dataIndex * Float.BYTES; // 4 bytes per float
+        int indexDataSizeInBytes = indexCount * Integer.BYTES; // 4 bytes per int
+        
+        if (pooled) {
+            vertexBuffer = graphics.createPooledVertexBuffer(vertexDataSizeInBytes);
+            if (vertexBuffer == null) {
+                vertexBuffer = graphics.createVertexBuffer(bufferUsage);
+            }
+
+            indexBuffer = graphics.createPooledIndexBuffer(indexDataSizeInBytes);
+            if (indexBuffer == null) {
+                indexBuffer = graphics.createIndexBuffer(bufferUsage);
+            }
+        } else {
+            vertexBuffer = graphics.createVertexBuffer(bufferUsage);
+            indexBuffer = graphics.createIndexBuffer(bufferUsage);
+        }
         
         vertexBuffer.setFormat(format);
 
         // Upload data
-        vertexBuffer.setData(cpuVertexBuffer, dataIndex * Float.BYTES); // 4 bytes per float
-        indexBuffer.setData(cpuIndexBuffer, indexCount * 4); // 4 bytes per int
+        vertexBuffer.setData(cpuVertexBuffer, vertexDataSizeInBytes);
+        indexBuffer.setData(cpuIndexBuffer, indexDataSizeInBytes);
 
         // Create mesh with VAO
         return new IndexedMesh(graphics, vertexBuffer, indexBuffer, indexCount);
