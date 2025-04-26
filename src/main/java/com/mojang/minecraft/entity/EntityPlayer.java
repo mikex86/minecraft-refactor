@@ -52,6 +52,14 @@ public class EntityPlayer extends EntityLiving {
     // Eye‐height interpolation fields
     private float prevHeightOffset;
 
+    // Distance walked fields
+    public float distanceWalked = 0.0F;
+    public float prevDistanceWalked = 0.0F;
+
+    // View bobbing state
+    public float bob = 0.0F;
+    public float prevBob = 0.0F;
+
     private final Inventory inventory = new Inventory();
     private boolean wasSprintKeyPressed;
 
@@ -167,6 +175,13 @@ public class EntityPlayer extends EntityLiving {
         // Move based on current velocity
         this.move(this.xd, this.yd, this.zd);
 
+        // Track distance walked
+        double dx = this.x - this.xo;
+        double dz = this.z - this.zo;
+        this.prevDistanceWalked = this.distanceWalked;
+        float horizontalDelta = (float) Math.sqrt(dx * dx + dz * dz) * 0.7f;
+        this.distanceWalked += horizontalDelta * 0.6F;
+
         // Apply air resistance
         this.xd *= 0.91F;
         this.yd *= 0.98F;
@@ -216,8 +231,6 @@ public class EntityPlayer extends EntityLiving {
 
         // --- Body rotation smoothing ---
         this.prevBodyYaw = this.bodyYaw;
-        double dx = this.x - this.xo;
-        double dz = this.z - this.zo;
         float movementThreshold = 0.001F;
         if (abs(dx) > movementThreshold || abs(dz) > movementThreshold) {
             float movementYaw = (float) (Math.atan2(dz, dx) * (180.0 / Math.PI)) - 90.0F;
@@ -236,6 +249,12 @@ public class EntityPlayer extends EntityLiving {
         this.bodyYaw = this.yaw - headDiff;
 
         updateAnimations();
+
+        // -- View bobbing
+        this.prevBob = this.bob;
+        float horizontalMotion = (float) Math.sqrt(xd * xd + zd * zd);
+        float bobSpeed = onGround ? Math.min(0.1F, horizontalMotion) : 0.0F;
+        this.bob += (bobSpeed - this.bob) * 0.4F;
     }
 
     /**

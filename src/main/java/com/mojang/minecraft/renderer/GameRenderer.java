@@ -39,7 +39,7 @@ public class GameRenderer implements Disposable {
     // Texture manager
     private final TextureManager textureManager;
 
-    private final int renderDistance = 32; // Render distance in chunks
+    private final int renderDistance = 16; // Render distance in chunks
 
     // Buffers for graphic operations
     private final FloatBuffer fogColor0;
@@ -180,7 +180,27 @@ public class GameRenderer implements Disposable {
         // Set up camera transformation
         graphics.setMatrixMode(GraphicsAPI.MatrixMode.MODELVIEW);
         graphics.loadIdentity();
+
+        this.bobView(player, partialTick);
         this.moveCameraToPlayer(partialTick);
+    }
+
+    private void bobView(EntityPlayer player, float partialTicks) {
+        float walkDelta = player.distanceWalked - player.prevDistanceWalked;
+        float h = -(player.distanceWalked + walkDelta * partialTicks);
+        float bobAmt = player.prevBob + (player.bob - player.prevBob) * partialTicks;
+        float sin = (float)Math.sin(h * Math.PI);
+        float cos = (float)Math.cos(h * Math.PI);
+
+        // vanilla translate
+        graphics.translate(
+            sin * bobAmt * 0.5F,
+            -Math.abs(cos * bobAmt),
+            0.0F
+        );
+        // lean left/right (Z) and tilt forward/back (X) as vanilla
+        graphics.rotateZ(sin * bobAmt * 3.0F);
+        graphics.rotateX(Math.abs((float)Math.cos(h * Math.PI - 0.2F) * bobAmt) * 5.0F);
     }
 
     /**
@@ -195,8 +215,9 @@ public class GameRenderer implements Disposable {
         float playerZ = player.zo + (player.z - player.zo) * partialTick;
 
         // Apply camera transforms
-        graphics.rotateX(player.cameraPitch);          // Pitch
+        graphics.rotateX(player.cameraPitch);        // Pitch
         graphics.rotateY(player.cameraYaw);          // Yaw
+
         graphics.translate(-playerX, -playerY - player.getInterpolatedEyeHeight(partialTick), -playerZ);
     }
 
