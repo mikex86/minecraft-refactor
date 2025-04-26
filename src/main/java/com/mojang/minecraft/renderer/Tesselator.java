@@ -171,7 +171,7 @@ public class Tesselator implements Disposable {
 
         // Set up vertex format based on tesselator state
         VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
-                true,                 // Always has positions
+                true,      // Always has positions
                 hasColor(),           // May have colors
                 hasTexture(),         // May have texture coords
                 false                 // No normals
@@ -186,7 +186,7 @@ public class Tesselator implements Disposable {
         // Upload data
         vertexBuffer.setData(cpuVertexBuffer, dataIndex * Float.BYTES); // 4 bytes per float
         indexBuffer.setData(cpuIndexBuffer, indexCount * 4); // 4 bytes per int
-        
+
         // Create mesh with VAO
         return new IndexedMesh(graphics, vertexBuffer, indexBuffer, indexCount);
     }

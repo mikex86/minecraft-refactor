@@ -194,7 +194,11 @@ public class Minecraft implements Runnable {
         EntityPlayer player = this.gameState.getPlayer();
         this.renderer.setPositionString("x: " + player.x + " y: " + player.y + " z: " + player.z);
         this.renderer.setFpsDebugString(this.engine.getFpsString());
-        this.renderer.setMemoryString("Native memory: " + MathUtils.humanReadableByteCountSI(NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.get()) + ", GPU memory: " + MathUtils.humanReadableByteCountSI(GpuMemoryTracker.ALLOCATED_GPU_MEMORY));
+
+        long usedJavaHeap = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+        long totalJavaHeap = Runtime.getRuntime().totalMemory();
+        this.renderer.setMemoryString("Used Java Heap: " + MathUtils.humanReadableByteCountSI(usedJavaHeap) + ", Java Heap Size " + MathUtils.humanReadableByteCountSI(totalJavaHeap));
+        this.renderer.setMemoryString2("Native memory: " + MathUtils.humanReadableByteCountSI(NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.get()) + ", Uploaded GPU memory: " + MathUtils.humanReadableByteCountSI(GpuMemoryTracker.UPLOADED_GPU_MEMORY) + ", Total GPU memory: " + MathUtils.humanReadableByteCountSI(GpuMemoryTracker.TOTAL_GPU_MEMORY));
     }
 
     /**

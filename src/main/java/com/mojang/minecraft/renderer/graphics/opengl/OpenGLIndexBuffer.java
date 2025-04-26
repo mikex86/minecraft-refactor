@@ -57,20 +57,25 @@ public class OpenGLIndexBuffer implements IndexBuffer {
             throw new IllegalStateException("Cannot use a disposed index buffer");
         }
 
-        // subtract previous size from allocated memory
-        GpuMemoryTracker.ALLOCATED_GPU_MEMORY -= this.sizeInBytes;
-        this.sizeInBytes = sizeInBytes;
+        if (this.sizeInBytes != 0) {
+            // track de-allocation of previous size
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboId);
+            GpuMemoryTracker.trackIbo(this.sizeInBytes, true);
+        }
 
-        // Add the size to allocated memory
-        GpuMemoryTracker.ALLOCATED_GPU_MEMORY += sizeInBytes;
+        this.sizeInBytes = sizeInBytes;
 
         // Calculate index count
         this.indexCount = sizeInBytes / 4; // 4 bytes per int
         
         // Upload data to IBO
-        bind();
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboId);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, data, usage);
-        unbind();
+
+        // track gpu memory
+        GpuMemoryTracker.trackIbo(this.sizeInBytes, false);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
     
     @Override
@@ -103,9 +108,13 @@ public class OpenGLIndexBuffer implements IndexBuffer {
     @Override
     public void dispose() {
         if (!disposed) {
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboId);
+            // track gpu memory de-allocation
+            GpuMemoryTracker.trackIbo(sizeInBytes, true);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
             glDeleteBuffers(iboId);
             disposed = true;
-            GpuMemoryTracker.ALLOCATED_GPU_MEMORY -= sizeInBytes;
         }
     }
 } 

@@ -163,6 +163,9 @@ public class LevelRenderer implements LevelListener, Disposable {
             if (dirtyChunks != null && !dirtyChunks.isEmpty()) {
                 dirtyChunks.sort(new DirtyChunkSorter(player, frustum));
                 for (Chunk dirtyChunk : dirtyChunks) {
+                    if (!frustum.isVisible(dirtyChunk.aabb)) {
+                        continue;
+                    }
                     rebuildQueue.add(dirtyChunk);
                     dirtyChunk.setRebuildScheduled(true);
                 }
@@ -174,6 +177,8 @@ public class LevelRenderer implements LevelListener, Disposable {
             Chunk chunk = uploadQueue.poll();
             if (chunk != null) {
                 chunk.uploadPendingMeshes();
+            } else {
+                break;
             }
         }
     }

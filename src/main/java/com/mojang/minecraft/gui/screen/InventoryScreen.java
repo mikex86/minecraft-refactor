@@ -197,7 +197,7 @@ public class InventoryScreen extends GuiScreen {
             graphics.rotateX(-mousePitch);
 
             // Render the model
-            graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS);
+            graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS_EQUAL);
             PLAYER_MODEL.render(graphics, this.player, partialTicks);
             graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
 

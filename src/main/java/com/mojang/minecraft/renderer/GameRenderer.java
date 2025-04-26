@@ -39,7 +39,7 @@ public class GameRenderer implements Disposable {
     // Texture manager
     private final TextureManager textureManager;
 
-    private final int renderDistance = 8; // Render distance in chunks
+    private final int renderDistance = 32; // Render distance in chunks
 
     // Buffers for graphic operations
     private final FloatBuffer fogColor0;
@@ -70,8 +70,9 @@ public class GameRenderer implements Disposable {
     private final TextLabel versionStringLabel;
     private final TextLabel fpsStringLabel;
     private final TextLabel positionStringLabel;
-    private final TextLabel memoryStringLabel;
-    private final String[] debugStrings = new String[3];
+    private final TextLabel memoryStringLabel1;
+    private final TextLabel memoryStringLabel2;
+    private final String[] debugStrings = new String[4];
 
     /**
      * Creates a new graphics renderer.
@@ -125,7 +126,8 @@ public class GameRenderer implements Disposable {
         this.versionStringLabel = new TextLabel(font, 0xFFFFFF, true);
         this.fpsStringLabel = new TextLabel(font, 0xFFFFFF, true);
         this.positionStringLabel = new TextLabel(font, 0xFFFFFF, true);
-        this.memoryStringLabel = new TextLabel(font, 0xFFFFFF, true);
+        this.memoryStringLabel1 = new TextLabel(font, 0xFFFFFF, true);
+        this.memoryStringLabel2 = new TextLabel(font, 0xFFFFFF, true);
     }
 
     /**
@@ -212,7 +214,7 @@ public class GameRenderer implements Disposable {
 
         // Enable face culling for performance
         graphics.setRasterizerState(GraphicsEnums.CullMode.BACK, GraphicsEnums.FillMode.SOLID);
-        graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS);
+        graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS_EQUAL);
 
         // Update chunks that have changed
         this.levelRenderer.updateDirtyChunks(this.player);
@@ -240,6 +242,10 @@ public class GameRenderer implements Disposable {
 
     public void setMemoryString(String memoryString) {
         this.debugStrings[2] = memoryString;
+    }
+
+    public void setMemoryString2(String memoryString) {
+        this.debugStrings[3] = memoryString;
     }
 
     private void render(float partialTicks) {
@@ -484,8 +490,10 @@ public class GameRenderer implements Disposable {
         this.fpsStringLabel.render(graphics, 2, 12);
         this.positionStringLabel.setText(positionString);
         this.positionStringLabel.render(graphics, 2, 22);
-        this.memoryStringLabel.setText(debugStrings[2]);
-        this.memoryStringLabel.render(graphics, 2, 32);
+        this.memoryStringLabel1.setText(debugStrings[2]);
+        this.memoryStringLabel1.render(graphics, 2, 32);
+        this.memoryStringLabel2.setText(debugStrings[3]);
+        this.memoryStringLabel2.render(graphics, 2, 42);
     }
 
     private IndexedMesh crosshairMesh;

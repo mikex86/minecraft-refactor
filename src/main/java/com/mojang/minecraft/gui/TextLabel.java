@@ -49,6 +49,7 @@ public class TextLabel implements Disposable {
         if (!this.text.equals(text)) {
             this.text = text;
             this.width = -1;
+            dispose();
             this.meshes[0] = null;
             this.meshes[1] = null;
         }
