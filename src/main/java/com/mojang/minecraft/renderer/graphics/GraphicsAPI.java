@@ -33,12 +33,28 @@ public interface GraphicsAPI {
     VertexBuffer createVertexBuffer(BufferUsage usage);
 
     /**
+     * Creates a pooled vertex buffer using the default vertex buffer pool.
+     *
+     * @param sizeInBytes The size of the buffer in bytes
+     * @return A new pooled vertex buffer, or null if the allocation failed
+     */
+    VertexBuffer createPooledVertexBuffer(int sizeInBytes);
+
+    /**
      * Creates an index buffer.
      *
      * @param usage The intended usage pattern of the buffer
      * @return A new index buffer
      */
     IndexBuffer createIndexBuffer(BufferUsage usage);
+
+    /**
+     * Creates a pooled index buffer using the default index buffer pool.
+     *
+     * @param sizeInBytes The size of the buffer in bytes
+     * @return A new pooled index buffer, or null if the allocation failed
+     */
+    IndexBuffer createPooledIndexBuffer(int sizeInBytes);
 
     /**
      * Creates a vertex array object.
