@@ -6,10 +6,9 @@ import com.mojang.minecraft.util.io.IOUtils;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
+import java.io.InputStream;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
-import java.util.zip.GZIPInputStream;
 
 public class LevelLoader {
 
@@ -39,17 +38,25 @@ public class LevelLoader {
     public void load(Chunk chunk, Consumer<Boolean> onFinish) {
         CompletableFuture.supplyAsync(() -> {
             savingLevelState.acquireLoading();
+            boolean noneExist = true;
             try {
-                String chunkFileName = "chunk_" + chunk.x0 + "_" + chunk.z0 + ".dat";
-                File chunkFile = new File(levelFile, chunkFileName);
-                if (!chunkFile.exists()) {
-                    return false; // Chunk file does not exist
+                int chunkIndexX = chunk.x0 >> Chunk.CHUNK_SIZE_LG2;
+                int chunkIndexZ = chunk.z0 >> Chunk.CHUNK_SIZE_LG2;
+                for (int section = 0; section < Chunk.CHUNK_SECTION_COUNT; section++) {
+                    try (RegionFile regionFile = RegionFile.getRegionFile(levelFile, chunkIndexX, chunkIndexZ, false)) {
+                        if (regionFile != null) {
+                            noneExist = false;
+                        } else {
+                            continue;
+                        }
+                        byte[] data = regionFile.readSection(chunkIndexX, chunkIndexZ, section);
+                        if (data == null) {
+                            continue;
+                        }
+                        chunk.load(section, data);
+                    }
                 }
-                try (GZIPInputStream dataIn = new GZIPInputStream(Files.newInputStream(chunkFile.toPath()))) {
-                    byte[] data = IOUtils.readAllBytes(dataIn);
-                    chunk.load(data);
-                }
-                return true;
+                return !noneExist;
             } catch (IOException e) {
                 CrashReporter.logException("Failed to load level during chunk load", e);
                 return false;

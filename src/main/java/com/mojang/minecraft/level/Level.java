@@ -49,7 +49,9 @@ public class Level {
      * Saves the level to disk.
      */
     public void save() {
-        batchUnloadChunks(this.fullyLoadedChunks, true);
+        synchronized (this.chunkLoadMutex) {
+            batchUnloadChunks(this.fullyLoadedChunks, true);
+        }
     }
 
 

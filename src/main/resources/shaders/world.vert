@@ -30,9 +30,6 @@ void main() {
     // Pass color to fragment shader
     vertexColor = color;
 
-    // Calculate fog
-    fogFactor = 1.0; // Default to no fog
-
     float eyeDistance = length(modelViewMatrix * vec4(position, 1.0));
 
     // EXP fog

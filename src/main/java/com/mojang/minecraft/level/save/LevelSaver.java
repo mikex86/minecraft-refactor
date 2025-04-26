@@ -5,28 +5,28 @@ import com.mojang.minecraft.level.chunk.Chunk;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
+import java.io.OutputStream;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.zip.GZIPOutputStream;
 
 public class LevelSaver {
 
     private final SavingLevelMutex savingLevelMutex = new SavingLevelMutex();
 
-    private final File file;
+    private final File levelFile;
 
     /**
      * Creates a new LevelSaver instance.
      *
-     * @param file The file to save the level data to
+     * @param levelFile The file to save the level data to
      */
-    public LevelSaver(File file) {
-        this.file = file;
-        if (!file.exists()) {
-            boolean success = file.mkdirs();
+    public LevelSaver(File levelFile) {
+        this.levelFile = levelFile;
+        if (!levelFile.exists()) {
+            boolean success = levelFile.mkdirs();
             if (!success) {
-                throw new RuntimeException("Failed to create level directory: " + file.getAbsolutePath());
+                throw new RuntimeException("Failed to create level directory: " + levelFile.getAbsolutePath());
             }
         }
     }
@@ -65,15 +65,20 @@ public class LevelSaver {
         }
     }
 
-    private void writeChunks(List<Chunk> chunks) {
+    private void writeChunks(List<Chunk> chunks) throws IOException {
         System.out.println("Saving level...");
         for (Chunk chunk : chunks) {
-            String chunkFileName = "chunk_" + chunk.x0 + "_" + chunk.z0 + ".dat";
-            File chunkFile = new File(file, chunkFileName);
-            try (GZIPOutputStream writer = new GZIPOutputStream(Files.newOutputStream(chunkFile.toPath()))) {
-                writer.write(chunk.getBlockStateIds());
-            } catch (IOException e) {
-                CrashReporter.logException("Failed to write chunk data", e);
+            int chunkIndexX = chunk.x0 >> Chunk.CHUNK_SIZE_LG2;
+            int chunkIndexZ = chunk.z0 >> Chunk.CHUNK_SIZE_LG2;
+            try (RegionFile regionFile = RegionFile.getRegionFile(levelFile, chunkIndexX, chunkIndexZ, true)) {
+                Objects.requireNonNull(regionFile, "Region file should not be null when createIfNotExists is true");
+                for (int section = 0; section < Chunk.CHUNK_SECTION_COUNT; section++) {
+                    byte[] blockStateIds = chunk.getBlockStateIds(section);
+                    if (blockStateIds == null) {
+                        continue;
+                    }
+                    regionFile.saveSection(chunkIndexX, chunkIndexZ, section, blockStateIds);
+                }
             }
         }
         System.out.println("Level saved.");

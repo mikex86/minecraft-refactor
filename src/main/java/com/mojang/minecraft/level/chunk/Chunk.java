@@ -27,9 +27,10 @@ public class Chunk implements Disposable {
 
     public static final int CHUNK_SIZE = 32;
     public static final int CHUNK_HEIGHT = 128;
-    public static final int SECTION_SIZE = 32;
+    public static final int SECTION_HEIGHT = 32;
     public static final int CHUNK_SIZE_LG2 = MathUtils.log2(CHUNK_SIZE);
     public static final int CHUNK_SIZE_MINUS_ONE = CHUNK_SIZE - 1;
+    public static final int CHUNK_SECTION_COUNT = CHUNK_HEIGHT / SECTION_HEIGHT;
 
     // Bounding box for this chunk
     public AABB aabb;
@@ -44,8 +45,6 @@ public class Chunk implements Disposable {
     public final int x1;
     public final int y1;
     public final int z1;
-
-    private final NativeByteArray blockStateIds;
 
     // Chunk center coordinates
     public final int centerX;
@@ -73,7 +72,7 @@ public class Chunk implements Disposable {
         totalUpdates = 0;
     }
 
-    private final NativeByteArray lightDepths;
+    private final NativeByteArray skyLightDepths;
 
     /**
      * Creates a new chunk with the specified boundaries.
@@ -94,9 +93,7 @@ public class Chunk implements Disposable {
         // Create bounding box
         this.aabb = new AABB((float) x0, (float) y0, (float) z0, (float) x1, (float) y1, (float) z1);
 
-        // Initialize blocks array
-        this.blockStateIds = new NativeByteArray(CHUNK_SIZE * CHUNK_SIZE * CHUNK_HEIGHT);
-        this.lightDepths = new NativeByteArray(CHUNK_SIZE * CHUNK_SIZE);
+        this.skyLightDepths = new NativeByteArray(CHUNK_SIZE * CHUNK_SIZE);
 
         // Initialize sections
         initSections();
@@ -106,23 +103,12 @@ public class Chunk implements Disposable {
      * Initializes the chunk sections based on chunk dimensions.
      */
     private void initSections() {
-        int xSections = (int) Math.ceil(CHUNK_SIZE / (float) SECTION_SIZE);
-        int ySections = (int) Math.ceil(CHUNK_HEIGHT / (float) SECTION_SIZE);
-        int zSections = (int) Math.ceil(CHUNK_SIZE / (float) SECTION_SIZE);
+        int ySections = (int) Math.ceil(CHUNK_HEIGHT / (float) SECTION_HEIGHT);
 
-        for (int sx = 0; sx < xSections; sx++) {
-            for (int sy = 0; sy < ySections; sy++) {
-                for (int sz = 0; sz < zSections; sz++) {
-                    int sectionX0 = x0 + sx * SECTION_SIZE;
-                    int sectionY0 = y0 + sy * SECTION_SIZE;
-                    int sectionZ0 = z0 + sz * SECTION_SIZE;
-                    int sectionX1 = Math.min(sectionX0 + SECTION_SIZE, x1);
-                    int sectionY1 = Math.min(sectionY0 + SECTION_SIZE, y1);
-                    int sectionZ1 = Math.min(sectionZ0 + SECTION_SIZE, z1);
-
-                    sections.add(new ChunkSection(sectionX0, sectionY0, sectionZ0, sectionX1, sectionY1, sectionZ1));
-                }
-            }
+        for (int sy = 0; sy < ySections; sy++) {
+            int sectionY0 = y0 + sy * SECTION_HEIGHT;
+            int sectionY1 = Math.min(sectionY0 + SECTION_HEIGHT, y1);
+            sections.add(new ChunkSection(x0, sectionY0, z0, x1, sectionY1, z1));
         }
     }
 
@@ -131,9 +117,11 @@ public class Chunk implements Disposable {
         if (localX < 0 || localY < 0 || localZ < 0 || localX >= CHUNK_SIZE || localY >= CHUNK_HEIGHT || localZ >= CHUNK_SIZE) {
             return null;
         }
-        // calculate the index in the blocks array
-        int index = (localX * CHUNK_HEIGHT + localY) * CHUNK_SIZE + localZ;
-        int blockStateId = blockStateIds.getByte(index);
+        // get the section for this block
+        int sectionIndex = localY / SECTION_HEIGHT;
+        ChunkSection section = sections.get(sectionIndex);
+        localY = localY % SECTION_HEIGHT;
+        int blockStateId = section.getBlockStateId(localX, localY, localZ);
         return Blocks.globalPalette.fromBlockStateId(blockStateId);
     }
 
@@ -142,8 +130,6 @@ public class Chunk implements Disposable {
         if (localX < 0 || localY < 0 || localZ < 0 || localX >= CHUNK_SIZE || localY >= CHUNK_HEIGHT || localZ >= CHUNK_SIZE) {
             return false;
         }
-        // calculate the index in the blocks array
-        int index = (localX * CHUNK_HEIGHT + localY) * CHUNK_SIZE + localZ;
 
         int blockStateId = Blocks.globalPalette.getPaletteId(blockState);
 
@@ -152,11 +138,18 @@ public class Chunk implements Disposable {
             throw new IllegalArgumentException("Block state ID exceeds 255: " + blockStateId);
         }
 
-        if (blockStateIds.getByte(index) == blockStateId) {
+        // get the section for this block
+        int sectionIndex = localY / SECTION_HEIGHT;
+
+        ChunkSection section = sections.get(sectionIndex);
+        localY = localY % SECTION_HEIGHT;
+
+        if (section.getBlockStateId(localX, localY, localZ) == blockStateId) {
             return false; // no change
         }
 
-        blockStateIds.setByte(index, (byte) blockStateId);
+        // set the block state ID
+        section.setBlockStateId(localX, localY, localZ, blockStateId);
         return true;
     }
 
@@ -277,24 +270,26 @@ public class Chunk implements Disposable {
             section.dispose();
         }
         sections.clear();
-        blockStateIds.dispose();
     }
 
-    public void load(byte[] newBlocks) {
+    public void load(int section, byte[] newBlocks) {
         try {
             dataMutex.writeLock().lock();
-            this.blockStateIds.setContents(newBlocks);
+            sections.get(section).setContents(newBlocks);
             setFullChunkDirty();
         } finally {
             dataMutex.writeLock().unlock();
         }
     }
 
-    public byte[] getBlockStateIds() {
+    public byte[] getBlockStateIds(int section) {
         byte[] blockStateIdsCopy;
         try {
             dataMutex.readLock().lock();
-            byte[] bytes = blockStateIds.getAsBytes();
+            byte[] bytes = sections.get(section).getAsBytes();
+            if (bytes == null) {
+                return null;
+            }
             blockStateIdsCopy = new byte[bytes.length];
             System.arraycopy(bytes, 0, blockStateIdsCopy, 0, bytes.length);
         } finally {
@@ -305,7 +300,7 @@ public class Chunk implements Disposable {
 
     public boolean isSkyLit(int localX, int y, int localZ) {
         if (localX >= 0 && y >= 0 && localZ >= 0 && localX < CHUNK_SIZE && y < CHUNK_HEIGHT && localZ < CHUNK_SIZE) {
-            return y >= this.lightDepths.getByte(localX + localZ * CHUNK_SIZE);
+            return y >= this.skyLightDepths.getByte(localX + localZ * CHUNK_SIZE);
         } else {
             return true;
         }
@@ -324,7 +319,7 @@ public class Chunk implements Disposable {
                     }
                     --y;
                 }
-                this.lightDepths.setByte(x + z * CHUNK_SIZE, (byte) y);
+                this.skyLightDepths.setByte(x + z * CHUNK_SIZE, (byte) y);
             }
         }
     }
@@ -353,6 +348,9 @@ public class Chunk implements Disposable {
         private int renderedTiles = 0;
         private boolean empty = true;
 
+
+        private NativeByteArray blockStateIds;
+
         private final Object uploadMutex = new Object();
 
 
@@ -378,6 +376,9 @@ public class Chunk implements Disposable {
             // Create bounding box for frustum culling
             this.aabb = new AABB((float) x0, (float) y0, (float) z0, (float) x1, (float) y1, (float) z1);
 
+            // Don't allocate the array until we need it
+            this.blockStateIds = null;
+
             this.chunkMesh = new ChunkMesh();
         }
 
@@ -396,6 +397,44 @@ public class Chunk implements Disposable {
         }
 
         /**
+         * Gets the block state ID at the specified local coordinates.
+         * NOTE: This does not perform bounds checking.
+         * @param localX the local x coordinate
+         * @param localY the local y coordinate
+         * @param localZ the local z coordinate
+         * @return the block state ID
+         */
+        int getBlockStateId(int localX, int localY, int localZ) {
+            if (blockStateIds == null) {
+                return 0; // empty section
+            }
+            int index = localX + (localY * CHUNK_SIZE) + (localZ * CHUNK_SIZE * CHUNK_SIZE);
+            return blockStateIds.getByte(index) & 0xFF;
+        }
+
+        private void ensureBlockStatesAllocated() {
+            if (this.blockStateIds != null) {
+                return;
+            }
+            this.blockStateIds = new NativeByteArray(CHUNK_SIZE * CHUNK_SIZE * SECTION_HEIGHT);
+        }
+
+        /**
+         * Sets the block state ID at the specified local coordinates.
+         * NOTE: This does not perform bounds checking.
+         * @param localX the local x coordinate
+         * @param localY the local y coordinate
+         * @param localZ the local z coordinate
+         * @param blockStateId the block state ID
+         */
+        void setBlockStateId(int localX, int localY, int localZ, int blockStateId) {
+            ensureBlockStatesAllocated();
+            int index = localX + (localY * CHUNK_SIZE) + (localZ * CHUNK_SIZE * CHUNK_SIZE);
+            this.blockStateIds.setByte(index, (byte) blockStateId);
+            this.empty = false;
+        }
+
+        /**
          * Gets the section's axis-aligned bounding box.
          */
         public AABB getAABB() {
@@ -409,12 +448,14 @@ public class Chunk implements Disposable {
             if (!this.dirty) {
                 return;
             }
+            if (this.empty) {
+                return; // no need to rebuild empty sections
+            }
 
             this.currentTesselator = ChunkBuildTesselatorPool.obtain();
             this.currentTesselator.init();
 
             this.renderedTiles = 0;
-            this.empty = true;
 
             // Render all visible tiles in the section
             for (int x = this.x0; x < this.x1; ++x) {
@@ -424,15 +465,12 @@ public class Chunk implements Disposable {
                         if (blockState != null) {
                             blockState.block.render(this.currentTesselator, level, x, y, z, blockState.facing);
                             ++this.renderedTiles;
-                            this.empty = false;
                         }
                     }
                 }
             }
 
-            if (!this.empty) {
-                this.pendingUpload = true;
-            }
+            this.pendingUpload = true;
             this.dirty = false;
         }
 
@@ -500,6 +538,22 @@ public class Chunk implements Disposable {
                 currentTesselator = null;
             }
             chunkMesh.dispose();
+        }
+
+        public void setContents(byte[] newBlocks) {
+            if (blockStateIds == null) {
+                ensureBlockStatesAllocated();
+            }
+            blockStateIds.setContents(newBlocks);
+            empty = false;
+            setDirty();
+        }
+
+        public byte[] getAsBytes() {
+            if (blockStateIds != null) {
+                return blockStateIds.getAsBytes();
+            }
+            return null;
         }
     }
 }
