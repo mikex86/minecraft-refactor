@@ -179,18 +179,20 @@ public class EntityPlayer extends EntityLiving {
         double dx = this.x - this.xo;
         double dz = this.z - this.zo;
         this.prevDistanceWalked = this.distanceWalked;
-        float horizontalDelta = (float) Math.sqrt(dx * dx + dz * dz) * 0.7f;
+        float horizontalDelta = (float) Math.sqrt(dx * dx + dz * dz);
         this.distanceWalked += horizontalDelta * 0.6F;
-
-        // Apply air resistance
-        this.xd *= 0.91F;
-        this.yd *= 0.98F;
-        this.zd *= 0.91F;
 
         // Apply ground friction
         if (this.onGround) {
-            this.xd *= 0.7F;
-            this.zd *= 0.7F;
+            float slipperyFactor = 0.6F;
+            this.xd *= slipperyFactor * 0.91F;
+            this.yd *= 0.98F;
+            this.zd *= slipperyFactor * 0.91F;
+        } else {
+            // Apply air resistance
+            this.xd *= 0.91F;
+            this.yd *= 0.98F;
+            this.zd *= 0.91F;
         }
 
         // FOV smoothing
