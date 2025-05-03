@@ -29,7 +29,7 @@ public class BlockPreviewRenderer {
         if (indexedMesh == null) {
             Tesselator t = Tesselator.instance;
             t.init();
-            block.render(t, null, 0, 0, 0, EnumFacing.UP);
+            block.render(t, null, null, 0, 0, 0, EnumFacing.UP);
             indexedMesh = t.createIndexedMesh(GraphicsEnums.BufferUsage.STATIC);
             blockMeshes.put(block, indexedMesh);
         }

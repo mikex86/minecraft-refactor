@@ -54,7 +54,7 @@ public class GrassBlock extends Block {
     @Override
     public void tick(Level level, int x, int y, int z, Random random) {
         // If not lit, convert to dirt
-        if (!level.isLit(x, y, z)) {
+        if (!level.isSkyLit(x, y, z)) {
             level.setBlockState(x, y, z, Blocks.rock.getDefaultBlockState());
         } else {
             // Try to spread grass to nearby dirt blocks
@@ -66,7 +66,7 @@ public class GrassBlock extends Block {
 
                 // If it's dirt and lit, convert it to grass
                 BlockState blockState = level.getBlockState(xt, yt, zt);
-                if (blockState != null && blockState.block == Blocks.rock && level.isLit(xt, yt, zt)) {
+                if (blockState != null && blockState.block == Blocks.rock && level.isSkyLit(xt, yt, zt)) {
                     level.setBlockState(xt, yt, zt, Blocks.grass.getDefaultBlockState());
                 }
             }

@@ -172,6 +172,9 @@ public class EntityPlayer extends EntityLiving {
         // Apply gravity
         this.yd = (float) ((double) this.yd - 0.08);
 
+        // Fly hack
+        this.yd = 0;
+
         // Move based on current velocity
         this.move(this.xd, this.yd, this.zd);
 

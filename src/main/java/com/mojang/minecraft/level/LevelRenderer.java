@@ -13,9 +13,7 @@ import com.mojang.minecraft.renderer.graphics.Texture;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.PriorityQueue;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 
 /**
@@ -122,14 +120,17 @@ public class LevelRenderer implements LevelListener, Disposable {
                         // process rebuild queue
                         try {
                             Chunk chunk = rebuildQueue.take();
+                            boolean requiresUpload = false;
                             try {
                                 chunk.dataMutex.readLock().lock();
-                                chunk.rebuild();
+                                requiresUpload = chunk.rebuild();
                             } finally {
                                 chunk.dataMutex.readLock().unlock();
                             }
                             chunk.setRebuildScheduled(false);
-                            uploadQueue.add(chunk);
+                            if (requiresUpload) {
+                                uploadQueue.add(chunk);
+                            }
                         } catch (InterruptedException e) {
                             // Handle interruption
                             Thread.currentThread().interrupt();
@@ -151,10 +152,10 @@ public class LevelRenderer implements LevelListener, Disposable {
     public void updateDirtyChunks(EntityPlayer player) {
         Frustum frustum = Frustum.getFrustum(graphics);
         if (rebuildQueue == null) {
-            rebuildQueue = new PriorityBlockingQueue<>(100, new DirtyChunkSorter(player, frustum));
+            rebuildQueue = new PriorityBlockingQueue<>(512, new DirtyChunkSorter(player, frustum));
         }
         if (uploadQueue == null) {
-            uploadQueue = new PriorityBlockingQueue<>(100, new DirtyChunkSorter(player, frustum));
+            uploadQueue = new PriorityBlockingQueue<>(512, new DirtyChunkSorter(player, frustum));
         }
 
         // schedule rebuild for all dirty chunks
@@ -187,24 +188,6 @@ public class LevelRenderer implements LevelListener, Disposable {
      */
     @Override
     public void tileChanged(int x, int y, int z) {
-    }
-
-    /**
-     * Called when a light column changes.
-     */
-    @Override
-    public void lightColumnChanged(int x, int z, int y0, int y1) {
-    }
-
-    /**
-     * Called when the entire level changes.
-     */
-    @Override
-    public void allChanged() {
-        // Mark all chunks as dirty
-        for (Chunk chunk : this.level.getLoadedChunks()) {
-            chunk.setFullChunkDirty();
-        }
     }
 
     /**

@@ -311,18 +311,6 @@ public class Entity {
     }
 
     /**
-     * Checks if the entity is in a lit area (for rendering brightness).
-     *
-     * @return true if the entity is in a lit area
-     */
-    public boolean isLit() {
-        int blockX = (int) this.x;
-        int blockY = (int) this.y;
-        int blockZ = (int) this.z;
-        return this.level.isLit(blockX, blockY, blockZ);
-    }
-
-    /**
      * Default render method. Override in subclasses to provide specific rendering.
      *
      * @param graphics The graphics api

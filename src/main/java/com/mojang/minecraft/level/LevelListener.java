@@ -13,18 +13,4 @@ public interface LevelListener {
      */
     void tileChanged(int x, int y, int z);
 
-    /**
-     * Called when the light column has changed in a vertical range.
-     *
-     * @param x    The x-coordinate of the light column
-     * @param z    The z-coordinate of the light column
-     * @param oldY The old height value
-     * @param newY The new height value
-     */
-    void lightColumnChanged(int x, int z, int oldY, int newY);
-
-    /**
-     * Called when the entire level has changed and needs to be redrawn.
-     */
-    void allChanged();
 }

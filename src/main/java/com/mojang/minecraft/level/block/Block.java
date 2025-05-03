@@ -2,6 +2,7 @@ package com.mojang.minecraft.level.block;
 
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.state.BlockState;
+import com.mojang.minecraft.level.chunk.Chunk;
 import com.mojang.minecraft.particle.Particle;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.phys.AABB;
@@ -38,14 +39,22 @@ public class Block {
     /**
      * Renders the tile in the world.
      *
-     * @param t      The tesselator for rendering
-     * @param level  The current level
-     * @param x      X coordinate
-     * @param y      Y coordinate
-     * @param z      Z coordinate
-     * @param facing the enum facing direction of the block
+     * @param t                   The tesselator for rendering
+     * @param currentSection             The current chunk section
+     * @param neighboringSections The neighboring sections. Layout:
+     *                            Layout:
+     *                            [0]: neighborSectionNX: (-1, 0, 0)
+     *                            [1]: neighborSectionPX: (1, 0, 0)
+     *                            [2]: neighborSectionNZ: (0, 0, -1)
+     *                            [3]: neighborSectionPZ: (0, 0, 1)
+     *                            [4]: sectionPY: (0, 1, 0)
+     *                            [5]: sectionNY: (0, -1, 0)
+     * @param x                   X coordinate
+     * @param y                   Y coordinate
+     * @param z                   Z coordinate
+     * @param facing              the enum facing direction of the block
      */
-    public void render(Tesselator t, Level level, int x, int y, int z, EnumFacing facing) {
+    public void render(Tesselator t, Chunk.ChunkSection currentSection, Chunk.ChunkSection[] neighboringSections, int x, int y, int z, EnumFacing facing) {
         float c1 = 1.0F;  // Top/bottom face lighting (100%)
         float c2 = 0.8F;  // North/south face lighting (80%)
         float c3 = 0.6F;  // East/west face lighting (60%)
@@ -64,13 +73,52 @@ public class Block {
         boolean isWestLit = true;
         boolean isEastLit = true;
 
-        if (level != null) {
-            isTopLit = level.isLit(x, y + 1, z);
-            isBottomLit = level.isLit(x, y - 1, z);
-            isNorthLit = level.isLit(x, y, z - 1);
-            isSouthLit = level.isLit(x, y, z + 1);
-            isWestLit = level.isLit(x - 1, y, z);
-            isEastLit = level.isLit(x + 1, y, z);
+        // get facing
+        Chunk.ChunkSection bottomSection;
+        if (y % Chunk.SECTION_HEIGHT == 0) {
+            bottomSection = neighboringSections == null ? null : neighboringSections[5];
+        } else {
+            bottomSection = currentSection;
+        }
+        Chunk.ChunkSection topSection;
+        if ((y + 1) % Chunk.SECTION_HEIGHT == 0) {
+            topSection = neighboringSections == null ? null : neighboringSections[4];
+        } else {
+            topSection = currentSection;
+        }
+        Chunk.ChunkSection northSection;
+        if (z % Chunk.CHUNK_SIZE == 0) {
+            northSection = neighboringSections == null ? null : neighboringSections[2];
+        } else {
+            northSection = currentSection;
+        }
+        Chunk.ChunkSection southSection;
+        if ((z + 1) % Chunk.CHUNK_SIZE == 0) {
+            southSection = neighboringSections == null ? null : neighboringSections[3];
+        } else {
+            southSection = currentSection;
+        }
+        Chunk.ChunkSection westSection;
+        if (x % Chunk.CHUNK_SIZE == 0) {
+            westSection = neighboringSections == null ? null : neighboringSections[0];
+        } else {
+            westSection = currentSection;
+        }
+        Chunk.ChunkSection eastSection;
+        if ((x + 1) % Chunk.CHUNK_SIZE == 0) {
+            eastSection = neighboringSections == null ? null : neighboringSections[1];
+        } else {
+            eastSection = currentSection;
+        }
+
+        // get lighting states
+        if (neighboringSections != null) {
+            isTopLit = topSection != null && topSection.parentChunk.isSkyLit(x & Chunk.CHUNK_SIZE_MINUS_ONE, (y + 1), z & Chunk.CHUNK_SIZE_MINUS_ONE);
+            isBottomLit = bottomSection != null && bottomSection.parentChunk.isSkyLit(x & Chunk.CHUNK_SIZE_MINUS_ONE, y - 1, z & Chunk.CHUNK_SIZE_MINUS_ONE);
+            isNorthLit = northSection != null && northSection.parentChunk.isSkyLit(x & Chunk.CHUNK_SIZE_MINUS_ONE, y, (z - 1) & Chunk.CHUNK_SIZE_MINUS_ONE);
+            isSouthLit = southSection != null && southSection.parentChunk.isSkyLit(x & Chunk.CHUNK_SIZE_MINUS_ONE, y, (z + 1) & Chunk.CHUNK_SIZE_MINUS_ONE);
+            isWestLit = westSection != null && westSection.parentChunk.isSkyLit((x - 1) & Chunk.CHUNK_SIZE_MINUS_ONE, y, z & Chunk.CHUNK_SIZE_MINUS_ONE);
+            isEastLit = eastSection != null && eastSection.parentChunk.isSkyLit((x + 1) & Chunk.CHUNK_SIZE_MINUS_ONE, y, z & Chunk.CHUNK_SIZE_MINUS_ONE);
         }
 
         float darkFactor = 0.5F;
@@ -94,37 +142,37 @@ public class Block {
         }
 
         // Bottom face
-        if (shouldRenderFace(level, x, y - 1, z)) {
+        if (shouldRenderFace(bottomSection, x & Chunk.CHUNK_SIZE_MINUS_ONE, (y - 1) & Chunk.SECTION_HEIGHT_MINUS_ONE, z & Chunk.CHUNK_SIZE_MINUS_ONE)) {
             t.grayScale(bottomColor);
             renderFace(t, x, y, z, 0, facing);
         }
 
         // Top face
-        if (shouldRenderFace(level, x, y + 1, z)) {
+        if (shouldRenderFace(topSection, x & Chunk.CHUNK_SIZE_MINUS_ONE, (y + 1) & Chunk.SECTION_HEIGHT_MINUS_ONE, z & Chunk.CHUNK_SIZE_MINUS_ONE)) {
             t.grayScale(topColor);
             renderFace(t, x, y, z, 1, facing);
         }
 
         // North face
-        if (shouldRenderFace(level, x, y, z - 1)) {
+        if (shouldRenderFace(northSection, x & Chunk.CHUNK_SIZE_MINUS_ONE, y & Chunk.SECTION_HEIGHT_MINUS_ONE, (z - 1) & Chunk.CHUNK_SIZE_MINUS_ONE)) {
             t.grayScale(northColor);
             renderFace(t, x, y, z, 2, facing);
         }
 
         // South face
-        if (shouldRenderFace(level, x, y, z + 1)) {
+        if (shouldRenderFace(southSection, x & Chunk.CHUNK_SIZE_MINUS_ONE, y & Chunk.SECTION_HEIGHT_MINUS_ONE, (z + 1) & Chunk.CHUNK_SIZE_MINUS_ONE)) {
             t.grayScale(southColor);
             renderFace(t, x, y, z, 3, facing);
         }
 
         // West face
-        if (shouldRenderFace(level, x - 1, y, z)) {
+        if (shouldRenderFace(westSection, (x - 1) & Chunk.CHUNK_SIZE_MINUS_ONE, y & Chunk.SECTION_HEIGHT_MINUS_ONE, z & Chunk.CHUNK_SIZE_MINUS_ONE)) {
             t.grayScale(westColor);
             renderFace(t, x, y, z, 4, facing);
         }
 
         // East face
-        if (shouldRenderFace(level, x + 1, y, z)) {
+        if (shouldRenderFace(eastSection, (x + 1) & Chunk.CHUNK_SIZE_MINUS_ONE, y & Chunk.SECTION_HEIGHT_MINUS_ONE, z & Chunk.CHUNK_SIZE_MINUS_ONE)) {
             t.grayScale(eastColor);
             renderFace(t, x, y, z, 5, facing);
         }
@@ -133,17 +181,21 @@ public class Block {
     /**
      * Determines if a face should be rendered based on neighbor blocks and lighting.
      *
-     * @param level The current level
-     * @param x     X coordinate
-     * @param y     Y coordinate
-     * @param z     Z coordinate
+     * @param section The chunk section
+     * @param lx      The local x coordinate inside the chunk section
+     * @param ly      The local y coordinate inside the chunk section
+     * @param lz      The local z coordinate inside the chunk section
      * @return True if the face should be rendered
      */
-    protected boolean shouldRenderFace(Level level, int x, int y, int z) {
-        if (level == null) {
+    protected boolean shouldRenderFace(Chunk.ChunkSection section, int lx, int ly, int lz) {
+        if (section == null) {
             return true;
         }
-        return !level.isSolidTile(x, y, z);
+        if (section.empty) {
+            return false;
+        }
+        BlockState blockState = section.getBlockState(lx, ly, lz);
+        return !(blockState != null && blockState.block.isSolid() && !blockState.block.isTransparent());
     }
 
     /**
@@ -188,7 +240,7 @@ public class Block {
      * @param z    Z coordinate
      * @param face The face to render (0-5)
      */
-    public void renderFace(Tesselator t, int x, int y, int z, int face, EnumFacing facing) {
+    public final void renderFace(Tesselator t, int x, int y, int z, int face, EnumFacing facing) {
         int tex = getTexture(face, facing);
         int rotation = getRotation(face, facing);
         float u0 = (tex % 16) / 16.0F;

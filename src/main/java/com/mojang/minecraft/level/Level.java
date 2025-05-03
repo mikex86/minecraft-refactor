@@ -11,6 +11,7 @@ import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.util.LongHashMap;
 import com.mojang.minecraft.util.math.CollisionUtils;
 import com.mojang.minecraft.util.math.RayCaster;
+import com.mojang.minecraft.util.threading.FastThreadLocal;
 import com.mojang.minecraft.world.HitResult;
 
 import java.io.File;
@@ -129,7 +130,7 @@ public class Level {
      *
      * @return true if the block state was changed, false if it was already the same or out of bounds
      */
-    public boolean setBlockState(int x, int y, int z, BlockState blockState) {
+    public final boolean setBlockState(int x, int y, int z, BlockState blockState) {
         Chunk chunk = getChunk(x, z);
         if (chunk == null) {
             return false;
@@ -182,7 +183,7 @@ public class Level {
     /**
      * Checks if a position is lit (above the highest light-blocking block).
      */
-    public boolean isLit(int x, int y, int z) {
+    public boolean isSkyLit(int x, int y, int z) {
         Chunk chunk = getChunk(x, z);
         if (chunk == null) {
             return false;
@@ -193,7 +194,7 @@ public class Level {
     /**
      * Gets the block at the specified coordinates.
      */
-    public BlockState getBlockState(int x, int y, int z) {
+    public final BlockState getBlockState(int x, int y, int z) {
         Chunk chunk = getChunk(x, z);
         if (chunk == null) {
             return null;
@@ -201,11 +202,11 @@ public class Level {
         return chunk.getBlockState(x & Chunk.CHUNK_SIZE_MINUS_ONE, y, z & Chunk.CHUNK_SIZE_MINUS_ONE);
     }
 
-    private final ThreadLocal<Long> lastChunkKey = new ThreadLocal<>();
-    private final ThreadLocal<Chunk> lastChunk = new ThreadLocal<>();
+    private final FastThreadLocal<Long> lastChunkKey = new FastThreadLocal<>();
+    private final FastThreadLocal<Chunk> lastChunk = new FastThreadLocal<>();
 
 
-    public Chunk getChunk(int x, int z) {
+    public final Chunk getChunk(int x, int z) {
         int cx = x >> Chunk.CHUNK_SIZE_LG2;
         int cz = z >> Chunk.CHUNK_SIZE_LG2;
         long chunkKey = makeChunkKey(cx, cz);
@@ -223,14 +224,6 @@ public class Level {
 
     private static long makeChunkKey(int cx, int cz) {
         return ((long) cx << 32) | (cz & 0xFFFFFFFFL);
-    }
-
-    /**
-     * Checks if a tile is solid at the specified coordinates.
-     */
-    public boolean isSolidTile(int x, int y, int z) {
-        BlockState blockState = this.getBlockState(x, y, z);
-        return blockState != null && blockState.block.isSolid() && !blockState.block.isTransparent();
     }
 
     /**

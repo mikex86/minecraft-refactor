@@ -18,7 +18,7 @@ import java.util.Objects;
  * This version uses indexed triangles instead of direct quads for modern GPU compatibility.
  * It also uses Vertex Array Objects (VAOs) for improved rendering performance.
  */
-public class Tesselator implements Disposable {
+public final class Tesselator implements Disposable {
     private static final int MAX_FLOATS = 262144;
     private static final int MAX_INDICES = 262144;
 

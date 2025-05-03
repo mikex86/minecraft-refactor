@@ -4,6 +4,7 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.level.block.Blocks;
 import com.mojang.minecraft.level.block.state.BlockState;
+import com.mojang.minecraft.level.chunk.Chunk;
 
 public class GlassBlock extends Block {
 
@@ -22,11 +23,11 @@ public class GlassBlock extends Block {
     }
 
     @Override
-    protected boolean shouldRenderFace(Level level, int x, int y, int z) {
-        if (level == null) {
+    protected boolean shouldRenderFace(Chunk.ChunkSection section, int x, int y, int z) {
+        if (section == null) {
             return true;
         }
-        BlockState blockState = level.getBlockState(x, y, z);
+        BlockState blockState = section.getBlockState(x, y, z);
         return blockState == null || blockState.block != Blocks.glass;
     }
 }

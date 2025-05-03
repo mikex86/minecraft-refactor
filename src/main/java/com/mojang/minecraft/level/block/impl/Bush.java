@@ -5,6 +5,7 @@ import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.level.block.Blocks;
 import com.mojang.minecraft.level.block.EnumFacing;
 import com.mojang.minecraft.level.block.state.BlockState;
+import com.mojang.minecraft.level.chunk.Chunk;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.Tesselator;
 
@@ -40,7 +41,7 @@ public class Bush extends Block {
         BlockState tileBelow = level.getBlockState(x, y - 1, z);
 
         // Check if bush has valid ground below and sufficient light
-        if (!level.isLit(x, y, z) || (tileBelow.block != Blocks.dirt && tileBelow.block != Blocks.grass)) {
+        if (!level.isSkyLit(x, y, z) || (tileBelow != null && tileBelow.block != Blocks.dirt && tileBelow.block != Blocks.grass)) {
             level.setBlockState(x, y, z, null); // Remove bush if conditions not met
         }
     }
@@ -48,14 +49,15 @@ public class Bush extends Block {
     /**
      * Custom rendering for bush tiles as crossed planes.
      *
-     * @param t     The tesselator for rendering
-     * @param level The current level
-     * @param x     X coordinate
-     * @param y     Y coordinate
-     * @param z     Z coordinate
+     * @param t                   The tesselator for rendering
+     * @param currentSection
+     * @param neighboringSections The current level
+     * @param x                   X coordinate
+     * @param y                   Y coordinate
+     * @param z                   Z coordinate
      */
     @Override
-    public void render(Tesselator t, Level level, int x, int y, int z, EnumFacing facing) {
+    public void render(Tesselator t, Chunk.ChunkSection currentSection, Chunk.ChunkSection[] neighboringSections, int x, int y, int z, EnumFacing facing) {
         int tex = this.getTexture(this.tex, facing);
         float u0 = (tex % 16) / 16.0F;
         float u1 = u0 + 0.0624375F;

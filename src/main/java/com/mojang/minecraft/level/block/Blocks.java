@@ -67,7 +67,7 @@ public class Blocks {
      */
     protected static List<BlockState> getValidBlockStates() {
         List<BlockState> list = new ArrayList<>();
-        list.add(null); // null = air is a valid block state
+        list.add(null); // null = air is a valid block state; Must be block-state id 0
         for (Block block : BLOCKS) {
             if (block != null) {
                 List<BlockState> blockStates = block.getValidBlockStates();
