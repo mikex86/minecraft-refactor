@@ -3,7 +3,7 @@ package com.mojang.minecraft.item;
 public class ItemStack {
 
     private final Item item;
-    private final int count;
+    private int count;
 
     public ItemStack(Item item, int count) {
         this.item = item;
@@ -16,5 +16,12 @@ public class ItemStack {
 
     public int getCount() {
         return count;
+    }
+
+    public void decreaseAmount(int amount) {
+        if (count == 0) {
+            return;
+        }
+        count -= amount;
     }
 }

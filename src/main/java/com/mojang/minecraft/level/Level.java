@@ -130,7 +130,7 @@ public class Level {
      *
      * @return true if the block state was changed, false if it was already the same or out of bounds
      */
-    public final boolean setBlockState(int x, int y, int z, BlockState blockState) {
+    public final boolean setBlockState(int x, int y, int z, BlockState blockState, boolean instantRebuild) {
         Chunk chunk = getChunk(x, z);
         if (chunk == null) {
             return false;
@@ -172,12 +172,25 @@ public class Level {
                 }
             }
 
+            if (instantRebuild) {
+                for (Chunk c : toRebuild) {
+                    c.rebuild();
+                }
+                for (Chunk c : toRebuild) {
+                    c.uploadPendingMeshes();
+                }
+            }
+
             for (LevelListener listener : this.levelListeners) {
                 listener.tileChanged(x, y, z);
             }
             return true;
         }
         return false;
+    }
+
+    public final boolean setBlockState(int x, int y, int z, BlockState blockState) {
+        return setBlockState(x, y, z, blockState, true);
     }
 
     /**

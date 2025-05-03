@@ -229,7 +229,7 @@ public class GameInputHandler {
         if (!isRightClick) {
             // Destroy mode
             BlockState oldBlock = this.level.getBlockState(hitResult.x, hitResult.y, hitResult.z);
-            boolean changed = this.level.setBlockState(hitResult.x, hitResult.y, hitResult.z, null);
+            boolean changed = this.level.setBlockState(hitResult.x, hitResult.y, hitResult.z, null, true);
             if (oldBlock != null && changed) {
                 oldBlock.block.destroy(this.level, hitResult.x, hitResult.y, hitResult.z, this.particleEngine);
             }
@@ -263,7 +263,8 @@ public class GameInputHandler {
                 if (item instanceof BlockItem) {
                     BlockItem blockItem = (BlockItem) item;
                     if (this.level.isFree(aabb)) {
-                        this.level.setBlockState(x, y, z, blockItem.getBlock().getBlockState(hitResult.facingDirection));
+                        this.level.setBlockState(x, y, z, blockItem.getBlock().getBlockState(hitResult.facingDirection), true);
+                        this.player.getInventory().decreaseHotbarItem(this.hotbarSlotIndex, 1);
                     }
                 }
             }

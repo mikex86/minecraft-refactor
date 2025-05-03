@@ -501,7 +501,7 @@ public class GameRenderer implements Disposable {
                     continue;
                 }
                 int count = itemStack.getCount();
-                if (count > 0) {
+                if (count > 1) {
                     stackSizeHotbarLabels[i].setText(StackCountStringPool.valueOf(count));
                     stackSizeHotbarLabels[i].render(graphics, centerX - HOTBAR_WIDTH / 2f + HOTBAR_SLOT_WIDTH + HOTBAR_SLOT_WIDTH * i - stackSizeHotbarLabels[i].getWidth(), screenHeight - font.getFontHeight() - 2);
                 }

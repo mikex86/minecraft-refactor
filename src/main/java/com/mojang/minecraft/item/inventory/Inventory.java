@@ -37,8 +37,12 @@ public class Inventory {
         if (slotIndex < 0 || slotIndex >= HOTBAR_SIZE) {
             throw new IndexOutOfBoundsException("Hotbar index " + slotIndex + " out of bounds");
         }
-        ItemStack[] hotbarBlocks = inventoryBlocks[3];
+        ItemStack[] hotbarBlocks = getHotBarBlocks();
         return hotbarBlocks[slotIndex];
+    }
+
+    private ItemStack[] getHotBarBlocks() {
+        return inventoryBlocks[3];
     }
 
     public ItemStack getInventoryItem(int row, int column) {
@@ -68,5 +72,16 @@ public class Inventory {
 
     public ItemStack getSelectedItem() {
         return selectedItem;
+    }
+
+    public void decreaseHotbarItem(int hotbarSlotIndex, int amount) {
+        ItemStack hotbarItem = getHotbarItem(hotbarSlotIndex);
+        if (hotbarItem != null) {
+            hotbarItem.decreaseAmount(amount);
+            if (hotbarItem.getCount() <= 0) {
+                ItemStack[] hotbarBlocks = getHotBarBlocks();
+                hotbarBlocks[hotbarSlotIndex] = null;
+            }
+        }
     }
 }

@@ -61,7 +61,6 @@ public class EntityPlayer extends EntityLiving {
     public float prevBob = 0.0F;
 
     private final Inventory inventory = new Inventory();
-    private boolean wasSprintKeyPressed;
 
     // Animation constants
     public static final float MODEL_SIZE = 0.058333334F;
@@ -104,13 +103,15 @@ public class EntityPlayer extends EntityLiving {
         this.jump = jump;
         this.sneak = sneak;
 
-        if (this.wasSprintKeyPressed != sprinting) {
-            this.wasSprintKeyPressed = sprinting;
-            if (forward && sprinting && !this.sprinting && !this.isCollidedHorizontally) {
+        if (forward && !this.isCollidedHorizontally) {
+            if (!this.sprinting && sprinting) {
                 // When sprinting is started, reset the 30s timer
                 this.sprinting = true;
                 this.sprintingTicksLeft = 600;
             }
+        } else {
+            this.sprinting = false;
+            this.sprintingTicksLeft = 0;
         }
     }
 
@@ -149,7 +150,7 @@ public class EntityPlayer extends EntityLiving {
 
             // Jump
             if (jump && this.onGround) {
-                this.yd = 0.5F; // Vertical velocity for jumping
+                this.yd = 0.42F; // Vertical velocity for jumping
             }
         }
 
@@ -169,11 +170,10 @@ public class EntityPlayer extends EntityLiving {
 
         this.moveRelative(xa, ya, speed);
 
-        // Apply gravity
-        this.yd = (float) ((double) this.yd - 0.08);
-
         // Move based on current velocity
         this.move(this.xd, this.yd, this.zd);
+        // Apply gravity
+        this.yd -= 0.08F;
 
         // Track distance walked
         double dx = this.x - this.xo;
