@@ -48,7 +48,7 @@ public class GameState {
 
         // Create player
         this.player = new EntityPlayer(this.level, true);
-        this.player.setPos(0.0F, 128, 0.0F);
+        this.player.setPos(0.0F, 256, 0.0F);
         this.level.spawnEntity(this.player);
 
         // Create particle engine

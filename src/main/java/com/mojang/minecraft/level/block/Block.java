@@ -192,7 +192,7 @@ public class Block {
             return true;
         }
         if (section.empty) {
-            return false;
+            return true;
         }
         BlockState blockState = section.getBlockState(lx, ly, lz);
         return !(blockState != null && blockState.block.isSolid() && !blockState.block.isTransparent());
