@@ -4,11 +4,12 @@ import com.mojang.minecraft.profiler.NativeMemoryTracker;
 import com.mojang.minecraft.renderer.graphics.*;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BufferUsage;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.PrimitiveType;
+import com.mojang.minecraft.util.Fp16Util;
+import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.jemalloc.JEmalloc;
 
-import java.nio.FloatBuffer;
+import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
-import java.util.Objects;
 
 /**
  * Tesselator implementation that uses the GraphicsAPI.
@@ -19,12 +20,15 @@ import java.util.Objects;
  * It also uses Vertex Array Objects (VAOs) for improved rendering performance.
  */
 public final class Tesselator implements Disposable {
-    private static final int MAX_FLOATS = 262144;
+    private static final int MAX_BYTES = 1048576;
     private static final int MAX_INDICES = 262144;
 
     // CPU-side data storage
-    private final FloatBuffer cpuVertexBuffer = Objects.requireNonNull(JEmalloc.je_calloc(MAX_FLOATS, Float.BYTES), "Failed to allocate cpu vertex buffer").asFloatBuffer();
-    private final IntBuffer cpuIndexBuffer = Objects.requireNonNull(JEmalloc.je_calloc(MAX_INDICES, Integer.BYTES), "Failed to allocate cpu index buffer").asIntBuffer();
+    private final long cpuVertexBuffer = JEmalloc.nje_calloc(MAX_BYTES, 1);
+    private final long cpuVertexBufferCapacity = MAX_BYTES;
+
+    private final long cpuIndexBuffer = JEmalloc.nje_calloc(MAX_INDICES, Integer.BYTES);
+    private final long cpuIndexBufferCapacity = MAX_INDICES * Integer.BYTES;
 
     // State tracking
     private int vertexCount = 0;
@@ -39,6 +43,9 @@ public final class Tesselator implements Disposable {
     private float colorG;
     private float colorB;
     private float grayScale;
+
+    private DataType positionDataType;
+    private DataType textCoordsDataType;
 
     // Feature flags
     private boolean hasColor = false;
@@ -62,8 +69,8 @@ public final class Tesselator implements Disposable {
      * Creates a new tesselator
      */
     public Tesselator() {
-        NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.addAndGet(cpuVertexBuffer.capacity());
-        NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.addAndGet(cpuIndexBuffer.capacity());
+        NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.addAndGet(cpuVertexBufferCapacity);
+        NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.addAndGet(cpuIndexBufferCapacity);
         this.graphics = GraphicsFactory.getGraphicsAPI();
         this.vertexBuffer = null;
         this.indexBuffer = null;
@@ -82,15 +89,15 @@ public final class Tesselator implements Disposable {
     /**
      * Gets the vertex buffer with accumulated vertex data
      */
-    public FloatBuffer getBuffer() {
-        return cpuVertexBuffer;
+    public ByteBuffer getBuffer() {
+        return MemoryUtil.memByteBuffer(this.cpuVertexBuffer, this.dataIndex);
     }
 
     /**
      * Gets the index buffer with accumulated index data
      */
     public IntBuffer getIndexBuffer() {
-        return cpuIndexBuffer;
+        return MemoryUtil.memIntBuffer(this.cpuIndexBuffer, this.indexCount);
     }
 
     /**
@@ -144,6 +151,12 @@ public final class Tesselator implements Disposable {
 
             // Update format
             format = new VertexBuffer.VertexFormat(
+                    this.positionDataType, // Position data type
+                    DataType.FLOAT, // Color data type
+                    DataType.UNSIGNED_BYTE, // Grayscale data type
+                    this.textCoordsDataType, // Texture coordinate data type
+                    DataType.FLOAT, // Normal data type
+
                     true,      // Always has positions
                     this.hasColor,        // May have colors
                     this.hasGrayScale,    // May have grayscale
@@ -154,8 +167,8 @@ public final class Tesselator implements Disposable {
             vertexBuffer.setFormat(format);
 
             // Upload data to GPU
-            vertexBuffer.setData(cpuVertexBuffer, dataIndex * 4); // 4 bytes per float
-            indexBuffer.setData(cpuIndexBuffer, indexCount * 4); // 4 bytes per int
+            vertexBuffer.setData(getBuffer(), dataIndex);
+            indexBuffer.setData(getIndexBuffer(), indexCount * Integer.BYTES); // 4 bytes per int
 
             // Set up VAO
             vao.setVertexBuffer(vertexBuffer);
@@ -191,7 +204,13 @@ public final class Tesselator implements Disposable {
 
         // Set up vertex format based on tesselator state
         VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
-                true,                // Always has positions
+                this.positionDataType, // Position data type
+                DataType.FLOAT, // Color data type
+                DataType.UNSIGNED_BYTE, // Grayscale data type
+                this.textCoordsDataType, // Texture coordinate data type
+                DataType.FLOAT, // Normal data type
+
+                true,                 // Always has positions
                 hasColor(),           // May have colors
                 hasGrayScale(),       // May have grayscale
                 hasTexture(),         // May have texture coords
@@ -203,7 +222,7 @@ public final class Tesselator implements Disposable {
         IndexBuffer indexBuffer;
 
         // Size calculations
-        int vertexDataSizeInBytes = dataIndex * Float.BYTES; // 4 bytes per float
+        int vertexDataSizeInBytes = dataIndex;
         int indexDataSizeInBytes = indexCount * Integer.BYTES; // 4 bytes per int
 
         if (pooled) {
@@ -226,8 +245,8 @@ public final class Tesselator implements Disposable {
         vertexBuffer.setFormat(format);
 
         // Upload data
-        vertexBuffer.setData(cpuVertexBuffer, vertexDataSizeInBytes);
-        indexBuffer.setData(cpuIndexBuffer, indexDataSizeInBytes);
+        vertexBuffer.setData(getBuffer(), vertexDataSizeInBytes);
+        indexBuffer.setData(getIndexBuffer(), indexDataSizeInBytes);
 
         // Create mesh with VAO
         return new IndexedMesh(graphics, vertexBuffer, indexBuffer, indexCount);
@@ -239,21 +258,26 @@ public final class Tesselator implements Disposable {
     public void clear() {
         this.vertexCount = 0;
         this.indexCount = 0;
-        this.cpuVertexBuffer.clear();
-        this.cpuIndexBuffer.clear();
         this.dataIndex = 0;
     }
 
     /**
      * Initialize the tesselator for a new drawing sequence
      */
-    public void init() {
+    public void init(DataType positionDataType, DataType textCoordsDataType) {
         this.clear();
         this.hasColor = false;
         this.hasTexture = false;
         this.disableColors = false;
         this.hasGrayScale = false;
         this.vertexSize = 3; // Start with just xyz
+
+        this.positionDataType = positionDataType;
+        this.textCoordsDataType = textCoordsDataType;
+    }
+
+    public void init() {
+        this.init(DataType.FLOAT, DataType.FLOAT);
     }
 
     /**
@@ -343,25 +367,66 @@ public final class Tesselator implements Disposable {
 
         // Add texture coordinates if enabled
         if (this.hasTexture) {
-            this.cpuVertexBuffer.put(currentIndex++, this.textureU);
-            this.cpuVertexBuffer.put(currentIndex++, this.textureV);
+            switch (this.textCoordsDataType) {
+                case FLOAT: {
+                    MemoryUtil.memPutFloat(this.cpuVertexBuffer + currentIndex, this.textureU);
+                    currentIndex += Float.BYTES;
+                    MemoryUtil.memPutFloat(this.cpuVertexBuffer + currentIndex, this.textureV);
+                    currentIndex += Float.BYTES;
+                    break;
+                }
+                case HALF_FLOAT: {
+                    MemoryUtil.memPutShort(this.cpuVertexBuffer + currentIndex, (short) Fp16Util.fromFloat(this.textureU));
+                    currentIndex += Short.BYTES;
+                    MemoryUtil.memPutShort(this.cpuVertexBuffer + currentIndex, (short) Fp16Util.fromFloat(this.textureV));
+                    currentIndex += Short.BYTES;
+                    break;
+                }
+                default: {
+                    throw new IllegalArgumentException("Unsupported texture coordinate data type: " + this.textCoordsDataType);
+                }
+            }
         }
 
         // Add color if enabled
         if (this.hasColor) {
-            this.cpuVertexBuffer.put(currentIndex++, this.colorR);
-            this.cpuVertexBuffer.put(currentIndex++, this.colorG);
-            this.cpuVertexBuffer.put(currentIndex++, this.colorB);
+            MemoryUtil.memPutFloat(this.cpuVertexBuffer + currentIndex, this.colorR);
+            currentIndex += Float.BYTES;
+            MemoryUtil.memPutFloat(this.cpuVertexBuffer + currentIndex, this.colorG);
+            currentIndex += Float.BYTES;
+            MemoryUtil.memPutFloat(this.cpuVertexBuffer + currentIndex, this.colorB);
+            currentIndex += Float.BYTES;
         }
         // Add grayscale if enabled
         else if (this.hasGrayScale) {
-            this.cpuVertexBuffer.put(currentIndex++, this.grayScale);
+            MemoryUtil.memPutByte(this.cpuVertexBuffer + currentIndex, (byte) (this.grayScale * 255));
+            currentIndex += Byte.BYTES;
         }
 
         // Add position (always present)
-        this.cpuVertexBuffer.put(currentIndex++, x);
-        this.cpuVertexBuffer.put(currentIndex++, y);
-        this.cpuVertexBuffer.put(currentIndex++, z);
+        switch (this.positionDataType) {
+            case SHORT: {
+                MemoryUtil.memPutShort(this.cpuVertexBuffer + currentIndex, (short) x);
+                currentIndex += Short.BYTES;
+                MemoryUtil.memPutShort(this.cpuVertexBuffer + currentIndex, (short) y);
+                currentIndex += Short.BYTES;
+                MemoryUtil.memPutShort(this.cpuVertexBuffer + currentIndex, (short) z);
+                currentIndex += Short.BYTES;
+                break;
+            }
+            case FLOAT: {
+                MemoryUtil.memPutFloat(this.cpuVertexBuffer + currentIndex, x);
+                currentIndex += Float.BYTES;
+                MemoryUtil.memPutFloat(this.cpuVertexBuffer + currentIndex, y);
+                currentIndex += Float.BYTES;
+                MemoryUtil.memPutFloat(this.cpuVertexBuffer + currentIndex, z);
+                currentIndex += Float.BYTES;
+                break;
+            }
+            default: {
+                throw new IllegalArgumentException("Unsupported position data type: " + this.positionDataType);
+            }
+        }
 
         // Update data index
         this.dataIndex = currentIndex;
@@ -375,14 +440,14 @@ public final class Tesselator implements Disposable {
             int baseIndex = this.vertexCount - 4;
 
             // First triangle (0, 1, 2)
-            this.cpuIndexBuffer.put(this.indexCount++, baseIndex);
-            this.cpuIndexBuffer.put(this.indexCount++, baseIndex + 1);
-            this.cpuIndexBuffer.put(this.indexCount++, baseIndex + 2);
+            MemoryUtil.memPutInt(this.cpuIndexBuffer + (long) this.indexCount++ * Integer.BYTES, baseIndex);
+            MemoryUtil.memPutInt(this.cpuIndexBuffer + (long) this.indexCount++ * Integer.BYTES, baseIndex + 1);
+            MemoryUtil.memPutInt(this.cpuIndexBuffer + (long) this.indexCount++ * Integer.BYTES, baseIndex + 2);
 
             // Second triangle (0, 2, 3)
-            this.cpuIndexBuffer.put(this.indexCount++, baseIndex);
-            this.cpuIndexBuffer.put(this.indexCount++, baseIndex + 2);
-            this.cpuIndexBuffer.put(this.indexCount++, baseIndex + 3);
+            MemoryUtil.memPutInt(this.cpuIndexBuffer + (long) this.indexCount++ * Integer.BYTES, baseIndex);
+            MemoryUtil.memPutInt(this.cpuIndexBuffer + (long) this.indexCount++ * Integer.BYTES, baseIndex + 2);
+            MemoryUtil.memPutInt(this.cpuIndexBuffer + (long) this.indexCount++ * Integer.BYTES, baseIndex + 3);
         }
     }
 
@@ -404,8 +469,8 @@ public final class Tesselator implements Disposable {
     @Override
     public void dispose() {
         // free the CPU-side buffers
-        JEmalloc.je_free(cpuVertexBuffer);
-        JEmalloc.je_free(cpuIndexBuffer);
+        JEmalloc.nje_free(cpuVertexBuffer);
+        JEmalloc.nje_free(cpuIndexBuffer);
 
         if (vertexBuffer != null) {
             vertexBuffer.dispose();

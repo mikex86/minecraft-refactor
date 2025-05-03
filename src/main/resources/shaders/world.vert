@@ -12,7 +12,7 @@ uniform vec4 fogColor;
 
 // Vertex attributes (replace gl_Vertex, gl_Color, etc.)
 layout (location = 0) in vec3 position;
-layout (location = 1) in float color;
+layout (location = 1) in uint color;
 layout (location = 2) in vec2 texCoord0;
 layout (location = 3) in vec3 normal;
 
@@ -28,7 +28,7 @@ void main() {
     texCoord = texCoord0;
 
     // Pass color to fragment shader
-    vertexColor = color;
+    vertexColor = color / 255.0f;
 
     float eyeDistance = length(modelViewMatrix * vec4(position, 1.0));
 

@@ -8,7 +8,7 @@ import java.io.IOException;
  * Shader implementation for particle rendering.
  * Replaces fixed function particle rendering with a programmable pipeline.
  */
-public class ParticleShader extends Shader implements FogShader {
+public class ParticleShader extends Shader {
 
     /**
      * Creates a new particle shader.

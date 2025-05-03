@@ -1,7 +1,6 @@
 #version 330 core
 
 // Fog uniforms
-uniform bool fogEnabled;
 uniform vec4 fogColor;
 
 // Texture sampler
@@ -18,18 +17,16 @@ out vec4 fragColor;
 void main() {
     // Sample the texture
     vec4 texColor = texture(textureSampler, texCoord);
-    
+
     // Apply vertex color
     vec4 finalColor = texColor * vertexColor;
 
     if (finalColor.a < 0.01) {
         discard;
     }
-    
+
     // Apply fog
-    if (fogEnabled) {
-        finalColor = mix(fogColor, finalColor, fogFactor);
-    }
+    finalColor = mix(fogColor, finalColor, fogFactor);
 
     // Output the final color
     fragColor = finalColor;

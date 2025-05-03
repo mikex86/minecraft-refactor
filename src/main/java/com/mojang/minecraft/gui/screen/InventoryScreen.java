@@ -16,6 +16,7 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 import com.mojang.minecraft.renderer.shader.ShaderRegistry;
 import com.mojang.minecraft.renderer.shader.impl.EntityShader;
+import com.mojang.minecraft.renderer.shader.impl.HudShader;
 import com.mojang.minecraft.renderer.shader.impl.WorldShader;
 
 import static com.mojang.minecraft.entity.EntityPlayer.PLAYER_MODEL;
@@ -37,6 +38,8 @@ public class InventoryScreen extends GuiScreen {
     private final TextLabel stackSizeSelectedItemLabel;
 
     private static final EntityShader ENTITY_SHADER = ShaderRegistry.getInstance().getEntityShader();
+    private static final WorldShader WORLD_SHADER = ShaderRegistry.getInstance().getWorldShader();
+    private static final HudShader HUD_SHADER = ShaderRegistry.getInstance().getHudShader();
 
     public InventoryScreen(TextureManager textureManager, Font font, EntityPlayer player, Inventory inventory) {
         this.textureManager = textureManager;
@@ -67,8 +70,6 @@ public class InventoryScreen extends GuiScreen {
     private static final int ITEM_SIZE = 10;
 
     private static final int ITEM_SLOT_SIZE = 18;
-
-    private static final WorldShader WORLD_SHADER = ShaderRegistry.getInstance().getWorldShader();
 
     @Override
     public void drawScreen(GraphicsAPI graphics, float screenWidth, float screenHeight, float partialTicks) {
@@ -146,6 +147,8 @@ public class InventoryScreen extends GuiScreen {
 
         // draw stack size labels
         {
+            graphics.setShader(HUD_SHADER);
+
             // draw main inventory stack size labels
             for (int row = 0; row < inventory.getMainInventoryRowCount(); row++) {
                 for (int column = 0; column < inventory.getColumnCount(); column++) {
@@ -177,6 +180,8 @@ public class InventoryScreen extends GuiScreen {
 
         // draw player model
         {
+            graphics.setShader(ENTITY_SHADER);
+            ENTITY_SHADER.setFogUniforms(0f, 0f, 0f, 0f, 0f, 0f, 0f);
             graphics.setTexture(textureManager.charTexture);
             graphics.pushMatrix();
 
@@ -214,6 +219,7 @@ public class InventoryScreen extends GuiScreen {
         // draw selected item at cursor position
         {
             // set terrain texture again after drawing labels & the player
+            graphics.setShader(WORLD_SHADER);
             graphics.setTexture(textureManager.terrainTexture);
 
             ItemStack selectedItem = inventory.getSelectedItem();
@@ -230,6 +236,7 @@ public class InventoryScreen extends GuiScreen {
 
             // draw selected item stack size label
             if (selectedItem != null) {
+                graphics.setShader(HUD_SHADER);
                 int count = selectedItem.getCount();
                 if (count > 1) {
                     this.stackSizeSelectedItemLabel.setText(StackCountStringPool.valueOf(count));

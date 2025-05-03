@@ -1,9 +1,11 @@
 package com.mojang.minecraft.renderer.graphics.opengl;
 
 import com.mojang.minecraft.profiler.GpuMemoryTracker;
+import com.mojang.minecraft.renderer.graphics.DataType;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 
-import java.nio.FloatBuffer;
+import java.nio.ByteBuffer;
+import java.util.Objects;
 
 import static org.lwjgl.opengl.GL15.*;
 
@@ -32,11 +34,13 @@ public class OpenGLVertexBuffer implements VertexBuffer {
     public OpenGLVertexBuffer(int usage) {
         this.vboId = glGenBuffers();
         this.usage = usage;
-        this.format = new VertexFormat(true, false, false, false, false);
+        this.format = null;
     }
 
     @Override
-    public void setData(FloatBuffer data, int sizeInBytes) {
+    public void setData(ByteBuffer data, int sizeInBytes) {
+        Objects.requireNonNull(format, "Vertex format must be set before uploading data");
+
         if (isDisposed()) {
             throw new IllegalStateException("Cannot use a disposed vertex buffer");
         }
@@ -50,7 +54,7 @@ public class OpenGLVertexBuffer implements VertexBuffer {
         this.sizeInBytes = sizeInBytes;
 
         // Calculate vertex count based on format stride
-        this.vertexCount = sizeInBytes / (format.getStride() * 4); // 4 bytes per float
+        this.vertexCount = sizeInBytes / format.getStrideInBytes();
 
         // Upload data to VBO
         glBindBuffer(GL_ARRAY_BUFFER, vboId);
@@ -63,7 +67,9 @@ public class OpenGLVertexBuffer implements VertexBuffer {
     }
 
     @Override
-    public void updateData(FloatBuffer data, int offsetInBytes, int sizeInBytes) {
+    public void updateData(ByteBuffer data, int offsetInBytes, int sizeInBytes) {
+        Objects.requireNonNull(format, "Vertex format must be set before uploading data");
+
         if (isDisposed()) {
             throw new IllegalStateException("Cannot use a disposed vertex buffer");
         }
@@ -89,7 +95,7 @@ public class OpenGLVertexBuffer implements VertexBuffer {
 
         // Recalculate vertex count if the buffer has data
         if (sizeInBytes > 0) {
-            this.vertexCount = sizeInBytes / (format.getStride() * 4); // 4 bytes per float
+            this.vertexCount = sizeInBytes / format.getStrideInBytes();
         }
     }
 

@@ -10,6 +10,7 @@ import com.mojang.minecraft.renderer.ChunkMesh;
 import com.mojang.minecraft.renderer.Disposable;
 import com.mojang.minecraft.renderer.Frustum;
 import com.mojang.minecraft.renderer.Tesselator;
+import com.mojang.minecraft.renderer.graphics.DataType;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.util.math.MathUtils;
 import com.mojang.minecraft.util.nio.NativeByteArray;
@@ -551,7 +552,7 @@ public final class Chunk implements Disposable {
             }
 
             this.currentTesselator = ChunkBuildTesselatorPool.obtain();
-            this.currentTesselator.init();
+            this.currentTesselator.init(DataType.SHORT, DataType.HALF_FLOAT);
 
             this.renderedTiles = 0;
 

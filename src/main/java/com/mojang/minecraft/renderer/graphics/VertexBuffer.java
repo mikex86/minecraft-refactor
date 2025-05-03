@@ -1,6 +1,7 @@
 package com.mojang.minecraft.renderer.graphics;
 
-import java.nio.FloatBuffer;
+import java.nio.ByteBuffer;
+import java.util.Objects;
 
 /**
  * Interface for a vertex buffer resource.
@@ -9,49 +10,49 @@ import java.nio.FloatBuffer;
 public interface VertexBuffer extends GraphicsResource {
     /**
      * Sets the vertex data in this buffer.
-     * 
-     * @param data      The buffer containing vertex data
+     *
+     * @param data        The buffer containing vertex data
      * @param sizeInBytes The size of the data in bytes
      */
-    void setData(FloatBuffer data, int sizeInBytes);
-    
+    void setData(ByteBuffer data, int sizeInBytes);
+
     /**
      * Updates a portion of the vertex data in this buffer.
-     * 
-     * @param data      The buffer containing vertex data
+     *
+     * @param data          The buffer containing vertex data
      * @param offsetInBytes The offset in bytes to start updating
      * @param sizeInBytes   The size of the data in bytes
      */
-    void updateData(FloatBuffer data, int offsetInBytes, int sizeInBytes);
-    
+    void updateData(ByteBuffer data, int offsetInBytes, int sizeInBytes);
+
     /**
      * Gets the vertex format of this buffer.
-     * 
+     *
      * @return The vertex format
      */
     VertexFormat getFormat();
-    
+
     /**
      * Sets the vertex format of this buffer.
-     * 
+     *
      * @param format The vertex format
      */
     void setFormat(VertexFormat format);
-    
+
     /**
      * Gets the size of this buffer in bytes.
-     * 
+     *
      * @return The size in bytes
      */
     long getSizeInBytes();
-    
+
     /**
      * Gets the number of vertices in this buffer.
-     * 
+     *
      * @return The number of vertices
      */
     long getVertexCount();
-    
+
     /**
      * A format descriptor for vertex data.
      * Describes the layout of a single vertex in a vertex buffer.
@@ -63,61 +64,85 @@ public interface VertexBuffer extends GraphicsResource {
         private final boolean hasTexCoords;
         private final boolean hasNormals;
         private final int stride;
-        
+
+        private final DataType positionDataType;
+        private final DataType colorDataType;
+        private final DataType grayScaleDataType;
+        private final DataType texCoordDataType;
+        private final DataType normalDataType;
+
         /**
          * Creates a new vertex format.
-         * 
-         * @param hasPositions  Whether vertices have positions
-         * @param hasColors     Whether vertices have colors
-         * @param hasGrayScale Whether vertices have grayscale colors
-         * @param hasTexCoords  Whether vertices have texture coordinates
-         * @param hasNormals    Whether vertices have normal vectors
+         *
+         * @param positionDataType  Data type for position data (may be null if not used)
+         * @param colorDataType     Data type for color data (may be null if not used)
+         * @param grayScaleDataType Data type for grayscale data (may be null if not used)
+         * @param texCoordDataType  Data type for texture coordinate data (may be null if not used)
+         * @param normalDataType    Data type for normal vector data (may be null if not used)
+         * @param hasPositions      Whether vertices have positions
+         * @param hasColors         Whether vertices have colors
+         * @param hasGrayScale      Whether vertices have grayscale colors
+         * @param hasTexCoords      Whether vertices have texture coordinates
+         * @param hasNormals        Whether vertices have normal vectors
          */
-        public VertexFormat(boolean hasPositions, boolean hasColors, boolean hasGrayScale, boolean hasTexCoords, boolean hasNormals) {
+        public VertexFormat(
+                DataType positionDataType, DataType colorDataType, DataType grayScaleDataType, DataType texCoordDataType, DataType normalDataType,
+                boolean hasPositions, boolean hasColors, boolean hasGrayScale, boolean hasTexCoords, boolean hasNormals) {
+            this.positionDataType = positionDataType;
+            this.colorDataType = colorDataType;
+            this.grayScaleDataType = grayScaleDataType;
+            this.texCoordDataType = texCoordDataType;
+            this.normalDataType = normalDataType;
+
             this.hasPositions = hasPositions;
             this.hasColors = hasColors;
             this.hasGrayScale = hasGrayScale;
             this.hasTexCoords = hasTexCoords;
             this.hasNormals = hasNormals;
-            
+
             // Calculate stride (in floats)
             int stride = 0;
-            
+
             if (hasPositions) {
-                stride += 3; // XYZ
+                Objects.requireNonNull(positionDataType, "Position data type cannot be null if positions are enabled");
+                stride += 3 * positionDataType.getSize(); // XYZ
             }
-            
+
             if (hasColors) {
-                stride += 3; // RGB
+                Objects.requireNonNull(colorDataType, "Color data type cannot be null if colors are enabled");
+                stride += 3 * colorDataType.getSize(); // RGB
             }
 
             if (hasGrayScale) {
-                stride += 1; // Grayscale
+                Objects.requireNonNull(grayScaleDataType, "Grayscale data type cannot be null if grayscale is enabled");
+                stride += grayScaleDataType.getSize(); // Grayscale
             }
-            
+
             if (hasTexCoords) {
-                stride += 2; // UV
+                Objects.requireNonNull(texCoordDataType, "Texture coordinate data type cannot be null if texture coordinates are enabled");
+                stride += 2 * texCoordDataType.getSize(); // UV
             }
-            
+
             if (hasNormals) {
-                stride += 3; // XYZ
+                Objects.requireNonNull(normalDataType, "Normal data type cannot be null if normals are enabled");
+                stride += 3 * normalDataType.getSize(); // Normal
             }
-            
+
             this.stride = stride;
         }
-        
+
         /**
          * Gets whether this format includes positions.
-         * 
+         *
          * @return true if this format includes positions
          */
         public boolean hasPositions() {
             return hasPositions;
         }
-        
+
         /**
          * Gets whether this format includes colors.
-         * 
+         *
          * @return true if this format includes colors
          */
         public boolean hasColors() {
@@ -135,39 +160,49 @@ public interface VertexBuffer extends GraphicsResource {
 
         /**
          * Gets whether this format includes texture coordinates.
-         * 
+         *
          * @return true if this format includes texture coordinates
          */
         public boolean hasTexCoords() {
             return hasTexCoords;
         }
-        
+
         /**
          * Gets whether this format includes normal vectors.
-         * 
+         *
          * @return true if this format includes normal vectors
          */
         public boolean hasNormals() {
             return hasNormals;
         }
-        
-        /**
-         * Gets the stride of this format.
-         * The stride is the number of floats per vertex.
-         * 
-         * @return The stride
-         */
-        public int getStride() {
-            return stride;
-        }
-        
+
         /**
          * Gets the stride of this format in bytes.
-         * 
+         *
          * @return The stride in bytes
          */
         public int getStrideInBytes() {
-            return stride * 4; // 4 bytes per float
+            return stride;
+        }
+
+        public DataType getColorDataType() {
+            return colorDataType;
+        }
+
+        public DataType getGrayScaleDataType() {
+            return grayScaleDataType;
+        }
+
+        public DataType getNormalDataType() {
+            return normalDataType;
+        }
+
+        public DataType getPositionDataType() {
+            return positionDataType;
+        }
+
+        public DataType getTexCoordDataType() {
+            return texCoordDataType;
         }
     }
 } 

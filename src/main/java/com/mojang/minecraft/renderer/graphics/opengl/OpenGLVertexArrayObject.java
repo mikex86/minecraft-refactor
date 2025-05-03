@@ -69,18 +69,14 @@ public class OpenGLVertexArrayObject implements VertexArrayObject {
         bind();
         
         // Determine buffer ID and offset
-        int bufferId;
         long bufferOffset = 0;
         
         if (vertexBuffer instanceof OpenGLVertexBuffer) {
-            // Standard vertex buffer
-            bufferId = ((OpenGLVertexBuffer) vertexBuffer).getBufferId();
             // Bind the vertex buffer
             ((OpenGLVertexBuffer) vertexBuffer).bind();
         } else {
             // Pooled vertex buffer
             OpenGLPooledVertexBuffer pooledBuffer = (OpenGLPooledVertexBuffer) vertexBuffer;
-            bufferId = pooledBuffer.getBufferId();
             bufferOffset = pooledBuffer.getOffset();
             // Bind the vertex buffer
             pooledBuffer.bind();
@@ -97,32 +93,32 @@ public class OpenGLVertexArrayObject implements VertexArrayObject {
         // Texture coordinates (attribute location 2)
         if (format.hasTexCoords()) {
             glEnableVertexAttribArray(2);
-            glVertexAttribPointer(2, 2, GL_FLOAT, false, stride, offset);
-            offset += 2 * 4; // 2 floats * 4 bytes
+            glVertexAttribPointer(2, 2, format.getTexCoordDataType().getGLType(), false, stride, offset);
+            offset += 2L * format.getTexCoordDataType().getSize(); // 2 scalars
         }
         
         // Colors (attribute location 1)
         if (format.hasColors()) {
             glEnableVertexAttribArray(1);
-            glVertexAttribPointer(1, 3, GL_FLOAT, false, stride, offset);
-            offset += 3 * 4; // 3 floats * 4 bytes
+            glVertexAttribPointer(1, 3, format.getColorDataType().getGLType(), false, stride, offset);
+            offset += 3L * format.getColorDataType().getSize(); // 3 scalars
         } else if (format.hasGrayScale()) {
             glEnableVertexAttribArray(1);
-            glVertexAttribPointer(1, 1, GL_FLOAT, false, stride, offset);
-            offset += 4; // 1 float
+            glVertexAttribPointer(1, 1, format.getGrayScaleDataType().getGLType(), false, stride, offset);
+            offset += format.getGrayScaleDataType().getSize(); // 1 scalar
         }
         
         // Normals (attribute location 3)
         if (format.hasNormals()) {
             glEnableVertexAttribArray(3);
-            glVertexAttribPointer(3, 3, GL_FLOAT, false, stride, offset);
-            offset += 3 * 4; // 3 floats * 4 bytes
+            glVertexAttribPointer(3, 3, format.getNormalDataType().getGLType(), false, stride, offset);
+            offset += 3L * format.getNormalDataType().getSize(); // 3 scalars
         }
         
         // Positions (attribute location 0)
         if (format.hasPositions()) {
             glEnableVertexAttribArray(0);
-            glVertexAttribPointer(0, 3, GL_FLOAT, false, stride, offset);
+            glVertexAttribPointer(0, 3, format.getPositionDataType().getGLType(), false, stride, offset);
             // No need to update offset as this is the last attribute
         }
         

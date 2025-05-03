@@ -1,14 +1,10 @@
 package com.mojang.minecraft.renderer.graphics.opengl;
 
-import com.mojang.minecraft.profiler.NativeMemoryTracker;
+import com.mojang.minecraft.renderer.graphics.DataType;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 import com.mojang.minecraft.renderer.graphics.opengl.OpenGLBufferPool.BufferRegion;
-import org.lwjgl.BufferUtils;
-import org.lwjgl.system.jemalloc.JEmalloc;
 
 import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
-import java.util.Objects;
 
 import static org.lwjgl.opengl.GL15.*;
 
@@ -34,11 +30,13 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
      */
     public OpenGLPooledVertexBuffer(BufferRegion region) {
         this.region = region;
-        this.format = new VertexFormat(true, false, false, false, false);
+        this.format = new VertexFormat(
+                DataType.BYTE, null, null, null, null,
+                true, false, false, false, false);
     }
 
     @Override
-    public void setData(FloatBuffer data, int sizeInBytes) {
+    public void setData(ByteBuffer data, int sizeInBytes) {
         if (isDisposed()) {
             throw new IllegalStateException("Cannot use a disposed vertex buffer");
         }
@@ -48,45 +46,16 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
         }
 
         // Calculate vertex count based on format stride
-        this.vertexCount = sizeInBytes / (format.getStride() * 4L); // 4 bytes per float
-
-        ByteBuffer byteBuffer = JEmalloc.je_malloc(sizeInBytes);
-        Objects.requireNonNull(byteBuffer, "Failed to allocate ByteBuffer via JEmalloc");
-        NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.addAndGet(sizeInBytes);
-
-        // Save the buffer's position and limit
-        int originalPosition = data.position();
-        int originalLimit = data.limit();
-
-        // Only read up to the size needed in floats
-        int floatCount = sizeInBytes / 4; // 4 bytes per float
-
-        // Make sure we don't read past the end of the buffer
-        int limit = Math.min(originalPosition + floatCount, originalLimit);
-        data.limit(limit);
-
-        // Copy the float data to the byte buffer
-        while (data.hasRemaining()) {
-            byteBuffer.putFloat(data.get());
-        }
-
-        // Reset buffer positions
-        data.position(originalPosition);
-        data.limit(originalLimit);
-        byteBuffer.flip();
+        this.vertexCount = sizeInBytes / format.getStrideInBytes();
 
         // Upload data to the buffer region
         glBindBuffer(GL_ARRAY_BUFFER, region.getBufferId());
-        glBufferSubData(GL_ARRAY_BUFFER, region.getOffset(), byteBuffer);
+        glBufferSubData(GL_ARRAY_BUFFER, region.getOffset(), data);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-        // Free the cpu buffer
-        JEmalloc.je_free(byteBuffer);
-        NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.addAndGet(-sizeInBytes);
     }
 
     @Override
-    public void updateData(FloatBuffer data, int offsetInBytes, int sizeInBytes) {
+    public void updateData(ByteBuffer data, int offsetInBytes, int sizeInBytes) {
         if (isDisposed()) {
             throw new IllegalStateException("Cannot use a disposed vertex buffer");
         }
@@ -95,39 +64,10 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
             throw new IllegalArgumentException("Update range exceeds buffer region size");
         }
 
-        ByteBuffer byteBuffer = JEmalloc.je_malloc(sizeInBytes);
-        Objects.requireNonNull(byteBuffer, "Failed to allocate ByteBuffer via JEmalloc");
-        NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.addAndGet(sizeInBytes);
-
-        // Save the buffer's position and limit
-        int originalPosition = data.position();
-        int originalLimit = data.limit();
-
-        // Only read up to the size needed in floats
-        int floatCount = sizeInBytes / 4; // 4 bytes per float
-
-        // Make sure we don't read past the end of the buffer
-        int limit = Math.min(originalPosition + floatCount, originalLimit);
-        data.limit(limit);
-
-        // Copy the float data to the byte buffer
-        while (data.hasRemaining()) {
-            byteBuffer.putFloat(data.get());
-        }
-
-        // Reset buffer positions
-        data.position(originalPosition);
-        data.limit(originalLimit);
-        byteBuffer.flip();
-
         // Upload data to the buffer region
         glBindBuffer(GL_ARRAY_BUFFER, region.getBufferId());
-        glBufferSubData(GL_ARRAY_BUFFER, region.getOffset() + offsetInBytes, byteBuffer);
+        glBufferSubData(GL_ARRAY_BUFFER, region.getOffset() + offsetInBytes, data);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-        // Free the cpu buffer
-        JEmalloc.je_free(byteBuffer);
-        NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.addAndGet(-sizeInBytes);
     }
 
     @Override
@@ -141,7 +81,7 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
 
         // Recalculate vertex count if the buffer has data
         if (region.getSize() > 0) {
-            this.vertexCount = region.getSize() / (format.getStride() * 4L); // 4 bytes per float
+            this.vertexCount = region.getSize() / format.getStrideInBytes();
         }
     }
 

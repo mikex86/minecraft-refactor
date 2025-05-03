@@ -308,7 +308,6 @@ public class GameRenderer implements Disposable {
         {
             graphics.setShader(particleShader);
             graphics.updateShaderMatrices();
-            setupFog(particleShader);
             this.particleEngine.render(this.graphics, this.player, partialTicks);
         }
     }
