@@ -272,7 +272,7 @@ public class EntityPlayer extends EntityLiving {
 
         // Position at interpolated location
         graphics.translate(
-                this.xo + (this.x - this.xo) * partialTicks + 4,
+                this.xo + (this.x - this.xo) * partialTicks,
                 this.yo + (this.y - this.yo) * partialTicks,
                 this.zo + (this.z - this.zo) * partialTicks
         );

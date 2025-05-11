@@ -1,5 +1,7 @@
 package com.mojang.minecraft.level.block;
 
+import com.mojang.minecraft.entity.EntityItem;
+import com.mojang.minecraft.item.BlockItem;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.level.chunk.Chunk;
@@ -11,6 +13,7 @@ import com.mojang.minecraft.renderer.Tesselator;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Base class for all tile types in the game.
@@ -545,6 +548,12 @@ public class Block {
                 }
             }
         }
+        EntityItem entityItem = new EntityItem(level, new BlockItem(this));
+        entityItem.setPos(x + 0.25f, y, z + 0.25f);
+        entityItem.xd = (float) (ThreadLocalRandom.current().nextGaussian() * 0.05F);
+        entityItem.yd = (float) (ThreadLocalRandom.current().nextGaussian() * 0.05F + 0.2F);
+        entityItem.zd = (float) (ThreadLocalRandom.current().nextGaussian() * 0.05F);
+        level.spawnEntity(entityItem);
     }
 
     public BlockState getDefaultBlockState() {

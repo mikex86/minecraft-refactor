@@ -11,11 +11,11 @@ import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 import java.util.HashMap;
 import java.util.Map;
 
-public class BlockPreviewRenderer {
+public class BlockRenderer {
 
     private static final Map<Block, IndexedMesh> blockMeshes = new HashMap<>();
 
-    public static void renderBlock(GraphicsAPI graphics, Block block, int scale) {
+    public static void renderBlockPreview(GraphicsAPI graphics, Block block, int scale) {
         graphics.scale(scale, scale, scale);
         graphics.rotateX(30.0F);
         graphics.rotateY(45.0F);
@@ -25,7 +25,7 @@ public class BlockPreviewRenderer {
         getBlockMesh(block).draw(graphics);
     }
 
-    private static IndexedMesh getBlockMesh(Block block) {
+    public static IndexedMesh getBlockMesh(Block block) {
         IndexedMesh indexedMesh = blockMeshes.get(block);
         if (indexedMesh == null) {
             Tesselator t = Tesselator.instance;

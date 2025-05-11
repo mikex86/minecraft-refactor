@@ -15,7 +15,7 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.optim.pools.StackCountStringPool;
 import com.mojang.minecraft.particle.ParticleEngine;
-import com.mojang.minecraft.renderer.block.BlockPreviewRenderer;
+import com.mojang.minecraft.renderer.block.BlockRenderer;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
@@ -39,7 +39,7 @@ public class GameRenderer implements Disposable {
     // Texture manager
     private final TextureManager textureManager;
 
-    private final int renderDistance = 32; // Render distance in chunks
+    private final int renderDistance = 16; // Render distance in chunks
 
     // Buffers for graphic operations
     private final FloatBuffer fogColor0;
@@ -471,7 +471,7 @@ public class GameRenderer implements Disposable {
                 BlockItem blockItem = (BlockItem) item;
                 graphics.pushMatrix();
                 graphics.translate(centerX - HOTBAR_WIDTH / 2f + (i * HOTBAR_SLOT_WIDTH) + HOTBAR_SLOT_WIDTH / 2f + 1, screenHeight - HOTBAR_SELECTOR_SIZE + ITEM_SIZE * 2 + 1, 0);
-                BlockPreviewRenderer.renderBlock(graphics, blockItem.getBlock(), ITEM_SIZE);
+                BlockRenderer.renderBlockPreview(graphics, blockItem.getBlock(), ITEM_SIZE);
                 graphics.popMatrix();
             }
         }

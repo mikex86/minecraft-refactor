@@ -10,7 +10,7 @@ import com.mojang.minecraft.item.inventory.Inventory;
 import com.mojang.minecraft.optim.pools.StackCountStringPool;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
-import com.mojang.minecraft.renderer.block.BlockPreviewRenderer;
+import com.mojang.minecraft.renderer.block.BlockRenderer;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
@@ -122,7 +122,7 @@ public class InventoryScreen extends GuiScreen {
                         BlockItem blockItem = (BlockItem) item;
                         graphics.pushMatrix();
                         graphics.translate(centerX - INVENTORY_UI_WIDTH / 2f + 16 + ITEM_SLOT_SIZE * column, centerY + 7 + ITEM_SLOT_SIZE * row + ITEM_SLOT_SIZE / 2f + 1, 0);
-                        BlockPreviewRenderer.renderBlock(graphics, blockItem.getBlock(), ITEM_SIZE);
+                        BlockRenderer.renderBlockPreview(graphics, blockItem.getBlock(), ITEM_SIZE);
                         graphics.popMatrix();
                     }
                 }
@@ -139,7 +139,7 @@ public class InventoryScreen extends GuiScreen {
                     BlockItem blockItem = (BlockItem) item;
                     graphics.pushMatrix();
                     graphics.translate(centerX - INVENTORY_UI_WIDTH / 2f + 16 + ITEM_SLOT_SIZE * i, centerY + INVENTORY_UI_HEIGHT / 2f - ITEM_SLOT_SIZE + ITEM_SLOT_SIZE / 2f + 1, 0);
-                    BlockPreviewRenderer.renderBlock(graphics, blockItem.getBlock(), ITEM_SIZE);
+                    BlockRenderer.renderBlockPreview(graphics, blockItem.getBlock(), ITEM_SIZE);
                     graphics.popMatrix();
                 }
             }
@@ -229,7 +229,7 @@ public class InventoryScreen extends GuiScreen {
                     BlockItem blockItem = (BlockItem) item;
                     graphics.pushMatrix();
                     graphics.translate(mouseX, mouseY + ITEM_SLOT_SIZE / 2f, 0);
-                    BlockPreviewRenderer.renderBlock(graphics, blockItem.getBlock(), ITEM_SIZE);
+                    BlockRenderer.renderBlockPreview(graphics, blockItem.getBlock(), ITEM_SIZE);
                     graphics.popMatrix();
                 }
             }
