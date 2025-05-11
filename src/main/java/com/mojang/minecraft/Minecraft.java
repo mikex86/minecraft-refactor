@@ -186,6 +186,7 @@ public class Minecraft implements Runnable {
     }
 
     private void tick() {
+        this.gameInputHandler.tick();
         this.gameState.tick();
         this.updateDebugStrings();
     }

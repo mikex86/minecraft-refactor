@@ -14,6 +14,7 @@ import java.util.List;
  * Handles basic physics, movement, and collision detection.
  */
 public class Entity {
+
     /**
      * The level this entity exists in
      */
@@ -100,14 +101,16 @@ public class Entity {
      * Vertical offset for camera and rendering
      */
     protected float heightOffset = 0.0F;
+
     /**
      * Width of bounding box
      */
-    protected float bbWidth = 0.6F;
+    public float bbWidth = 0.6F;
+
     /**
      * Height of bounding box
      */
-    protected float bbHeight = 1.8F;
+    public float bbHeight = 1.8F;
 
     /**
      * Whether the entity has collided horizontally
@@ -118,6 +121,8 @@ public class Entity {
      * The number of ticks performed on the entity.
      */
     public int ticksPerformed = 0;
+
+    public boolean hasBlockCollision = false;
 
     /**
      * Creates a new entity in the specified level.
@@ -238,7 +243,7 @@ public class Entity {
         float originalZa = za;
 
         // Handle Y-axis collisions first
-        List<AABB> collisionBoxes = new ArrayList<>(this.level.getCubes(this.boundingBox.expand(0, ya, 0)));
+        List<AABB> collisionBoxes = new ArrayList<>(this.level.getCubes(this.boundingBox.expandWithDir(0, ya, 0)));
         for (AABB collisionBox : collisionBoxes) {
             ya = CollisionUtils.clipYCollide(collisionBox, this.boundingBox, ya);
         }
@@ -246,7 +251,7 @@ public class Entity {
 
         // Handle X-axis collisions
         collisionBoxes.clear();
-        collisionBoxes.addAll(this.level.getCubes(this.boundingBox.expand(xa, 0, 0)));
+        collisionBoxes.addAll(this.level.getCubes(this.boundingBox.expandWithDir(xa, 0, 0)));
         for (AABB box : collisionBoxes) {
             xa = CollisionUtils.clipXCollide(box, this.boundingBox, xa);
         }
@@ -254,7 +259,7 @@ public class Entity {
 
         // Handle Z-axis collisions
         collisionBoxes.clear();
-        collisionBoxes.addAll(this.level.getCubes(this.boundingBox.expand(0, 0, za)));
+        collisionBoxes.addAll(this.level.getCubes(this.boundingBox.expandWithDir(0, 0, za)));
         for (AABB collisionBox : collisionBoxes) {
             za = CollisionUtils.clipZCollide(collisionBox, this.boundingBox, za);
         }
@@ -308,6 +313,14 @@ public class Entity {
         // Apply rotation matrix
         this.xd += xa * cos - za * sin;
         this.zd += za * cos + xa * sin;
+    }
+
+
+    /**
+     * Called when the entity collides with a player.
+     * @param player The player that collided with this entity
+     */
+    protected void onCollideWithPlayer(EntityPlayer player) {
     }
 
     /**

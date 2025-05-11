@@ -36,6 +36,16 @@ public class GameInputHandler {
     // Currently open GUI screen (if any)
     private GuiScreen currentScreen = null;
 
+    private int leftClickDelayTimer = 0;
+    private int rightClickDelayTimer = 0;
+
+    // whether left / right mouse buttons are currently down
+    private boolean leftClickPressed = false;
+    private boolean rightClickPressed = false;
+
+    // last hit result
+    private HitResult lastHitResult;
+
     /**
      * Creates a new GameInputHandler.
      *
@@ -62,6 +72,29 @@ public class GameInputHandler {
     }
 
     /**
+     * Tick method to update the input handler state.
+     * Handles repeated right-click actions and processes left-click actions when buttons are held down.
+     */
+    public void tick() {
+        if (rightClickDelayTimer > 0) {
+            rightClickDelayTimer--;
+        }
+        if (leftClickDelayTimer > 0) {
+            leftClickDelayTimer--;
+        }
+        if (rightClickDelayTimer == 0 && rightClickPressed) {
+            if (this.lastHitResult != null) {
+                this.handleRightClick(this.lastHitResult);
+            }
+        }
+        if (leftClickDelayTimer == 0 && leftClickPressed) {
+            if (this.lastHitResult != null) {
+                this.handleLeftClick(this.lastHitResult);
+            }
+        }
+    }
+
+    /**
      * Process all pending input events and update game state accordingly.
      *
      * @param hitResult    The current hit result (block being looked at)
@@ -69,6 +102,8 @@ public class GameInputHandler {
      * @param windowHeight the window height
      */
     public void processInput(HitResult hitResult, int windowWidth, int windowHeight) {
+        this.lastHitResult = hitResult;
+
         // Process all keyboard events
         while (inputHandler.hasNextKeyEvent()) {
             InputHandler.KeyEvent event = inputHandler.getNextKeyEvent();
@@ -147,11 +182,17 @@ public class GameInputHandler {
                 // Auto-grab mouse on click when not grabbed
                 this.grabMouse();
             } else {
-                // Handle left mouse button (destroy/place blocks)
-                if (button == InputHandler.MouseButtons.BUTTON_LEFT || button == InputHandler.MouseButtons.BUTTON_RIGHT) {
+                // Handle left/right mouse buttons (destroy/place blocks)
+                if (button == InputHandler.MouseButtons.BUTTON_RIGHT) {
                     if (pressed) {
-                        this.handleMouseClick(hitResult, button == InputHandler.MouseButtons.BUTTON_RIGHT);
+                        this.handleRightClick(hitResult);
                     }
+                    this.rightClickPressed = pressed;
+                } else if (button == InputHandler.MouseButtons.BUTTON_LEFT) {
+                    if (pressed) {
+                        this.handleLeftClick(hitResult);
+                    }
+                    this.leftClickPressed = pressed;
                 }
             }
         }
@@ -184,6 +225,18 @@ public class GameInputHandler {
 
         this.player.setInput(forward, back, left, right, jump, sneak, sprinting);
 
+    }
+
+    private void handleRightClick(HitResult hitResult) {
+        if (this.handleMouseClick(hitResult, true)) {
+            this.rightClickDelayTimer = 4; // Delay for right-click actions
+        }
+    }
+
+    private void handleLeftClick(HitResult hitResult) {
+        if (this.handleMouseClick(hitResult, false)) {
+            this.leftClickDelayTimer = 6; // Delay for left-click actions
+        }
     }
 
     /**
@@ -220,10 +273,12 @@ public class GameInputHandler {
 
     /**
      * Handles mouse click actions in the world, either destroying or placing blocks.
+     *
+     * @return true if the action was successful, false otherwise
      */
-    private void handleMouseClick(HitResult hitResult, boolean isRightClick) {
+    private boolean handleMouseClick(HitResult hitResult, boolean isRightClick) {
         if (hitResult == null) {
-            return;
+            return false;
         }
 
         if (!isRightClick) {
@@ -233,6 +288,7 @@ public class GameInputHandler {
             if (oldBlock != null && changed) {
                 oldBlock.block.destroy(this.level, hitResult.x, hitResult.y, hitResult.z, this.particleEngine);
             }
+            return changed;
         } else {
             // Build mode
             int x = hitResult.x;
@@ -265,9 +321,11 @@ public class GameInputHandler {
                     if (this.level.isFree(aabb)) {
                         this.level.setBlockState(x, y, z, blockItem.getBlock().getBlockState(hitResult.facingDirection), true);
                         this.player.getInventory().decreaseHotbarItem(this.hotbarSlotIndex, 1);
+                        return true;
                     }
                 }
             }
+            return false;
         }
     }
 
@@ -303,6 +361,7 @@ public class GameInputHandler {
 
     /**
      * Sets the mouse position.
+     *
      * @param x the x coordinate of the mouse
      * @param y the y coordinate of the mouse
      */

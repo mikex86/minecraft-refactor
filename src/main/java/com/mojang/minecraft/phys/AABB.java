@@ -63,7 +63,7 @@ public class AABB {
      * @param za Z-axis movement
      * @return A new AABB expanded in the direction of movement
      */
-    public AABB expand(float xa, float ya, float za) {
+    public AABB expandWithDir(float xa, float ya, float za) {
         float newX0 = this.x0;
         float newY0 = this.y0;
         float newZ0 = this.z0;

@@ -3,12 +3,15 @@ package com.mojang.minecraft.entity;
 import com.mojang.minecraft.item.BlockItem;
 import com.mojang.minecraft.item.Item;
 import com.mojang.minecraft.level.Level;
+import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.block.BlockRenderer;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 import com.mojang.minecraft.renderer.shader.ShaderRegistry;
 import com.mojang.minecraft.renderer.shader.impl.WorldShader;
+import com.mojang.minecraft.renderer.shape.Cube;
+import com.mojang.minecraft.util.math.CollisionUtils;
 
 public class EntityItem extends Entity {
 
@@ -17,6 +20,8 @@ public class EntityItem extends Entity {
     private final Item item;
 
     private final float hoverPhase;
+
+    private EntityPlayer target;
 
     /**
      * Creates a new entity in the specified level.
@@ -28,8 +33,8 @@ public class EntityItem extends Entity {
         super(level);
         this.item = item;
         this.hoverPhase = (float) (Math.random() * Math.PI * 2.0D);
-        this.bbWidth = 0.5f;
-        this.bbHeight = 0.5f;
+        this.bbWidth = 0.25f;
+        this.bbHeight = 0.25f;
     }
 
     @Override
@@ -54,6 +59,13 @@ public class EntityItem extends Entity {
             this.yd *= 0.98F;
             this.zd *= 0.91F;
         }
+
+        // Check for collision with player
+        if (target != null) {
+            if (CollisionUtils.intersects(boundingBox, target.boundingBox)) {
+                this.remove();
+            }
+        }
     }
 
     @Override
@@ -76,6 +88,7 @@ public class EntityItem extends Entity {
                 this.yo + (this.y - this.yo) * partialTicks,
                 this.zo + (this.z - this.zo) * partialTicks
         );
+
         float f = (ticksPerformed + partialTicks) / 10.0F + hoverPhase;
         float bobOffset = (float) (Math.sin(f) * 0.1F);
         graphics.translate(0, bobOffset + (3f / 16f), 0);
@@ -93,5 +106,22 @@ public class EntityItem extends Entity {
         mesh.draw(graphics);
 
         graphics.popMatrix();
+    }
+
+    @Override
+    protected void onCollideWithPlayer(EntityPlayer player) {
+        if (this.target == null) {
+            if (player.attemptPickupItem(item)) {
+                this.target = player;
+            }
+        }
+        if (this.target != null) {
+            float dx = player.x - this.x;
+            float dy = (player.y + player.getHeightOffset()/2) - this.y;
+            float dz = player.z - this.z;
+            this.xd += dx / 8.0f;
+            this.yd += dy / 8.0f;
+            this.zd += dz / 8.0f;
+        }
     }
 }

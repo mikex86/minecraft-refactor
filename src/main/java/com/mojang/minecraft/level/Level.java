@@ -2,6 +2,7 @@ package com.mojang.minecraft.level;
 
 import com.mojang.minecraft.crash.CrashReporter;
 import com.mojang.minecraft.entity.Entity;
+import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.level.chunk.Chunk;
 import com.mojang.minecraft.level.generation.WorldGenerator;
@@ -36,6 +37,7 @@ public class Level {
     private final LevelSaver levelSaver = new LevelSaver(new File(LEVEL_FILE_NAME));
     private final LevelLoader levelLoader = new LevelLoader(new File(LEVEL_FILE_NAME), levelSaver.getSavingLevelMutex());
 
+    // TODO: PER CHUNK ENTITY LIST
     private final List<Entity> entities = new ArrayList<>();
 
     private final int seed = 42; // TODO: Make seeds configurable
@@ -247,6 +249,12 @@ public class Level {
         for (Entity entity : this.entities) {
             entity.tick();
         }
+        for (int i = 0; i < this.entities.size(); ++i) {
+            Entity entity = this.entities.get(i);
+            if (entity.removed) {
+                this.entities.remove(i--);
+            }
+        }
     }
 
     public HitResult raycast(Entity entity, float partialTick) {
@@ -263,6 +271,9 @@ public class Level {
     public boolean isFree(AABB aabb) {
         // Check for collision with any entity
         for (Entity entity : this.entities) {
+            if (!entity.hasBlockCollision) {
+                continue; // skip entities that don't collide with blocks
+            }
             if (CollisionUtils.intersects(entity.boundingBox, aabb)) {
                 return false;
             }
@@ -373,5 +384,21 @@ public class Level {
 
     public void spawnEntity(Entity player) {
         this.entities.add(player);
+    }
+
+    /**
+     * Gets all entities within the specified AABB, excluding the specified entity.
+     * @param excluded the entity to exclude from the search
+     * @param aab the AABB to search within
+     * @return a list of entities within the specified AABB, excluding the specified entity
+     */
+    public List<Entity> getNearbyEntitiesExcluding(Entity excluded, AABB aab) {
+        List<Entity> nearbyEntities = new ArrayList<>();
+        for (Entity entity : this.entities) {
+            if (entity != excluded && CollisionUtils.intersects(entity.boundingBox, aab)) {
+                nearbyEntities.add(entity);
+            }
+        }
+        return nearbyEntities;
     }
 }

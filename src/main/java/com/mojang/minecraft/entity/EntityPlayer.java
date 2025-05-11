@@ -1,5 +1,6 @@
 package com.mojang.minecraft.entity;
 
+import com.mojang.minecraft.item.Item;
 import com.mojang.minecraft.item.inventory.Inventory;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.chunk.Chunk;
@@ -123,6 +124,14 @@ public class EntityPlayer extends EntityLiving {
     @Override
     public void tick() {
         super.tick();
+
+        List<Entity> nearby = level.getNearbyEntitiesExcluding(
+                this,
+                boundingBox.grow(1, 0, 1)
+        );
+        for (Entity e : nearby) {
+            e.onCollideWithPlayer(this);
+        }
 
         this.pitch = this.cameraPitch;
         this.yaw = this.cameraYaw;
@@ -257,6 +266,15 @@ public class EntityPlayer extends EntityLiving {
         float horizontalMotion = (float) Math.sqrt(xd * xd + zd * zd);
         float bobSpeed = onGround ? Math.min(0.1F, horizontalMotion) : 0.0F;
         this.bob += (bobSpeed - this.bob) * 0.4F;
+    }
+
+    /**
+     * Attempts to pick up an item.
+     * @param item The item to pick up
+     * @return true if the item was picked up, false otherwise
+     */
+    public boolean attemptPickupItem(Item item) {
+        return inventory.addItem(item);
     }
 
     /**
@@ -463,16 +481,6 @@ public class EntityPlayer extends EntityLiving {
         if (angle >= 180.0F) angle -= 360.0F;
         if (angle < -180.0F) angle += 360.0F;
         return angle;
-    }
-
-    /**
-     * Clamps the change from current toward target to at most maxDelta.
-     */
-    private static float clampAngle(float current, float target, float maxDelta) {
-        float delta = wrapDegrees(target - current);
-        if (delta > maxDelta) delta = maxDelta;
-        if (delta < -maxDelta) delta = -maxDelta;
-        return current + delta;
     }
 
     public boolean isThePlayer() {

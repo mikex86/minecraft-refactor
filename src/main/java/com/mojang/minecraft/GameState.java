@@ -53,7 +53,6 @@ public class GameState {
 
         // Create particle engine
         this.particleEngine = new ParticleEngine(this.level, this.textureManager);
-
     }
 
     /**

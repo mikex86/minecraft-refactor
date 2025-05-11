@@ -33,12 +33,12 @@ public class Polygon {
      * @param u1       Second U texture coordinate
      * @param v1       Second V texture coordinate
      */
-    public Polygon(Vertex[] vertices, int u0, int v0, int u1, int v1) {
+    public Polygon(Vertex[] vertices, float u0, float v0, float u1, float v1) {
         this(vertices);
-        vertices[0] = vertices[0].remap((float) u1, (float) v0);
-        vertices[1] = vertices[1].remap((float) u0, (float) v0);
-        vertices[2] = vertices[2].remap((float) u0, (float) v1);
-        vertices[3] = vertices[3].remap((float) u1, (float) v1);
+        vertices[0] = vertices[0].remap(u1, v0);
+        vertices[1] = vertices[1].remap(u0, v0);
+        vertices[2] = vertices[2].remap(u0, v1);
+        vertices[3] = vertices[3].remap(u1, v1);
     }
 
     /**

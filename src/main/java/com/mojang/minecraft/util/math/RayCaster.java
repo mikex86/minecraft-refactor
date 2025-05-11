@@ -5,11 +5,6 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.world.HitResult;
 
-/**
- * Utility class for performing raycasting operations.
- * Uses an efficient and accurate DDA (Digital Differential Analysis) algorithm
- * to determine exactly which block the player is looking at.
- */
 public class RayCaster {
     private static final float EPSILON = 0.001F;
 
@@ -75,10 +70,6 @@ public class RayCaster {
      */
     private static HitResult raycastBlocks(Level level, float startX, float startY, float startZ,
                                           float dirX, float dirY, float dirZ, float maxDistance) {
-
-        // calculate angle from direction vector
-        float yaw = (float) Math.toDegrees(Math.atan2(dirX, dirZ));
-        float pitch = (float) Math.toDegrees(Math.atan2(dirY, dirZ));
 
         // Initial block position (the block containing the ray start point)
         int blockX = (int) Math.floor(startX);

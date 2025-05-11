@@ -26,7 +26,6 @@ public class InputHandler {
     private double lastMouseY = 0;
     private double mouseDX = 0;
     private double mouseDY = 0;
-    private double mouseScrollX = 0;
     private double mouseScrollY = 0;
 
     // Reference to the window
@@ -77,8 +76,7 @@ public class InputHandler {
 
             @Override
             public void onScroll(double xoffset, double yoffset) {
-                mouseScrollX += xoffset;
-                mouseScrollY += yoffset;
+                mouseScrollY += (yoffset + xoffset);
             }
         });
     }
@@ -209,17 +207,6 @@ public class InputHandler {
      */
     public void setMousePosition(double x, double y) {
         this.window.setCursorPosition(x, y);
-    }
-
-    /**
-     * Gets the mouse scroll X movement since the last update.
-     *
-     * @return Mouse scroll X movement
-     */
-    public double getMouseScrollX() {
-        double scrollX = mouseScrollX;
-        mouseScrollX = 0;
-        return scrollX;
     }
 
     /**

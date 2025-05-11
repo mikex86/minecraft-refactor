@@ -73,8 +73,8 @@ public class InventoryScreen extends GuiScreen {
 
     @Override
     public void drawScreen(GraphicsAPI graphics, float screenWidth, float screenHeight, float partialTicks) {
-        float centerX = screenWidth / 2f;
-        float centerY = screenHeight / 2f;
+        float centerX = (float) (int) screenWidth / 2;
+        float centerY = (float) (int) screenHeight / 2;
 
         // if we have not received any mouse input yet, assume it is center of screen
         // this is true because every time we un-grab the mouse, we reset the mouse position to center
@@ -89,10 +89,10 @@ public class InventoryScreen extends GuiScreen {
             t.color(1, 1, 1);
 
             // draw quad
-            t.vertexUV(centerX + INVENTORY_UI_WIDTH / 2f, centerY - INVENTORY_UI_HEIGHT / 2f, 0.0F, (INVENTORY_UI_WIDTH) / 256f, 0.0F);
+            t.vertexUV(centerX + INVENTORY_UI_WIDTH / 2f, centerY - INVENTORY_UI_HEIGHT / 2f, 0.0F, INVENTORY_UI_WIDTH / 256f, 0.0F);
             t.vertexUV(centerX - INVENTORY_UI_WIDTH / 2f, centerY - INVENTORY_UI_HEIGHT / 2f, 0.0F, 0.0F, 0.0F);
             t.vertexUV(centerX - INVENTORY_UI_WIDTH / 2f, centerY + INVENTORY_UI_HEIGHT / 2f, 0.0F, 0.0F, INVENTORY_UI_HEIGHT / 256f);
-            t.vertexUV(centerX + INVENTORY_UI_WIDTH / 2f, centerY + INVENTORY_UI_HEIGHT / 2f, 0.0F, (INVENTORY_UI_WIDTH) / 256f, INVENTORY_UI_HEIGHT / 256f);
+            t.vertexUV(centerX + INVENTORY_UI_WIDTH / 2f, centerY + INVENTORY_UI_HEIGHT / 2f, 0.0F, INVENTORY_UI_WIDTH / 256f, INVENTORY_UI_HEIGHT / 256f);
 
             inventoryQuadMesh = t.createIndexedMesh(GraphicsEnums.BufferUsage.STATIC);
         }
@@ -264,7 +264,7 @@ public class InventoryScreen extends GuiScreen {
                 float x = centerX - INVENTORY_UI_WIDTH / 2f + 8 + ITEM_SLOT_SIZE * column;
                 float y = centerY + ITEM_SLOT_SIZE * row;
                 if (mouseX >= x && mouseX <= x + ITEM_SLOT_SIZE && mouseY >= y && mouseY <= y + ITEM_SLOT_SIZE) {
-                    inventory.selectItem(row, column);
+                    inventory.clickItem(row, column);
                 }
             }
         }
@@ -274,7 +274,7 @@ public class InventoryScreen extends GuiScreen {
             float x = centerX - INVENTORY_UI_WIDTH / 2f + 8 + ITEM_SLOT_SIZE * i;
             float y = centerY + ITEM_SLOT_SIZE * inventory.getMainInventoryRowCount();
             if (mouseX >= x && mouseX <= x + ITEM_SLOT_SIZE && mouseY >= y && mouseY <= y + ITEM_SLOT_SIZE) {
-                inventory.selectItem(inventory.getMainInventoryRowCount(), i);
+                inventory.clickItem(inventory.getMainInventoryRowCount(), i);
             }
         }
     }

@@ -42,7 +42,7 @@ public class Bush extends Block {
 
         // Check if bush has valid ground below and sufficient light
         if (!level.isSkyLit(x, y, z) || (tileBelow != null && tileBelow.block != Blocks.dirt && tileBelow.block != Blocks.grass)) {
-            level.setBlockState(x, y, z, null); // Remove bush if conditions not met
+            level.setBlockState(x, y, z, null, false); // Remove bush if conditions not met
         }
     }
 

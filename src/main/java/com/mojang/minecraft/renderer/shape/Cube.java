@@ -61,14 +61,14 @@ public class Cube {
      * @param height Height of the box
      * @param depth  Depth of the box
      */
-    public void addBox(float x0, float y0, float z0, int width, int height, int depth) {
+    public void addBox(float x0, float y0, float z0, float width, float height, float depth) {
         this.vertices = new Vertex[8];
         this.polygons = new Polygon[6];
 
         // Calculate end coordinates
-        float x1 = x0 + (float) width;
-        float y1 = y0 + (float) height;
-        float z1 = z0 + (float) depth;
+        float x1 = x0 + width;
+        float y1 = y0 + height;
+        float z1 = z0 + depth;
 
         // Create vertices for the upper face
         Vertex upperNW = new Vertex(x0, y0, z0, 0.0F, 0.0F);

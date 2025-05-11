@@ -189,18 +189,18 @@ public class GameRenderer implements Disposable {
         float walkDelta = player.distanceWalked - player.prevDistanceWalked;
         float h = -(player.distanceWalked + walkDelta * partialTicks);
         float bobAmt = player.prevBob + (player.bob - player.prevBob) * partialTicks;
-        float sin = (float)Math.sin(h * Math.PI);
-        float cos = (float)Math.cos(h * Math.PI);
+        float sin = (float) Math.sin(h * Math.PI);
+        float cos = (float) Math.cos(h * Math.PI);
 
         // vanilla translate
         graphics.translate(
-            sin * bobAmt * 0.5F,
-            -Math.abs(cos * bobAmt),
-            0.0F
+                sin * bobAmt * 0.5F,
+                -Math.abs(cos * bobAmt),
+                0.0F
         );
         // lean left/right (Z) and tilt forward/back (X) as vanilla
         graphics.rotateZ(sin * bobAmt * 3.0F);
-        graphics.rotateX(Math.abs((float)Math.cos(h * Math.PI - 0.2F) * bobAmt) * 5.0F);
+        graphics.rotateX(Math.abs((float) Math.cos(h * Math.PI - 0.2F) * bobAmt) * 5.0F);
     }
 
     /**
@@ -471,6 +471,22 @@ public class GameRenderer implements Disposable {
                 BlockItem blockItem = (BlockItem) item;
                 graphics.pushMatrix();
                 graphics.translate(centerX - HOTBAR_WIDTH / 2f + (i * HOTBAR_SLOT_WIDTH) + HOTBAR_SLOT_WIDTH / 2f + 1, screenHeight - HOTBAR_SELECTOR_SIZE + ITEM_SIZE * 2 + 1, 0);
+
+
+                // render item pickup animation
+                {
+                    // real mc has a tick-updated animation counter here, we don't do that.
+                    // we just use time millis
+                    double ticksPassed = (System.currentTimeMillis() - itemStack.lastPickupTimeMs) / 50.0;
+                    double animTicks = Math.min(ticksPassed, 8.0);
+                    double anim = 8.0 - animTicks;
+                    float f = (float)(anim / 8.0);
+                    float scaleFactor = 1.0f + f*f*0.5f;
+                    if (anim > 0) {
+                        graphics.scale(1.0f / scaleFactor, (scaleFactor + 1.0f) / 2.0f, 1.0f);
+                    }
+                }
+
                 BlockRenderer.renderBlockPreview(graphics, blockItem.getBlock(), ITEM_SIZE);
                 graphics.popMatrix();
             }

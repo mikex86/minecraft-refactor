@@ -1,6 +1,7 @@
 package com.mojang.minecraft.item.inventory;
 
 import com.mojang.minecraft.item.BlockItem;
+import com.mojang.minecraft.item.Item;
 import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.level.block.Blocks;
@@ -64,10 +65,22 @@ public class Inventory {
         return HOTBAR_SIZE;
     }
 
-    public void selectItem(int row, int column) {
-        ItemStack block = getInventoryItem(row, column);
-        inventoryBlocks[row][column] = selectedItem;
-        selectedItem = block;
+    public void clickItem(int row, int column) {
+        ItemStack clickedStack = getInventoryItem(row, column);
+        ItemStack currentStack = getSelectedItem();
+        if (currentStack == null || clickedStack == null || !currentStack.getItem().equals(clickedStack.getItem())) {
+            // swap stacks
+            inventoryBlocks[row][column] = selectedItem;
+            selectedItem = clickedStack;
+        } else {
+            // merge stacks
+            int increased = inventoryBlocks[row][column].increaseAmount(currentStack.getCount());
+            if (increased == currentStack.getCount()) {
+                selectedItem = null;
+            } else {
+                currentStack.decreaseAmount(increased);
+            }
+        }
     }
 
     public ItemStack getSelectedItem() {
@@ -83,5 +96,31 @@ public class Inventory {
                 hotbarBlocks[hotbarSlotIndex] = null;
             }
         }
+    }
+
+    public boolean addItem(Item item) {
+        // add items to inventory in reverse row priority
+        for (int i = inventoryBlocks.length - 1; i >= 0; i--) {
+            for (int j = 0, m = inventoryBlocks[i].length; j < m; j++) {
+                ItemStack itemStack = inventoryBlocks[i][j];
+                if (itemStack != null && itemStack.getItem().equals(item)) {
+                    if (itemStack.increaseAmount(1) == 1) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        for (int i = inventoryBlocks.length - 1; i >= 0; i--) {
+            for (int j = 0, m = inventoryBlocks[i].length; j < m; j++) {
+                ItemStack itemStack = inventoryBlocks[i][j];
+                if (itemStack == null) {
+                    inventoryBlocks[i][j] = new ItemStack(item, 1);
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }

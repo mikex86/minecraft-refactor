@@ -12,6 +12,7 @@ public class EntityLiving extends Entity {
 
     public EntityLiving(Level level) {
         super(level);
+        this.hasBlockCollision = true;
     }
 
     @Override
