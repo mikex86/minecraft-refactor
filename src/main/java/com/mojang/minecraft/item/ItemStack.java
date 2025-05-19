@@ -37,12 +37,13 @@ public class ItemStack {
      * Increases the amount of this item stack by the specified amount.
      *
      * @param amount The amount to increase by
+     * @param isItemPickup whether this increase is due to an item pickup. if true, this will trigger associated animation timers to reset.
      * @return The amount added to the stack
      */
-    public int increaseAmount(int amount) {
+    public int increaseAmount(int amount, boolean isItemPickup) {
         int added = Math.min(amount, maxCount - count);
         count += added;
-        if (added > 0) {
+        if (isItemPickup && added > 0) {
             lastPickupTimeMs = System.currentTimeMillis();
         }
         return added;

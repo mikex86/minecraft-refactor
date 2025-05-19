@@ -274,7 +274,7 @@ public class EntityPlayer extends EntityLiving {
      * @return true if the item was picked up, false otherwise
      */
     public boolean attemptPickupItem(Item item) {
-        return inventory.addItem(item);
+        return inventory.addItem(item, true);
     }
 
     /**

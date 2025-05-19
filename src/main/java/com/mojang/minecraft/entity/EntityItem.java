@@ -3,14 +3,12 @@ package com.mojang.minecraft.entity;
 import com.mojang.minecraft.item.BlockItem;
 import com.mojang.minecraft.item.Item;
 import com.mojang.minecraft.level.Level;
-import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.block.BlockRenderer;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 import com.mojang.minecraft.renderer.shader.ShaderRegistry;
 import com.mojang.minecraft.renderer.shader.impl.WorldShader;
-import com.mojang.minecraft.renderer.shape.Cube;
 import com.mojang.minecraft.util.math.CollisionUtils;
 
 public class EntityItem extends Entity {
@@ -22,6 +20,8 @@ public class EntityItem extends Entity {
     private final float hoverPhase;
 
     private EntityPlayer target;
+
+    private int pickupDelay = 10;
 
     /**
      * Creates a new entity in the specified level.
@@ -41,11 +41,16 @@ public class EntityItem extends Entity {
     public void tick() {
         super.tick();
 
+        // Decrease pickup delay
+        if (this.pickupDelay > 0) {
+            this.pickupDelay--;
+        }
+
         // Move based on current velocity
         this.move(this.xd, this.yd, this.zd);
 
         // Apply gravity
-        this.yd -= 0.08F;
+        this.yd -= 0.04F;
 
         // Apply ground friction
         if (this.onGround) {
@@ -110,6 +115,9 @@ public class EntityItem extends Entity {
 
     @Override
     protected void onCollideWithPlayer(EntityPlayer player) {
+        if (this.pickupDelay > 0) {
+            return;
+        }
         if (this.target == null) {
             if (player.attemptPickupItem(item)) {
                 this.target = player;

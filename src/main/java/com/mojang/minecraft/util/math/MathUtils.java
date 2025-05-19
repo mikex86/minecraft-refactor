@@ -38,4 +38,9 @@ public class MathUtils {
         }
         return String.format("%.1f %cB", bytes / 1000.0, ci.current());
     }
+
+    public static int floor(float value) {
+        int xi = (int) value;
+        return value < xi ? xi - 1 : xi;
+    }
 }

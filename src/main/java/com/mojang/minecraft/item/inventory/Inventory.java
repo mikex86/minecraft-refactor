@@ -74,7 +74,7 @@ public class Inventory {
             selectedItem = clickedStack;
         } else {
             // merge stacks
-            int increased = inventoryBlocks[row][column].increaseAmount(currentStack.getCount());
+            int increased = inventoryBlocks[row][column].increaseAmount(currentStack.getCount(), false);
             if (increased == currentStack.getCount()) {
                 selectedItem = null;
             } else {
@@ -98,13 +98,13 @@ public class Inventory {
         }
     }
 
-    public boolean addItem(Item item) {
+    public boolean addItem(Item item, boolean isItemPickup) {
         // add items to inventory in reverse row priority
         for (int i = inventoryBlocks.length - 1; i >= 0; i--) {
             for (int j = 0, m = inventoryBlocks[i].length; j < m; j++) {
                 ItemStack itemStack = inventoryBlocks[i][j];
                 if (itemStack != null && itemStack.getItem().equals(item)) {
-                    if (itemStack.increaseAmount(1) == 1) {
+                    if (itemStack.increaseAmount(1, isItemPickup) == 1) {
                         return true;
                     }
                 }

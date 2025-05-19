@@ -1,10 +1,12 @@
 package com.mojang.minecraft.entity;
 
 import com.mojang.minecraft.level.Level;
+import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.util.math.CollisionUtils;
+import com.mojang.minecraft.util.math.MathUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -318,6 +320,7 @@ public class Entity {
 
     /**
      * Called when the entity collides with a player.
+     *
      * @param player The player that collided with this entity
      */
     protected void onCollideWithPlayer(EntityPlayer player) {
@@ -326,7 +329,7 @@ public class Entity {
     /**
      * Default render method. Override in subclasses to provide specific rendering.
      *
-     * @param graphics The graphics api
+     * @param graphics    The graphics api
      * @param partialTick Partial tick time for smooth animation
      */
     public void render(GraphicsAPI graphics, TextureManager textureManager, float partialTick) {
