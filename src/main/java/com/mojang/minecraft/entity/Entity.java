@@ -317,6 +317,102 @@ public class Entity {
         this.zd += za * cos + xa * sin;
     }
 
+    protected void pushOutOfBlocks(float queryPosX, float queryPosY, float queryPosZ) {
+        int bx = MathUtils.floor(queryPosX);
+        int by = MathUtils.floor(queryPosY);
+        int bz = MathUtils.floor(queryPosZ);
+        float dx = queryPosX - bx;
+        float dy = queryPosY - by;
+        float dz = queryPosZ - bz;
+
+        float best = Float.MAX_VALUE;
+        int dir = -1;
+
+        BlockState state;
+        // NORTH (0,0,-1)
+        state = this.level.getBlockState(bx, by, bz - 1);
+        if (state == null || !state.block.isBlockingMovement()) {
+            if (dz < best) {
+                best = dz;
+                dir = 0;
+            }
+        }
+        // SOUTH (0,0,+1)
+        state = this.level.getBlockState(bx, by, bz + 1);
+        if (state != null && !state.block.isBlockingMovement()) {
+            float penetration = 1.0f - dz;
+            if (penetration < best) {
+                best = penetration;
+                dir = 1;
+            }
+        }
+        // WEST (-1,0,0)
+        state = this.level.getBlockState(bx - 1, by, bz);
+        if (state != null && !state.block.isBlockingMovement()) {
+            if (dx < best) {
+                best = dx;
+                dir = 2;
+            }
+        }
+        // EAST (+1,0,0)
+        state = this.level.getBlockState(bx + 1, by, bz);
+        if (state == null || !state.block.isBlockingMovement()) {
+            float penetration = 1.0f - dx;
+            if (penetration < best) {
+                best = penetration;
+                dir = 3;
+            }
+        }
+        // UP (0,+1,0)
+        state = this.level.getBlockState(bx, by + 1, bz);
+        if (state == null || !state.block.isBlockingMovement()) {
+            float penetration = 1.0f - dy;
+            if (penetration < best) {
+                best = penetration;
+                dir = 4;
+            }
+        }
+
+        // random push strength between 0.1 and 0.3
+        float scl = (float) (Math.random() * 0.2 + 0.1);
+
+        // scale current velocity
+        float vx = this.xd * 0.75f;
+        float vy = this.yd * 0.75f;
+        float vz = this.zd * 0.75f;
+
+        // apply the nudge along the chosen axis
+        switch (dir) {
+            case 0: // NORTH: negative Z
+                this.xd = vx;
+                this.yd = vy;
+                this.zd = -scl;
+                break;
+            case 1: // SOUTH: positive Z
+                this.xd = vx;
+                this.yd = vy;
+                this.zd = scl;
+                break;
+            case 2: // WEST: negative X
+                this.xd = -scl;
+                this.yd = vy;
+                this.zd = vz;
+                break;
+            case 3: // EAST: positive X
+                this.xd = scl;
+                this.yd = vy;
+                this.zd = vz;
+                break;
+            case 4: // UP: positive Y
+                this.xd = vx;
+                this.yd = scl;
+                this.zd = vz;
+                break;
+            default:
+                // no valid direction: do nothing
+        }
+    }
+
 
     /**
      * Called when the entity collides with a player.

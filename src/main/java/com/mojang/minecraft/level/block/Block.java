@@ -572,4 +572,8 @@ public class Block {
         }
         return validBlockStates.get(0); // default block state
     }
+
+    public boolean isBlockingMovement() {
+        return true;
+    }
 }

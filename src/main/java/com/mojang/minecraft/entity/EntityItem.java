@@ -52,6 +52,11 @@ public class EntityItem extends Entity {
         // Apply gravity
         this.yd -= 0.04F;
 
+        // try to push item out of blocks
+        if (!this.level.isFreeFromBlocks(this.boundingBox)) {
+            this.pushOutOfBlocks(this.x, (this.boundingBox.y0 + this.boundingBox.y1) / 2, this.z);
+        }
+
         // Apply ground friction
         if (this.onGround) {
             float slipperyFactor = 0.6F;

@@ -2,7 +2,6 @@ package com.mojang.minecraft.level;
 
 import com.mojang.minecraft.crash.CrashReporter;
 import com.mojang.minecraft.entity.Entity;
-import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.level.chunk.Chunk;
 import com.mojang.minecraft.level.generation.WorldGenerator;
@@ -263,12 +262,12 @@ public class Level {
 
 
     /**
-     * Checks if a bounding box is free from collisions with entities and the player.
+     * Checks if a bounding box is free from collisions with entities.
      *
      * @param aabb The bounding box to check
      * @return true if the area is free, false if there's a collision
      */
-    public boolean isFree(AABB aabb) {
+    public boolean isFreeFromEntities(AABB aabb) {
         // Check for collision with any entity
         for (Entity entity : this.entities) {
             if (!entity.hasBlockCollision) {
@@ -279,6 +278,34 @@ public class Level {
             }
         }
 
+        return true;
+    }
+
+    /**
+     * Checks if a bounding box is free from blocks.
+     *
+     * @param aabb The bounding box to check
+     * @return true if the area is free, false if there's a block collision
+     */
+    public boolean isFreeFromBlocks(AABB aabb) {
+        int x0 = ceilFloor(aabb.x0);
+        int x1 = ceilFloor(aabb.x1);
+        int y0 = ceilFloor(aabb.y0);
+        int y1 = ceilFloor(aabb.y1);
+        int z0 = ceilFloor(aabb.z0);
+        int z1 = ceilFloor(aabb.z1);
+
+        // Check all blocks in the AABB
+        for (int x = x0; x <= x1; ++x) {
+            for (int y = y0; y <= y1; ++y) {
+                for (int z = z0; z <= z1; ++z) {
+                    BlockState blockState = this.getBlockState(x, y, z);
+                    if (blockState != null && blockState.block.isSolid()) {
+                        return false;
+                    }
+                }
+            }
+        }
         return true;
     }
 
@@ -388,8 +415,9 @@ public class Level {
 
     /**
      * Gets all entities within the specified AABB, excluding the specified entity.
+     *
      * @param excluded the entity to exclude from the search
-     * @param aab the AABB to search within
+     * @param aab      the AABB to search within
      * @return a list of entities within the specified AABB, excluding the specified entity
      */
     public List<Entity> getNearbyEntitiesExcluding(Entity excluded, AABB aab) {

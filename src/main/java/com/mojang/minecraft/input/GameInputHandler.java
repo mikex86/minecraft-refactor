@@ -318,7 +318,7 @@ public class GameInputHandler {
                 Item item = itemStack.getItem();
                 if (item instanceof BlockItem) {
                     BlockItem blockItem = (BlockItem) item;
-                    if (this.level.isFree(aabb)) {
+                    if (this.level.isFreeFromEntities(aabb)) {
                         this.level.setBlockState(x, y, z, blockItem.getBlock().getBlockState(hitResult.facingDirection), true);
                         this.player.getInventory().decreaseHotbarItem(this.hotbarSlotIndex, 1);
                         return true;
