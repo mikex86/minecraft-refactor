@@ -77,6 +77,12 @@ public class EntityPlayer extends EntityLiving {
      */
     private HitResult currentHitResult = null;
 
+    /// Swinging animation
+    private int swingTime = 0;
+    private boolean swinging = false;
+    private float swingAmount = 0.0F;
+    private float prevSwingAmount = 0.0F;
+
     /**
      * Creates a new Player instance.
      *
@@ -273,11 +279,29 @@ public class EntityPlayer extends EntityLiving {
         float horizontalMotion = (float) Math.sqrt(xd * xd + zd * zd);
         float bobSpeed = onGround ? Math.min(0.1F, horizontalMotion) : 0.0F;
         this.bob += (bobSpeed - this.bob) * 0.4F;
-    }
 
+        // -- Update swing progress
+        {
+            int duration = this.getSwingDuration();
+            if (this.swinging) {
+                this.swingTime++;
+                if (this.swingTime >= duration) {
+                    this.swingTime = -1;
+                    this.swinging = false;
+                }
+            } else {
+                this.swingTime = 0;
+            }
+            if (this.swinging) {
+                this.prevSwingAmount = this.swingAmount;
+                this.swingAmount = (float) this.swingTime / (float) duration;
+            }
+        }
+    }
 
     /**
      * Attempts to pick up an item.
+     *
      * @param item The item to pick up
      * @return true if the item was picked up, false otherwise
      */
@@ -323,6 +347,7 @@ public class EntityPlayer extends EntityLiving {
 
     /**
      * Called by Minecraft.java to update the block breaking progress for the single player.
+     *
      * @return true if the current block should be broken, false otherwise
      */
     public boolean updateBlockBreaking() {
@@ -518,6 +543,35 @@ public class EntityPlayer extends EntityLiving {
     public float getInterpolatedFOV(float partialTicks) {
         // linear interpolate between last and current smoothed FOV
         return this.prevFovModifier + (this.fovModifier - this.prevFovModifier) * partialTicks;
+    }
+
+    /**
+     * Returns the per-frame interpolated swing progress.
+     *
+     * @param partialTicks interpolation factor between ticks [0..1)
+     * @return smooth swing progress
+     */
+    public float getSwingProgress(float partialTicks) {
+        if (!this.swinging) {
+            return 0.0F;
+        }
+        float delta = this.swingAmount - this.prevSwingAmount;
+        if (delta < 0.0F) {
+            delta += 1.0F;
+        }
+        return this.prevSwingAmount + delta * partialTicks;
+    }
+
+    public void swing() {
+        if (this.swinging && this.swingTime < this.getSwingDuration() / 2 && this.swingTime >= 0) {
+            return;
+        }
+        this.swingTime = -1;
+        this.swinging = true;
+    }
+
+    private int getSwingDuration() {
+        return 6;
     }
 
     /**

@@ -277,29 +277,44 @@ public class GameRenderer implements Disposable {
         }
 
         // Calculate aspect ratio
-        float aspectRatio = (float) (this.width) / this.height;
-
         graphics.setShader(worldShader);
         graphics.setTexture(textureManager.terrainTexture);
 
-        graphics.setPerspectiveProjection(70.0F, aspectRatio, 0.05F, 4096.0F);
-        graphics.setMatrixMode(GraphicsAPI.MatrixMode.MODELVIEW);
+        graphics.pushMatrix();
         graphics.loadIdentity();
 
         graphics.clear(false, true, 0.0F, 0.0F, 0.0F, 0.0F);
         graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
-        graphics.pushMatrix();
         bobView(player, partialTicks);
 
-        float equip = 0F;
-        graphics.translate(0.60F, -0.62F + equip * 0.6F, -0.72F);
+        float f = player.getSwingProgress(partialTicks);
 
-        graphics.translate(0.0F, 0.1875F, 0.0F);
-        graphics.rotateY(-46.0F);
-        graphics.rotateX(2);
+        // pre-translation
+        {
+            float h = (float) (-0.4F * Math.sin(Math.sqrt(f) * (float) Math.PI));
+            float j = (float) (0.2F * Math.sin(Math.sqrt(f) * (float) (Math.PI * 2)));
+            float k = (float) (-0.2F * Math.sin(f * (float) Math.PI));
+            graphics.translate(h, j, k);
+            graphics.translate(0, -f, 0);
+        }
+
+        // arm transform
+        float equipProgress = 1.0F;
+        {
+            graphics.translate(0.44F, -0.52F - (1-equipProgress) * -0.6F, -0.72F);
+        }
+
+        // attack transform
+        float g = (float) Math.sin(f * f * (float) Math.PI);
+        graphics.rotateY(g * -20.0F);
+        {
+            float h = (float) Math.sin(Math.sqrt(f) * (float) Math.PI);
+            graphics.rotateZ(h * -20.0F);
+            graphics.rotateX(h * -30.0F);
+            graphics.rotateY(-45.0F);
+        }
+
         graphics.scale(0.32F, 0.32F, 0.32F);
-
-        graphics.translate(-0.5F, -0.5F, 0.0F);
 
         graphics.updateShaderMatrices();
         Item item = itemStack.getItem();

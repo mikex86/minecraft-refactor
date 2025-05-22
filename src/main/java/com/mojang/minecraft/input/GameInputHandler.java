@@ -279,16 +279,22 @@ public class GameInputHandler {
      * @return true if the action was successful, false otherwise
      */
     private boolean handleMouseClick(HitResult hitResult, boolean isRightClick, boolean isRepeatEvent) {
-        if (hitResult == null) {
-            return false;
-        }
 
         if (!isRightClick) {
+            this.player.swing();
+            if (hitResult == null) {
+                return false;
+            }
+
             // Destroy mode
 
             // TODO: HANDLE INSTANT BREAKING
             this.player.setBreakingBlockPos(hitResult.x, hitResult.y, hitResult.z);
         } else {
+            if (hitResult == null) {
+                return false;
+            }
+
             this.player.resetBreakingBlockPos();
 
             // Build mode
@@ -322,6 +328,7 @@ public class GameInputHandler {
                     if (this.level.isFreeFromEntities(aabb)) {
                         this.level.setBlockState(x, y, z, blockItem.getBlock().getBlockState(hitResult.facingDirection), true);
                         this.player.getInventory().decreaseHotbarItem(this.hotbarSlotIndex, 1);
+                        this.player.swing();
                         return true;
                     }
                 }
