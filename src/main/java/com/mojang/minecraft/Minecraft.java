@@ -4,6 +4,9 @@ import com.mojang.minecraft.crash.CrashReporter;
 import com.mojang.minecraft.engine.GameEngine;
 import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.input.GameInputHandler;
+import com.mojang.minecraft.level.Level;
+import com.mojang.minecraft.level.block.state.BlockState;
+import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.profiler.GpuMemoryTracker;
 import com.mojang.minecraft.profiler.NativeMemoryTracker;
 import com.mojang.minecraft.renderer.GameRenderer;
@@ -147,7 +150,13 @@ public class Minecraft implements Runnable {
 
                     // Process input
                     HitResult hitResult = this.gameState.getLevel().raycast(this.gameState.getPlayer(), partialTick);
+                    this.gameState.getPlayer().setCurrentHitResult(hitResult);
                     gameInputHandler.processInput(hitResult, this.engine.getWidth(), this.engine.getHeight());
+
+                    // Update client player
+                    if (ticksToProcess > 0) {
+                        updateClientPlayer(partialTick);
+                    }
 
                     // Process game ticks
                     for (int i = 0; i < ticksToProcess; ++i) {
@@ -183,6 +192,25 @@ public class Minecraft implements Runnable {
             // Clean up resources
             this.destroy();
         }
+    }
+
+    private void updateClientPlayer(float partialTick) {
+        EntityPlayer player = this.gameState.getPlayer();
+        if (player.updateBlockBreaking()) {
+            this.breakBlock(player.breakingBlockX, player.breakingBlockY, player.breakingBlockZ);
+            player.resetBreakingBlockPos();
+        }
+    }
+
+    public boolean breakBlock(int x, int y, int z) {
+        Level level = this.gameState.getLevel();
+        ParticleEngine particleEngine = this.gameState.getParticleEngine();
+        BlockState oldBlock = level.getBlockState(x, y, z);
+        boolean changed = level.setBlockState(x, y, z, null);
+        if (oldBlock != null && changed) {
+            oldBlock.block.destroy(level, x, y, z, particleEngine);
+        }
+        return changed;
     }
 
     private void tick() {

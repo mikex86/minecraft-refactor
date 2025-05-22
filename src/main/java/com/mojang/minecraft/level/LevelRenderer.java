@@ -19,7 +19,7 @@ import java.util.concurrent.PriorityBlockingQueue;
 /**
  * Handles rendering of the Minecraft level.
  */
-public class LevelRenderer implements LevelListener, Disposable {
+public class LevelRenderer implements Disposable {
     // Level data
     private final Level level;
 
@@ -37,9 +37,6 @@ public class LevelRenderer implements LevelListener, Disposable {
         this.level = level;
         this.textureManager = textureManager;
         this.graphics = GraphicsFactory.getGraphicsAPI();
-
-        // Register as a level listener
-        level.addListener(this);
     }
 
     /**
@@ -181,13 +178,6 @@ public class LevelRenderer implements LevelListener, Disposable {
                 break;
             }
         }
-    }
-
-    /**
-     * Called when a tile changes.
-     */
-    @Override
-    public void tileChanged(int x, int y, int z) {
     }
 
     /**

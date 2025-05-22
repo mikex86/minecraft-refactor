@@ -45,13 +45,14 @@ public final class Tesselator implements Disposable {
     private float grayScale;
 
     private DataType positionDataType;
-    private DataType textCoordsDataType;
+    private DataType texCoordsDataType;
 
     // Feature flags
     private boolean hasColor = false;
     private boolean hasGrayScale = false;
     private boolean hasTexture = false;
     private boolean disableColors = false;
+    private boolean useIndexBuffer = true;
 
     // Graphics API and resources
     private final GraphicsAPI graphics;
@@ -154,7 +155,7 @@ public final class Tesselator implements Disposable {
                     this.positionDataType, // Position data type
                     DataType.FLOAT, // Color data type
                     DataType.UNSIGNED_BYTE, // Grayscale data type
-                    this.textCoordsDataType, // Texture coordinate data type
+                    this.texCoordsDataType, // Texture coordinate data type
                     DataType.FLOAT, // Normal data type
 
                     true,      // Always has positions
@@ -164,18 +165,20 @@ public final class Tesselator implements Disposable {
                     false                 // No normals
             );
 
+            int elementCount = useIndexBuffer ? indexCount : vertexCount;
+
             vertexBuffer.setFormat(format);
 
             // Upload data to GPU
             vertexBuffer.setData(getBuffer(), dataIndex);
-            indexBuffer.setData(getIndexBuffer(), indexCount * Integer.BYTES); // 4 bytes per int
+            indexBuffer.setData(getIndexBuffer(), elementCount * Integer.BYTES); // 4 bytes per int
 
             // Set up VAO
             vao.setVertexBuffer(vertexBuffer);
             vao.setIndexBuffer(indexBuffer);
 
             // Draw the vertices
-            graphics.drawPrimitives(vao, PrimitiveType.TRIANGLES, 0, indexCount);
+            graphics.drawPrimitives(vao, PrimitiveType.TRIANGLES, 0, elementCount);
         }
 
         // Reset state
@@ -207,7 +210,7 @@ public final class Tesselator implements Disposable {
                 this.positionDataType, // Position data type
                 DataType.FLOAT, // Color data type
                 DataType.UNSIGNED_BYTE, // Grayscale data type
-                this.textCoordsDataType, // Texture coordinate data type
+                this.texCoordsDataType, // Texture coordinate data type
                 DataType.FLOAT, // Normal data type
 
                 true,                 // Always has positions
@@ -219,7 +222,7 @@ public final class Tesselator implements Disposable {
 
         // Create buffers
         VertexBuffer vertexBuffer;
-        IndexBuffer indexBuffer;
+        IndexBuffer indexBuffer = null;
 
         // Size calculations
         int vertexDataSizeInBytes = dataIndex;
@@ -232,24 +235,30 @@ public final class Tesselator implements Disposable {
                 vertexBuffer = graphics.createVertexBuffer(bufferUsage);
             }
 
-            indexBuffer = graphics.createPooledIndexBuffer(indexDataSizeInBytes);
-            if (indexBuffer == null) {
-                System.out.println("Failed to create pooled index buffer, falling back to dynamic allocation");
-                indexBuffer = graphics.createIndexBuffer(bufferUsage);
+            if (useIndexBuffer) {
+                indexBuffer = graphics.createPooledIndexBuffer(indexDataSizeInBytes);
+                if (indexBuffer == null) {
+                    System.out.println("Failed to create pooled index buffer, falling back to dynamic allocation");
+                    indexBuffer = graphics.createIndexBuffer(bufferUsage);
+                }
             }
         } else {
             vertexBuffer = graphics.createVertexBuffer(bufferUsage);
-            indexBuffer = graphics.createIndexBuffer(bufferUsage);
+            if (useIndexBuffer) {
+                indexBuffer = graphics.createIndexBuffer(bufferUsage);
+            }
         }
 
         vertexBuffer.setFormat(format);
 
         // Upload data
         vertexBuffer.setData(getBuffer(), vertexDataSizeInBytes);
-        indexBuffer.setData(getIndexBuffer(), indexDataSizeInBytes);
+        if (indexBuffer != null) {
+            indexBuffer.setData(getIndexBuffer(), indexDataSizeInBytes);
+        }
 
         // Create mesh with VAO
-        return new IndexedMesh(graphics, vertexBuffer, indexBuffer, indexCount);
+        return new IndexedMesh(graphics, vertexBuffer, indexBuffer, vertexCount, indexCount);
     }
 
     /**
@@ -264,20 +273,21 @@ public final class Tesselator implements Disposable {
     /**
      * Initialize the tesselator for a new drawing sequence
      */
-    public void init(DataType positionDataType, DataType textCoordsDataType) {
+    public void init(DataType positionDataType, DataType texCoordsDataType, boolean useIndexBuffer) {
         this.clear();
         this.hasColor = false;
         this.hasTexture = false;
         this.disableColors = false;
         this.hasGrayScale = false;
+        this.useIndexBuffer = useIndexBuffer;
         this.vertexSize = 3; // Start with just xyz
 
         this.positionDataType = positionDataType;
-        this.textCoordsDataType = textCoordsDataType;
+        this.texCoordsDataType = texCoordsDataType;
     }
 
     public void init() {
-        this.init(DataType.FLOAT, DataType.FLOAT);
+        this.init(DataType.FLOAT, DataType.FLOAT, true);
     }
 
     /**
@@ -367,7 +377,7 @@ public final class Tesselator implements Disposable {
 
         // Add texture coordinates if enabled
         if (this.hasTexture) {
-            switch (this.textCoordsDataType) {
+            switch (this.texCoordsDataType) {
                 case FLOAT: {
                     MemoryUtil.memPutFloat(this.cpuVertexBuffer + currentIndex, this.textureU);
                     currentIndex += Float.BYTES;
@@ -383,7 +393,7 @@ public final class Tesselator implements Disposable {
                     break;
                 }
                 default: {
-                    throw new IllegalArgumentException("Unsupported texture coordinate data type: " + this.textCoordsDataType);
+                    throw new IllegalArgumentException("Unsupported texture coordinate data type: " + this.texCoordsDataType);
                 }
             }
         }
@@ -435,7 +445,7 @@ public final class Tesselator implements Disposable {
         this.vertexCount++;
 
         // Add indices for triangles
-        if (this.vertexCount % 4 == 0) {
+        if (this.useIndexBuffer && this.vertexCount % 4 == 0) {
             // For each quad, generate two triangles
             int baseIndex = this.vertexCount - 4;
 

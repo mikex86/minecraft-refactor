@@ -20,4 +20,11 @@ public class GuiScreen implements Disposable {
     @Override
     public void dispose() {
     }
+
+    /**
+     * Called when the screen is closed.
+     * Called before any call to {@link #dispose()}.
+     */
+    public void onClose() {
+    }
 }

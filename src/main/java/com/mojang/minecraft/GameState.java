@@ -1,6 +1,5 @@
 package com.mojang.minecraft;
 
-import com.mojang.minecraft.entity.Entity;
 import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
@@ -48,7 +47,7 @@ public class GameState {
 
         // Create player
         this.player = new EntityPlayer(this.level, true);
-        this.player.setPos(0.0F, 256, 0.0F);
+        this.player.setPosition(0.0F, 128, 0.0F);
         this.level.spawnEntity(this.player);
 
         // Create particle engine

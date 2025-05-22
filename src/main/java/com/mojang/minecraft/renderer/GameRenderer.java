@@ -13,6 +13,7 @@ import com.mojang.minecraft.item.Item;
 import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
+import com.mojang.minecraft.level.block.Blocks;
 import com.mojang.minecraft.optim.pools.StackCountStringPool;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.renderer.block.BlockRenderer;
@@ -50,6 +51,7 @@ public class GameRenderer implements Disposable {
     private final EntityShader entityShader;
     private final HudShader hudShader;
     private final HudNoTexShader hudNoTexShader;
+    private final OutlineShader outlineShader;
 
     // Font renderer
     private final Font font;
@@ -123,6 +125,7 @@ public class GameRenderer implements Disposable {
         this.entityShader = shaderRegistry.getEntityShader();
         this.hudShader = shaderRegistry.getHudShader();
         this.hudNoTexShader = shaderRegistry.getHudNoTexShader();
+        this.outlineShader = shaderRegistry.getOutlineShader();
 
         this.versionStringLabel = new TextLabel(font, 0xFFFFFF, true);
         this.fpsStringLabel = new TextLabel(font, 0xFFFFFF, true);
@@ -203,6 +206,7 @@ public class GameRenderer implements Disposable {
         graphics.rotateX(Math.abs((float) Math.cos(h * Math.PI - 0.2F) * bobAmt) * 5.0F);
     }
 
+
     /**
      * Positions the camera based on the player's position and orientation.
      *
@@ -248,6 +252,9 @@ public class GameRenderer implements Disposable {
         if (hitResult != null) {
             renderBlockOutline(hitResult);
         }
+
+        // Render held block in 3D with view bobbing
+        // renderHeldItem(partialTicks, this.width, this.height);
 
         // Render HUD elements
         {
@@ -318,13 +325,107 @@ public class GameRenderer implements Disposable {
 
     }
 
+    private IndexedMesh blockOutlineMesh;
+
     /**
      * Renders an outline around the selected block.
      *
      * @param hitResult The hit result containing the block to highlight
      */
     private void renderBlockOutline(HitResult hitResult) {
-        // Implementation would go here
+        if (blockOutlineMesh == null) {
+            Tesselator t = Tesselator.instance;
+            t.init();
+
+            final float width = 0.003F;
+            final float eps = 0.00F;
+
+            // Edges along X axis
+            // (0,0,0)-(1,0,0)
+            t.vertex(0 - eps, -width - eps, 0 - eps);
+            t.vertex(0 - eps, 0 - eps, -width - eps);
+            t.vertex(1 + eps, 0 - eps, -width - eps);
+            t.vertex(1 + eps, -width - eps, 0 - eps);
+            // (0,1,0)-(1,1,0)
+            t.vertex(0 - eps, 1 + width + eps, 0 - eps);
+            t.vertex(1 + eps, 1 + width + eps, 0 - eps);
+            t.vertex(1 + eps, 1 + eps, -width - eps);
+            t.vertex(0 - eps, 1 + eps, -width - eps);
+            // (0,1,1)-(1,1,1)
+            t.vertex(0 - eps, 1 + width + eps, 1 + eps);
+            t.vertex(1 + eps, 1 + width + eps, 1 + eps);
+            t.vertex(1 + eps, 1 + eps, 1 + width + eps);
+            t.vertex(0 - eps, 1 + eps, 1 + width + eps);
+            // (0,0,1)-(1,0,1)
+            t.vertex(0 - eps, -width - eps, 1 + eps);
+            t.vertex(1 + eps, -width - eps, 1 + eps);
+            t.vertex(1 + eps, 0 - eps, 1 + width + eps);
+            t.vertex(0 - eps, 0 - eps, 1 + width + eps);
+
+            // Edges along Y axis
+            // (0,0,0)-(0,1,0)
+            t.vertex(-width - eps, 0 - eps, 0 - eps);
+            t.vertex(0 - eps, 0 - eps, -width - eps);
+            t.vertex(0 - eps, 1 + eps, -width - eps);
+            t.vertex(-width - eps, 1 + eps, 0 - eps);
+            // (1,0,0)-(1,1,0)
+            t.vertex(1 + width + eps, 0 - eps, 0 - eps);
+            t.vertex(1 + eps, 0 - eps, -width - eps);
+            t.vertex(1 + eps, 1 + eps, -width - eps);
+            t.vertex(1 + width + eps, 1 + eps, 0 - eps);
+            // (1,0,1)-(1,1,1)
+            t.vertex(1 + width + eps, 0 - eps, 1 + eps);
+            t.vertex(1 + eps, 0 - eps, 1 + width + eps);
+            t.vertex(1 + eps, 1 + eps, 1 + width + eps);
+            t.vertex(1 + width + eps, 1 + eps, 1 + eps);
+            // (0,0,1)-(0,1,1)
+            t.vertex(-width - eps, 0 - eps, 1 + eps);
+            t.vertex(0 - eps, 0 - eps, 1 + width + eps);
+            t.vertex(0 - eps, 1 + eps, 1 + width + eps);
+            t.vertex(-width - eps, 1 + eps, 1 + eps);
+
+            // Edges along Z axis
+            // (0,0,0)-(0,0,1)
+            t.vertex(-width - eps, 0 - eps, 0 - eps);
+            t.vertex(0 - eps, -width - eps, 0 - eps);
+            t.vertex(0 - eps, -width - eps, 1 + eps);
+            t.vertex(-width - eps, 0 - eps, 1 + eps);
+            // (1,0,0)-(1,0,1)
+            t.vertex(1 + width + eps, 0 - eps, 0 - eps);
+            t.vertex(1 + eps, -width - eps, 0 - eps);
+            t.vertex(1 + eps, -width - eps, 1 + eps);
+            t.vertex(1 + width + eps, 0 - eps, 1 + eps);
+            // (1,1,0)-(1,1,1)
+            t.vertex(1 + width + eps, 1 + eps, 0 - eps);
+            t.vertex(1 + eps, 1 + width + eps, 0 - eps);
+            t.vertex(1 + eps, 1 + width + eps, 1 + eps);
+            t.vertex(1 + width + eps, 1 + eps, 1 + eps);
+            // (0,1,0)-(0,1,1)
+            t.vertex(-width - eps, 1 + eps, 0 - eps);
+            t.vertex(0 - eps, 1 + width + eps, 0 - eps);
+            t.vertex(0 - eps, 1 + width + eps, 1 + eps);
+            t.vertex(-width - eps, 1 + eps, 1 + eps);
+
+            blockOutlineMesh = t.createIndexedMesh(GraphicsEnums.BufferUsage.STATIC);
+        }
+
+        graphics.pushMatrix();
+        graphics.translate(hitResult.x, hitResult.y, hitResult.z);
+
+        graphics.setShader(outlineShader);
+        graphics.updateShaderMatrices();
+
+        graphics.setRasterizerState(GraphicsEnums.CullMode.NONE, GraphicsEnums.FillMode.SOLID);
+        graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS_EQUAL);
+
+        graphics.setBlendState(true, GraphicsEnums.BlendFactor.SRC_ALPHA,
+                GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
+
+        blockOutlineMesh.draw(graphics, GraphicsEnums.PrimitiveType.TRIANGLES);
+
+        graphics.setRasterizerState(GraphicsEnums.CullMode.BACK, GraphicsEnums.FillMode.SOLID);
+
+        graphics.popMatrix();
     }
 
     /**
@@ -399,6 +500,7 @@ public class GameRenderer implements Disposable {
 
     public void closeScreen() {
         if (this.currentScreen != null) {
+            this.currentScreen.onClose();
             this.currentScreen.dispose();
             this.currentScreen = null;
             this.gameInputHandler.setCurrentScreen(null);
@@ -480,8 +582,8 @@ public class GameRenderer implements Disposable {
                     double ticksPassed = (System.currentTimeMillis() - itemStack.lastPickupTimeMs) / 50.0;
                     double animTicks = Math.min(ticksPassed, 8.0);
                     double anim = 8.0 - animTicks;
-                    float f = (float)(anim / 8.0);
-                    float scaleFactor = 1.0f + f*f*0.5f;
+                    float f = (float) (anim / 8.0);
+                    float scaleFactor = 1.0f + f * f * 0.5f;
                     if (anim > 0) {
                         graphics.scale(1.0f / scaleFactor, (scaleFactor + 1.0f) / 2.0f, 1.0f);
                     }

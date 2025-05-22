@@ -549,7 +549,7 @@ public class Block {
             }
         }
         EntityItem entityItem = new EntityItem(level, new BlockItem(this));
-        entityItem.setPos(x + 0.25f, y + 0.01f, z + 0.25f);
+        entityItem.setPosition(x + 0.25f, y + 0.01f, z + 0.25f);
         entityItem.xd = (float) (ThreadLocalRandom.current().nextGaussian() * 0.05F);
         entityItem.yd = (float) (ThreadLocalRandom.current().nextGaussian() * 0.05F + 0.2F);
         entityItem.zd = (float) (ThreadLocalRandom.current().nextGaussian() * 0.05F);

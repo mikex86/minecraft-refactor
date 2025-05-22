@@ -552,7 +552,7 @@ public final class Chunk implements Disposable {
             }
 
             this.currentTesselator = ChunkBuildTesselatorPool.obtain();
-            this.currentTesselator.init(DataType.SHORT, DataType.HALF_FLOAT);
+            this.currentTesselator.init(DataType.SHORT, DataType.HALF_FLOAT, true);
 
             this.renderedTiles = 0;
 

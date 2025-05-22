@@ -36,22 +36,22 @@ public class PlayerModel implements Model<EntityPlayer> {
         // Create the right arm (4x12x4 cube)
         this.rightArm = new Cube(40, 16);
         this.rightArm.addBox(-3.0F, -2.0F, -2.0F, 4, 12, 4);
-        this.rightArm.setPos(-5.0F, 2.0F, 0.0F);
+        this.rightArm.setPosition(-5.0F, 2.0F, 0.0F);
 
         // Create the left arm (4x12x4 cube)
         this.leftArm = new Cube(40, 16);
         this.leftArm.addBox(-1.0F, -2.0F, -2.0F, 4, 12, 4);
-        this.leftArm.setPos(5.0F, 2.0F, 0.0F);
+        this.leftArm.setPosition(5.0F, 2.0F, 0.0F);
 
         // Create the right leg (4x12x4 cube)
         this.rightLeg = new Cube(0, 16);
         this.rightLeg.addBox(-2.0F, 0.0F, -2.0F, 4, 12, 4);
-        this.rightLeg.setPos(-2.0F, 12.0F, 0.0F);
+        this.rightLeg.setPosition(-2.0F, 12.0F, 0.0F);
 
         // Create the left leg (4x12x4 cube)
         this.leftLeg = new Cube(0, 16);
         this.leftLeg.addBox(-2.0F, 0.0F, -2.0F, 4, 12, 4);
-        this.leftLeg.setPos(2.0F, 12.0F, 0.0F);
+        this.leftLeg.setPosition(2.0F, 12.0F, 0.0F);
     }
 
     /**

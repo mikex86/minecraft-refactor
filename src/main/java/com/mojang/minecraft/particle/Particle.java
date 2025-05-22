@@ -45,7 +45,7 @@ public class Particle extends Entity {
         this.tex = tex;
         this.setSize(0.2F, 0.2F);
         this.heightOffset = this.bbHeight / 2.0F;
-        this.setPos(x, y, z);
+        this.setPosition(x, y, z);
 
         // Add some randomness to initial velocity
         this.xd = xa + (float) (Math.random() * 2.0F - 1.0F) * 0.4F;

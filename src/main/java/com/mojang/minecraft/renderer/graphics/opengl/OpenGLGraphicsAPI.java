@@ -282,15 +282,21 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
             // Determine if we're using a pooled index buffer
             long indexOffset = start * 4L; // 4 bytes per int (default)
 
+
             // If using a pooled index buffer, add its base offset to the start
             IndexBuffer indexBuffer = glVao.getIndexBuffer();
-            if (indexBuffer instanceof OpenGLPooledIndexBuffer) {
-                OpenGLPooledIndexBuffer pooledIndexBuffer = (OpenGLPooledIndexBuffer) indexBuffer;
-                indexOffset += pooledIndexBuffer.getOffset();
-            }
+            if (indexBuffer != null) {
+                if (indexBuffer instanceof OpenGLPooledIndexBuffer) {
+                    OpenGLPooledIndexBuffer pooledIndexBuffer = (OpenGLPooledIndexBuffer) indexBuffer;
+                    indexOffset += pooledIndexBuffer.getOffset();
+                }
 
-            // Draw the indexed primitives
-            glDrawElements(translatePrimitiveType(type), count, GL_UNSIGNED_INT, indexOffset);
+                // Draw the indexed primitives
+                glDrawElements(translatePrimitiveType(type), count, GL_UNSIGNED_INT, indexOffset);
+            } else {
+                // Draw the non-indexed primitives
+                glDrawArrays(translatePrimitiveType(type), start, count);
+            }
 
             // Unbind the VAO
             glVao.unbind();

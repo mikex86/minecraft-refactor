@@ -30,7 +30,6 @@ public class GameInputHandler {
     // Game references needed for input processing
     private final EntityPlayer player;
     private final Level level;
-    private final ParticleEngine particleEngine;
     private final boolean fullscreen;
 
     // Currently open GUI screen (if any)
@@ -64,7 +63,6 @@ public class GameInputHandler {
         this.inputHandler = inputHandler;
         this.player = player;
         this.level = level;
-        this.particleEngine = particleEngine;
         this.fullscreen = fullscreen;
 
         // Initially grab the mouse
@@ -84,12 +82,12 @@ public class GameInputHandler {
         }
         if (rightClickDelayTimer == 0 && rightClickPressed) {
             if (this.lastHitResult != null) {
-                this.handleRightClick(this.lastHitResult);
+                this.handleRightClick(this.lastHitResult, true);
             }
         }
         if (leftClickDelayTimer == 0 && leftClickPressed) {
             if (this.lastHitResult != null) {
-                this.handleLeftClick(this.lastHitResult);
+                this.handleLeftClick(this.lastHitResult, true);
             }
         }
     }
@@ -185,12 +183,16 @@ public class GameInputHandler {
                 // Handle left/right mouse buttons (destroy/place blocks)
                 if (button == InputHandler.MouseButtons.BUTTON_RIGHT) {
                     if (pressed) {
-                        this.handleRightClick(hitResult);
+                        this.handleRightClick(hitResult, false);
+                    } else {
+                        this.handleMouseRelease(hitResult, true);
                     }
                     this.rightClickPressed = pressed;
                 } else if (button == InputHandler.MouseButtons.BUTTON_LEFT) {
                     if (pressed) {
-                        this.handleLeftClick(hitResult);
+                        this.handleLeftClick(hitResult, false);
+                    } else {
+                        this.handleMouseRelease(hitResult, false);
                     }
                     this.leftClickPressed = pressed;
                 }
@@ -227,14 +229,14 @@ public class GameInputHandler {
 
     }
 
-    private void handleRightClick(HitResult hitResult) {
-        if (this.handleMouseClick(hitResult, true)) {
+    private void handleRightClick(HitResult hitResult, boolean isRepeatEvent) {
+        if (this.handleMouseClick(hitResult, true, isRepeatEvent)) {
             this.rightClickDelayTimer = 4; // Delay for right-click actions
         }
     }
 
-    private void handleLeftClick(HitResult hitResult) {
-        if (this.handleMouseClick(hitResult, false)) {
+    private void handleLeftClick(HitResult hitResult, boolean isRepeatEvent) {
+        if (this.handleMouseClick(hitResult, false, isRepeatEvent)) {
             this.leftClickDelayTimer = 6; // Delay for left-click actions
         }
     }
@@ -276,20 +278,19 @@ public class GameInputHandler {
      *
      * @return true if the action was successful, false otherwise
      */
-    private boolean handleMouseClick(HitResult hitResult, boolean isRightClick) {
+    private boolean handleMouseClick(HitResult hitResult, boolean isRightClick, boolean isRepeatEvent) {
         if (hitResult == null) {
             return false;
         }
 
         if (!isRightClick) {
             // Destroy mode
-            BlockState oldBlock = this.level.getBlockState(hitResult.x, hitResult.y, hitResult.z);
-            boolean changed = this.level.setBlockState(hitResult.x, hitResult.y, hitResult.z, null, true);
-            if (oldBlock != null && changed) {
-                oldBlock.block.destroy(this.level, hitResult.x, hitResult.y, hitResult.z, this.particleEngine);
-            }
-            return changed;
+
+            // TODO: HANDLE INSTANT BREAKING
+            this.player.setBreakingBlockPos(hitResult.x, hitResult.y, hitResult.z);
         } else {
+            this.player.resetBreakingBlockPos();
+
             // Build mode
             int x = hitResult.x;
             int y = hitResult.y;
@@ -325,7 +326,13 @@ public class GameInputHandler {
                     }
                 }
             }
-            return false;
+        }
+        return false;
+    }
+
+    private void handleMouseRelease(HitResult hitResult, boolean isRightClick) {
+        if (!isRightClick) {
+            this.player.resetBreakingBlockPos();
         }
     }
 

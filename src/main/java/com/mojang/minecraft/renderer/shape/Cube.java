@@ -146,7 +146,7 @@ public class Cube {
      * @param y Y coordinate
      * @param z Z coordinate
      */
-    public void setPos(float x, float y, float z) {
+    public void setPosition(float x, float y, float z) {
         this.x = x;
         this.y = y;
         this.z = z;

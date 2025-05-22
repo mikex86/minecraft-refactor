@@ -24,6 +24,7 @@ public class ShaderRegistry implements Disposable {
     private EntityShader entityShader;
     private HudShader hudShader;
     private HudNoTexShader hudNoTexShader;
+    private OutlineShader outlineShader;
 
     /**
      * Gets the singleton instance of the shader manager.
@@ -55,6 +56,7 @@ public class ShaderRegistry implements Disposable {
         entityShader = new EntityShader();
         hudShader = new HudShader();
         hudNoTexShader = new HudNoTexShader();
+        outlineShader = new OutlineShader();
     }
 
     /**
@@ -117,4 +119,8 @@ public class ShaderRegistry implements Disposable {
         
         instance = null;
     }
-} 
+
+    public OutlineShader getOutlineShader() {
+        return outlineShader;
+    }
+}

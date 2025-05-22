@@ -10,8 +10,13 @@ public class Inventory {
 
     private static final int HOTBAR_SIZE = 9;
 
+    /**
+     * The inventory is a 2D array of ItemStacks in the shape [rows][columns].
+     */
     private final ItemStack[][] inventoryBlocks = new ItemStack[4][9];
     private ItemStack selectedItem = null;
+
+    private int selectedItemSlotRow, selectedItemSlotColumn;
 
     {
         ItemStack[] hotbarBlocks = inventoryBlocks[3];
@@ -72,6 +77,8 @@ public class Inventory {
             // swap stacks
             inventoryBlocks[row][column] = selectedItem;
             selectedItem = clickedStack;
+            selectedItemSlotColumn = column;
+            selectedItemSlotRow = row;
         } else {
             // merge stacks
             int increased = inventoryBlocks[row][column].increaseAmount(currentStack.getCount(), false);
@@ -81,6 +88,16 @@ public class Inventory {
                 currentStack.decreaseAmount(increased);
             }
         }
+    }
+
+    public void resetSelectedItem() {
+        if (selectedItem == null) {
+            return;
+        }
+        inventoryBlocks[selectedItemSlotRow][selectedItemSlotColumn] = selectedItem;
+        selectedItem = null;
+        selectedItemSlotRow = -1;
+        selectedItemSlotColumn = -1;
     }
 
     public ItemStack getSelectedItem() {

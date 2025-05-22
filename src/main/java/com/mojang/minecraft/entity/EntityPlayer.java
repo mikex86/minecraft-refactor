@@ -9,6 +9,7 @@ import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.model.Model;
 import com.mojang.minecraft.renderer.model.ModelRegistry;
 import com.mojang.minecraft.renderer.model.impl.PlayerModel;
+import com.mojang.minecraft.world.HitResult;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -69,6 +70,12 @@ public class EntityPlayer extends EntityLiving {
     private static final float DEGREES_TO_RADIANS = (float) (180.0F / Math.PI);
 
     public static final Model<EntityPlayer> PLAYER_MODEL = ModelRegistry.getInstance().getModel("player", PlayerModel::new);
+
+    /**
+     * The current hit result of the player.
+     * Set externally by Minecraft.java
+     */
+    private HitResult currentHitResult = null;
 
     /**
      * Creates a new Player instance.
@@ -268,6 +275,7 @@ public class EntityPlayer extends EntityLiving {
         this.bob += (bobSpeed - this.bob) * 0.4F;
     }
 
+
     /**
      * Attempts to pick up an item.
      * @param item The item to pick up
@@ -275,6 +283,80 @@ public class EntityPlayer extends EntityLiving {
      */
     public boolean attemptPickupItem(Item item) {
         return inventory.addItem(item, true);
+    }
+
+    /**
+     * The current position of the block being broken.
+     * Not invalidated after the block-breaking state changes back to false.
+     * Minecraft.java will access this variable to execute the block-breaking action.
+     * Minecraft.java will call {@link #resetBreakingBlockPos()} afterward.
+     */
+    public int breakingBlockX, breakingBlockY, breakingBlockZ;
+    private boolean breakingBlock = false;
+    private int blockBreakingProgress = 0;
+
+    public void resetBreakingBlockPos() {
+        this.breakingBlockX = 0;
+        this.breakingBlockY = 0;
+        this.breakingBlockZ = 0;
+        this.breakingBlock = false;
+        System.out.println("Resetting breaking block position");
+    }
+
+    public void setBreakingBlockPos(int x, int y, int z) {
+        if (this.breakingBlockX == x && this.breakingBlockY == y && this.breakingBlockZ == z) {
+            return; // No change in position
+        }
+        this.breakingBlockX = x;
+        this.breakingBlockY = y;
+        this.breakingBlockZ = z;
+        this.breakingBlock = true;
+        this.blockBreakingProgress = 0;
+        System.out.println("Breaking block at " + x + ", " + y + ", " + z);
+    }
+
+    public void setCurrentHitResult(HitResult hitResult) {
+        this.currentHitResult = hitResult;
+    }
+
+    private HitResult lastHitResultBlockBreaking = null;
+
+    /**
+     * Called by Minecraft.java to update the block breaking progress for the single player.
+     * @return true if the current block should be broken, false otherwise
+     */
+    public boolean updateBlockBreaking() {
+        // Update block breaking progress
+        if (this.breakingBlock) {
+            // abort block breaking if the hit result changes block position
+            if (this.lastHitResultBlockBreaking != null && this.currentHitResult != null) {
+                int lastX = this.lastHitResultBlockBreaking.x;
+                int lastY = this.lastHitResultBlockBreaking.y;
+                int lastZ = this.lastHitResultBlockBreaking.z;
+                int currentX = this.currentHitResult.x;
+                int currentY = this.currentHitResult.y;
+                int currentZ = this.currentHitResult.z;
+                if (lastX != currentX || lastY != currentY || lastZ != currentZ) {
+                    System.out.println("Block breaking aborted: hit result changed");
+                    this.breakingBlock = false;
+                    this.blockBreakingProgress = 0;
+                }
+            }
+            if (this.breakingBlock) {
+                this.blockBreakingProgress++;
+                if (this.blockBreakingProgress >= 10) {
+                    this.blockBreakingProgress = 0;
+                    this.breakingBlock = false;
+                    return true;
+                }
+            }
+        }
+        this.lastHitResultBlockBreaking = this.currentHitResult;
+        return false;
+    }
+
+    public boolean isBreakingBlock() {
+        return breakingBlock;
     }
 
     /**

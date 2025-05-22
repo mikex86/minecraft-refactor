@@ -300,4 +300,9 @@ public class InventoryScreen extends GuiScreen {
             inventoryQuadMesh = null;
         }
     }
+
+    @Override
+    public void onClose() {
+        inventory.resetSelectedItem();
+    }
 }

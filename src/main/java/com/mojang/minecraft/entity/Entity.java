@@ -169,7 +169,7 @@ public class Entity {
      * @param y New y position
      * @param z New z position
      */
-    public void setPos(float x, float y, float z) {
+    public void setPosition(float x, float y, float z) {
         this.x = x;
         this.y = y;
         this.z = z;

@@ -27,8 +27,6 @@ public class Level {
     private static final int TILE_UPDATE_INTERVAL = 400;
     private static final String LEVEL_FILE_NAME = "world";
 
-    private final List<LevelListener> levelListeners = new ArrayList<>();
-
     private final LongHashMap<Chunk> chunkMap = new LongHashMap<>();
     private final List<Chunk> fullyLoadedChunks = new ArrayList<>();
     private final Object chunkLoadMutex = new Object();
@@ -80,20 +78,6 @@ public class Level {
                 this.fullyLoadedChunks.remove(chunk);
             }
         }
-    }
-
-    /**
-     * Adds a level listener.
-     */
-    public void addListener(LevelListener levelListener) {
-        this.levelListeners.add(levelListener);
-    }
-
-    /**
-     * Removes a level listener.
-     */
-    public void removeListener(LevelListener levelListener) {
-        this.levelListeners.remove(levelListener);
     }
 
     /**
@@ -180,10 +164,6 @@ public class Level {
                 for (Chunk c : toRebuild) {
                     c.uploadPendingMeshes();
                 }
-            }
-
-            for (LevelListener listener : this.levelListeners) {
-                listener.tileChanged(x, y, z);
             }
             return true;
         }

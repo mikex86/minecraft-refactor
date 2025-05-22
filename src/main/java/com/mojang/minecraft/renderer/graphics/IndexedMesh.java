@@ -11,21 +11,26 @@ public class IndexedMesh implements Disposable {
     private final VertexBuffer vertexBuffer;
     private final IndexBuffer indexBuffer;
     private final VertexArrayObject vao;
+
+    private final int vertexCount;
     private final int indexCount;
+
 
     /**
      * Creates a new indexed mesh with legacy VBO/IBO approach.
      *
      * @param vertexBuffer The vertex buffer
      * @param indexBuffer  The index buffer
+     * @param vertexCount  The number of vertices
      * @param indexCount   The number of indices
      * @deprecated Use {@link #IndexedMesh(GraphicsAPI, VertexBuffer, IndexBuffer, int)} instead
      */
     @Deprecated
-    public IndexedMesh(VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int indexCount) {
+    public IndexedMesh(VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int vertexCount, int indexCount) {
         this.vertexBuffer = vertexBuffer;
         this.indexBuffer = indexBuffer;
         this.vao = null;
+        this.vertexCount = vertexCount;
         this.indexCount = indexCount;
     }
 
@@ -34,27 +39,37 @@ public class IndexedMesh implements Disposable {
      *
      * @param graphics     The graphics API
      * @param vertexBuffer The vertex buffer
-     * @param indexBuffer  The index buffer
+     * @param indexBuffer  The index buffer (nullable)
+     * @param vertexCount  The number of vertices
      * @param indexCount   The number of indices
      */
-    public IndexedMesh(GraphicsAPI graphics, VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int indexCount) {
+    public IndexedMesh(GraphicsAPI graphics, VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int vertexCount, int indexCount) {
         this.vertexBuffer = vertexBuffer;
         this.indexBuffer = indexBuffer;
+        this.vertexCount = vertexCount;
         this.indexCount = indexCount;
 
         // Create and set up VAO
         this.vao = graphics.createVertexArrayObject();
         this.vao.setVertexBuffer(vertexBuffer);
-        this.vao.setIndexBuffer(indexBuffer);
+        if (indexBuffer != null) {
+            this.vao.setIndexBuffer(indexBuffer);
+        }
     }
 
     /**
      * Draws this mesh.
      *
-     * @param graphics The graphics API
+     * @param graphics      The graphics API
+     * @param primitiveType The primitive type to draw (e.g., triangles, lines)
      */
+    public void draw(GraphicsAPI graphics, PrimitiveType primitiveType) {
+        int elementCount = indexBuffer != null ? indexCount : vertexCount;
+        graphics.drawPrimitives(vao, primitiveType, 0, elementCount);
+    }
+
     public void draw(GraphicsAPI graphics) {
-        graphics.drawPrimitives(vao, PrimitiveType.TRIANGLES, 0, indexCount);
+        draw(graphics, PrimitiveType.TRIANGLES);
     }
 
     /**
@@ -107,4 +122,4 @@ public class IndexedMesh implements Disposable {
             vao.dispose();
         }
     }
-} 
+}
