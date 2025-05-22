@@ -13,6 +13,7 @@ import com.mojang.minecraft.item.Item;
 import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
+import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.level.block.Blocks;
 import com.mojang.minecraft.optim.pools.StackCountStringPool;
 import com.mojang.minecraft.particle.ParticleEngine;
@@ -254,12 +255,61 @@ public class GameRenderer implements Disposable {
         }
 
         // Render held block in 3D with view bobbing
-        // renderHeldItem(partialTicks, this.width, this.height);
+        renderHeldItem(partialTicks);
 
         // Render HUD elements
         {
             drawUI(graphics, debugStrings, gameInputHandler, partialTicks);
         }
+    }
+
+
+    /**
+     * Renders the currently held block in first-person view with view bobbing.
+     *
+     * @param partialTicks interpolation factor between ticks
+     */
+    private void renderHeldItem(float partialTicks) {
+        int hotbarItem = gameInputHandler.getHotbarSlotIndex();
+        ItemStack itemStack = player.getInventory().getHotbarItem(hotbarItem);
+        if (itemStack == null) {
+            return;
+        }
+
+        // Calculate aspect ratio
+        float aspectRatio = (float) (this.width) / this.height;
+
+        graphics.setShader(worldShader);
+        graphics.setTexture(textureManager.terrainTexture);
+
+        graphics.setPerspectiveProjection(70.0F, aspectRatio, 0.05F, 4096.0F);
+        graphics.setMatrixMode(GraphicsAPI.MatrixMode.MODELVIEW);
+        graphics.loadIdentity();
+
+        graphics.clear(false, true, 0.0F, 0.0F, 0.0F, 0.0F);
+        graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
+        graphics.pushMatrix();
+        bobView(player, partialTicks);
+
+        float equip = 0F;
+        graphics.translate(0.60F, -0.62F + equip * 0.6F, -0.72F);
+
+        graphics.translate(0.0F, 0.1875F, 0.0F);
+        graphics.rotateY(-46.0F);
+        graphics.rotateX(2);
+        graphics.scale(0.32F, 0.32F, 0.32F);
+
+        graphics.translate(-0.5F, -0.5F, 0.0F);
+
+        graphics.updateShaderMatrices();
+        Item item = itemStack.getItem();
+        if (item instanceof BlockItem) {
+            BlockItem blockItem = (BlockItem) item;
+            Block block = blockItem.getBlock();
+            BlockRenderer.getBlockMesh(block).draw(graphics);
+        }
+        graphics.popMatrix();
+        graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS_EQUAL);
     }
 
     public void setFpsDebugString(String fpsString) {
