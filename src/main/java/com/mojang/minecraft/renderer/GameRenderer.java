@@ -290,33 +290,36 @@ public class GameRenderer implements Disposable {
         graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
         bobView(player, partialTicks);
 
-        float f = player.getSwingProgress(partialTicks);
+        float swingProgress = player.getSwingProgress(partialTicks);
 
-        // pre-translation
+        // pre-rotation
         {
-            float h = (float) (-0.4F * Math.sin(Math.sqrt(f) * (float) Math.PI));
-            float j = (float) (0.2F * Math.sin(Math.sqrt(f) * (float) (Math.PI * 2)));
-            float k = (float) (-0.2F * Math.sin(f * (float) Math.PI));
+            float h = (float) (-0.4F * Math.sin(Math.sqrt(swingProgress) * (float) Math.PI));
+            float j = (float) (0.2F * Math.sin(Math.sqrt(swingProgress) * (float) (Math.PI * 2)));
+            float k = (float) (-0.2F * Math.sin(swingProgress * (float) Math.PI));
             graphics.translate(h, j, k);
         }
 
         // arm transform
         float equipProgress = 1.0F;
         {
-            graphics.translate(0.40F, -0.52F - (1-equipProgress) * -0.6F, -0.72F);
+            graphics.translate(0.56F, -0.52F, -0.71999997F);
+            graphics.translate(0.0F, equipProgress * -0.6F, 0.0F);
         }
+
+        graphics.rotateY(45.0F);
 
         // attack transform
-        float g = (float) Math.sin(f * f * (float) Math.PI);
-        graphics.rotateY(g * -20.0F);
+        float f = (float) Math.sin(swingProgress * swingProgress * (float) Math.PI);
         {
-            float h = (float) Math.sin(Math.sqrt(f) * (float) Math.PI);
-            graphics.rotateZ(h * 20.0F);
-            graphics.rotateX(h * -30.0F);
-            graphics.rotateY(-45.0F);
+            float f1 = (float) Math.sin(Math.sqrt(swingProgress) * (float) Math.PI);
+            graphics.rotateY(f * -20.0F);
+            graphics.rotateZ(f1 * -20.0F);
+            graphics.rotateX(f1 * -80.0F);
         }
 
-        graphics.scale(0.29F, 0.29F, 0.29F);
+        graphics.translate(-0.2F, 0.4F, -0.2F);
+        graphics.scale(0.4F, 0.4F, 0.4F);
 
         graphics.updateShaderMatrices();
         Item item = itemStack.getItem();
