@@ -270,6 +270,7 @@ public class GameRenderer implements Disposable {
      * @param partialTicks interpolation factor between ticks
      */
     private void renderHeldItem(float partialTicks) {
+        float aspectRatio = (float) (this.width) / this.height;
         int hotbarItem = gameInputHandler.getHotbarSlotIndex();
         ItemStack itemStack = player.getInventory().getHotbarItem(hotbarItem);
         if (itemStack == null) {
@@ -280,6 +281,8 @@ public class GameRenderer implements Disposable {
         graphics.setShader(worldShader);
         graphics.setTexture(textureManager.terrainTexture);
 
+        graphics.setPerspectiveProjection(70.0F, aspectRatio, 0.05F, 4096.0F);
+        graphics.setMatrixMode(GraphicsAPI.MatrixMode.MODELVIEW);
         graphics.pushMatrix();
         graphics.loadIdentity();
 
@@ -301,7 +304,7 @@ public class GameRenderer implements Disposable {
         // arm transform
         float equipProgress = 1.0F;
         {
-            graphics.translate(0.44F, -0.52F - (1-equipProgress) * -0.6F, -0.72F);
+            graphics.translate(0.40F, -0.52F - (1-equipProgress) * -0.6F, -0.72F);
         }
 
         // attack transform
@@ -314,7 +317,7 @@ public class GameRenderer implements Disposable {
             graphics.rotateY(-45.0F);
         }
 
-        graphics.scale(0.32F, 0.32F, 0.32F);
+        graphics.scale(0.29F, 0.29F, 0.29F);
 
         graphics.updateShaderMatrices();
         Item item = itemStack.getItem();
