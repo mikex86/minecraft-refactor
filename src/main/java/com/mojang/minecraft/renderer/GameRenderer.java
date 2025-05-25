@@ -298,7 +298,6 @@ public class GameRenderer implements Disposable {
             float j = (float) (0.2F * Math.sin(Math.sqrt(f) * (float) (Math.PI * 2)));
             float k = (float) (-0.2F * Math.sin(f * (float) Math.PI));
             graphics.translate(h, j, k);
-            graphics.translate(0, -f, 0);
         }
 
         // arm transform
@@ -312,7 +311,7 @@ public class GameRenderer implements Disposable {
         graphics.rotateY(g * -20.0F);
         {
             float h = (float) Math.sin(Math.sqrt(f) * (float) Math.PI);
-            graphics.rotateZ(h * -20.0F);
+            graphics.rotateZ(h * 20.0F);
             graphics.rotateX(h * -30.0F);
             graphics.rotateY(-45.0F);
         }
