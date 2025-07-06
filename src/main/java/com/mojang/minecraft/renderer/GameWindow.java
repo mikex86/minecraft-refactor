@@ -6,6 +6,7 @@ import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
 
+import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
@@ -21,6 +22,7 @@ public class GameWindow implements Disposable {
 
     // Window handle
     private final long window;
+    public final float contentScaleX, contentScaleY;
 
     // Window dimensions
     private int width;
@@ -137,6 +139,15 @@ public class GameWindow implements Disposable {
 
         // Initialize OpenGL capabilities (needed for LWJGL to work with OpenGL)
         GL.createCapabilities();
+
+        // get content scale factor
+        try (MemoryStack stack = stackPush()) {
+            FloatBuffer pScaleX = stack.mallocFloat(1);
+            FloatBuffer pScaleY = stack.mallocFloat(1);
+            glfwGetWindowContentScale(window, pScaleX, pScaleY);
+            this.contentScaleX = pScaleX.get(0);
+            this.contentScaleY = pScaleY.get(0);
+        }
 
         // Get the graphics API
         this.graphics = GraphicsFactory.getGraphicsAPI();

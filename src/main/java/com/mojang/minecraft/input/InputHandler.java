@@ -157,16 +157,15 @@ public class InputHandler {
      * @return Mouse X position in pixels
      */
     public double getMouseX() {
-        return mouseX;
+        return mouseX * window.contentScaleX;
     }
-
     /**
      * Gets the current mouse Y position.
      *
      * @return Mouse Y position in pixels
      */
     public double getMouseY() {
-        return mouseY;
+        return mouseY * window.contentScaleY;
     }
 
     /**
@@ -177,7 +176,7 @@ public class InputHandler {
     public double getMouseDX() {
         double dx = mouseDX;
         mouseDX = 0;
-        return dx;
+        return dx * window.contentScaleX;
     }
 
     /**
@@ -188,7 +187,7 @@ public class InputHandler {
     public double getMouseDY() {
         double dy = mouseDY;
         mouseDY = 0;
-        return dy;
+        return dy * window.contentScaleY;
     }
 
     /**
