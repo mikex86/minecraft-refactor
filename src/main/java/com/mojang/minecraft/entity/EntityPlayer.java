@@ -62,6 +62,12 @@ public class EntityPlayer extends EntityLiving {
     public float bob = 0.0F;
     public float prevBob = 0.0F;
 
+    // Smoothed camera angles used for first-person hand drift
+    public float viewPitchBob = 0.0F;
+    public float prevViewPitchBob = 0.0F;
+    public float viewYawBob = 0.0F;
+    public float prevViewYawBob = 0.0F;
+
     private final Inventory inventory = new Inventory();
 
     // Animation constants
@@ -148,6 +154,11 @@ public class EntityPlayer extends EntityLiving {
 
         this.pitch = this.cameraPitch;
         this.yaw = this.cameraYaw;
+
+        this.prevViewPitchBob = this.viewPitchBob;
+        this.prevViewYawBob = this.viewYawBob;
+        this.viewPitchBob += (this.cameraPitch - this.viewPitchBob) * 0.5F;
+        this.viewYawBob += (this.cameraYaw - this.viewYawBob) * 0.5F;
 
         float xa = 0.0F; // X movement input
         float ya = 0.0F; // Z movement input (forward/backward)

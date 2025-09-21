@@ -14,7 +14,6 @@ import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.level.block.Block;
-import com.mojang.minecraft.level.block.Blocks;
 import com.mojang.minecraft.optim.pools.StackCountStringPool;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.renderer.block.BlockRenderer;
@@ -281,55 +280,85 @@ public class GameRenderer implements Disposable {
         graphics.setShader(worldShader);
         graphics.setTexture(textureManager.terrainTexture);
 
-        graphics.setPerspectiveProjection(70.0F, aspectRatio, 0.05F, 4096.0F);
+        float handFov = 70.0F * player.getInterpolatedFOV(partialTicks);
+        graphics.setPerspectiveProjection(handFov, aspectRatio, 0.05F, 4096.0F);
         graphics.setMatrixMode(GraphicsAPI.MatrixMode.MODELVIEW);
         graphics.pushMatrix();
-        graphics.loadIdentity();
+        try {
+            graphics.loadIdentity();
 
-        graphics.clear(false, true, 0.0F, 0.0F, 0.0F, 0.0F);
-        graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
-        bobView(player, partialTicks);
+            graphics.clear(false, true, 0.0F, 0.0F, 0.0F, 0.0F);
+            graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
 
-        float swingProgress = player.getSwingProgress(partialTicks);
+            // In vanilla the hurt tilt is applied before bobbing. The clone currently has no hurt tilt data.
+            bobView(player, partialTicks);
+            applyViewDriftCompensation(partialTicks);
 
-        // pre-rotation
-        {
-            float h = (float) (-0.4F * Math.sin(Math.sqrt(swingProgress) * (float) Math.PI));
-            float j = (float) (0.2F * Math.sin(Math.sqrt(swingProgress) * (float) (Math.PI * 2)));
-            float k = (float) (-0.2F * Math.sin(swingProgress * (float) Math.PI));
-            graphics.translate(h, j, k);
+            float swingProgress = player.getSwingProgress(partialTicks);
+            float swingSqrt = (float) Math.sqrt(swingProgress);
+            float handSign = 1.0F; // clone is right-handed only
+
+            // Swing translation
+            float swingSin = (float) Math.sin(swingSqrt * Math.PI);
+            float swingSinFull = (float) Math.sin(swingProgress * Math.PI);
+            float swingSinDouble = (float) Math.sin(swingSqrt * (Math.PI * 2.0F));
+            graphics.translate(handSign * -0.4F * swingSin, 0.2F * swingSinDouble, -0.2F * swingSinFull);
+
+            // Base hand placement with equip progress offset
+            float equipProgress = getMainHandEquipProgress(partialTicks);
+            graphics.translate(handSign * 0.56F, -0.52F + equipProgress * -0.6F, -0.72F);
+
+            // Attack rotations (match vanilla order so swing-driven rotation composes correctly)
+            float swingCurve = (float) Math.sin(swingProgress * swingProgress * Math.PI);
+            float swingCurveSqrt = (float) Math.sin(swingSqrt * Math.PI);
+            graphics.rotateY(handSign * 45.0F);
+            graphics.rotateY(handSign * swingCurve * -20.0F);
+            graphics.rotateZ(handSign * swingCurveSqrt * -20.0F);
+            graphics.rotateX(swingCurveSqrt * -80.0F);
+            graphics.rotateY(handSign * -45.0F);
+
+            graphics.pushMatrix();
+            try {
+                applyBlockFirstPersonTransform(handSign);
+                graphics.updateShaderMatrices();
+                Item item = itemStack.getItem();
+                if (item instanceof BlockItem) {
+                    BlockItem blockItem = (BlockItem) item;
+                    Block block = blockItem.getBlock();
+                    BlockRenderer.getBlockMesh(block).draw(graphics);
+                }
+            } finally {
+                graphics.popMatrix();
+            }
+        } finally {
+            graphics.popMatrix();
         }
-
-        // arm transform
-        float equipProgress = 1.0F;
-        {
-            graphics.translate(0.56F, -0.52F, -0.71999997F);
-            graphics.translate(0.0F, equipProgress * -0.6F, 0.0F);
-        }
-
-        graphics.rotateY(45.0F);
-
-        // attack transform
-        float f = (float) Math.sin(swingProgress * swingProgress * (float) Math.PI);
-        {
-            float f1 = (float) Math.sin(Math.sqrt(swingProgress) * (float) Math.PI);
-            graphics.rotateY(f * -20.0F);
-            graphics.rotateZ(f1 * -20.0F);
-            graphics.rotateX(f1 * -80.0F);
-        }
-
-        graphics.translate(-0.2F, 0.4F, -0.2F);
-        graphics.scale(0.4F, 0.4F, 0.4F);
-
-        graphics.updateShaderMatrices();
-        Item item = itemStack.getItem();
-        if (item instanceof BlockItem) {
-            BlockItem blockItem = (BlockItem) item;
-            Block block = blockItem.getBlock();
-            BlockRenderer.getBlockMesh(block).draw(graphics);
-        }
-        graphics.popMatrix();
         graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS_EQUAL);
+    }
+
+    private void applyBlockFirstPersonTransform(float handSign) {
+        // Mirrors the default block first-person item transform from block/block.json
+        graphics.rotateY(handSign * 45.0F);
+        graphics.scale(0.4F, 0.4F, 0.4F);
+        graphics.translate(-0.5F, -0.5F, -0.5F);
+    }
+
+    private void applyViewDriftCompensation(float partialTicks) {
+        float pitch = lerp(partialTicks, player.prevPitch, player.pitch);
+        float yaw = lerp(partialTicks, player.prevYaw, player.yaw);
+        float smoothedPitch = lerp(partialTicks, player.prevViewPitchBob, player.viewPitchBob);
+        float smoothedYaw = lerp(partialTicks, player.prevViewYawBob, player.viewYawBob);
+
+        graphics.rotateX((pitch - smoothedPitch) * 0.1F);
+        graphics.rotateY((yaw - smoothedYaw) * 0.1F);
+    }
+
+    private float getMainHandEquipProgress(float partialTicks) {
+        return 0.0F;
+    }
+
+    private static float lerp(float delta, float start, float end) {
+        return start + (end - start) * delta;
     }
 
     public void setFpsDebugString(String fpsString) {
