@@ -221,14 +221,14 @@ public class Minecraft implements Runnable {
 
     private void updateDebugStrings() {
         EntityPlayer player = this.gameState.getPlayer();
-        this.renderer.setPositionString("x: " + player.x + " y: " + player.y + " z: " + player.z);
-        this.renderer.setFpsDebugString(this.engine.getFpsString());
+        this.renderer.setDebugString(0, String.format("x: %.3f y: %.3f z: %.3f, xd: %.3f yd: %.3f zd: %.3f", player.x, player.y, player.z, player.xd, player.yd, player.zd));
+        this.renderer.setDebugString(1, this.engine.getFpsString());
 
         long usedJavaHeap = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
         long totalJavaHeap = Runtime.getRuntime().totalMemory();
-        this.renderer.setMemoryString("Used Java Heap: " + MathUtils.humanReadableByteCountSI(usedJavaHeap) + ", Java Heap Size " + MathUtils.humanReadableByteCountSI(totalJavaHeap));
-        this.renderer.setMemoryString2("Native memory: " + MathUtils.humanReadableByteCountSI(NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.get()) + ", Uploaded GPU memory: " + MathUtils.humanReadableByteCountSI(GpuMemoryTracker.UPLOADED_GPU_MEMORY) + ", Total GPU memory: " + MathUtils.humanReadableByteCountSI(GpuMemoryTracker.TOTAL_GPU_MEMORY));
-        this.renderer.setMemoryString3("Pooled GPU memory: " + MathUtils.humanReadableByteCountSI(GpuMemoryTracker.POOLED_GPU_MEMORY) + ", Pooled used GPU memory: " + MathUtils.humanReadableByteCountSI(GpuMemoryTracker.POOLED_USED_GPU_MEMORY));
+        this.renderer.setDebugString(2, "Used Java Heap: " + MathUtils.humanReadableByteCountSI(usedJavaHeap) + ", Java Heap Size " + MathUtils.humanReadableByteCountSI(totalJavaHeap));
+        this.renderer.setDebugString(3, "Native memory: " + MathUtils.humanReadableByteCountSI(NativeMemoryTracker.ALLOCATED_NATIVE_MEMORY.get()) + ", Uploaded GPU memory: " + MathUtils.humanReadableByteCountSI(GpuMemoryTracker.UPLOADED_GPU_MEMORY) + ", Total GPU memory: " + MathUtils.humanReadableByteCountSI(GpuMemoryTracker.TOTAL_GPU_MEMORY));
+        this.renderer.setDebugString(4, "Pooled GPU memory: " + MathUtils.humanReadableByteCountSI(GpuMemoryTracker.POOLED_GPU_MEMORY) + ", Pooled used GPU memory: " + MathUtils.humanReadableByteCountSI(GpuMemoryTracker.POOLED_USED_GPU_MEMORY));
     }
 
     /**

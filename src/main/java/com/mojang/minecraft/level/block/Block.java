@@ -576,4 +576,8 @@ public class Block {
     public boolean isBlockingMovement() {
         return true;
     }
+
+    public float getSlipperiness() {
+        return 0.6F;
+    }
 }

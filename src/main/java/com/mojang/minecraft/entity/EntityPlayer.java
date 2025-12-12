@@ -3,6 +3,7 @@ package com.mojang.minecraft.entity;
 import com.mojang.minecraft.item.Item;
 import com.mojang.minecraft.item.inventory.Inventory;
 import com.mojang.minecraft.level.Level;
+import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.level.chunk.Chunk;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
@@ -10,6 +11,7 @@ import com.mojang.minecraft.renderer.model.Model;
 import com.mojang.minecraft.renderer.model.ModelRegistry;
 import com.mojang.minecraft.renderer.model.impl.PlayerModel;
 import com.mojang.minecraft.world.HitResult;
+import com.mojang.minecraft.util.math.MathUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +33,9 @@ public class EntityPlayer extends EntityLiving {
     private boolean jump = false;
     private boolean sneak = false;
     private boolean sprinting = false;
+    private boolean sprintKeyHeld = false;
+    private boolean doubleTapSprintReady = false;
+    private int sprintToggleTimer = 0;
 
     /**
      * State whether this player instance is the local input-controlled player.
@@ -116,22 +121,21 @@ public class EntityPlayer extends EntityLiving {
         if (this.inventoryOpen) {
             return;
         }
+        boolean wasForward = this.forward;
         this.forward = forward;
         this.back = back;
         this.left = left;
         this.right = right;
         this.jump = jump;
         this.sneak = sneak;
+        this.sprintKeyHeld = sprinting;
 
-        if (forward && !this.isCollidedHorizontally) {
-            if (!this.sprinting && sprinting) {
-                // When sprinting is started, reset the 30s timer
-                this.sprinting = true;
-                this.sprintingTicksLeft = 600;
+        if (forward && !wasForward) {
+            if (this.sprintToggleTimer > 0) {
+                this.doubleTapSprintReady = true;
+            } else {
+                this.sprintToggleTimer = 7;
             }
-        } else {
-            this.sprinting = false;
-            this.sprintingTicksLeft = 0;
         }
     }
 
@@ -160,6 +164,8 @@ public class EntityPlayer extends EntityLiving {
         this.viewPitchBob += (this.cameraPitch - this.viewPitchBob) * 0.5F;
         this.viewYawBob += (this.cameraYaw - this.viewYawBob) * 0.5F;
 
+        this.updateSprintingState();
+
         float xa = 0.0F; // X movement input
         float ya = 0.0F; // Z movement input (forward/backward)
 
@@ -184,24 +190,39 @@ public class EntityPlayer extends EntityLiving {
             // Jump
             if (jump && this.onGround) {
                 this.yd = 0.42F; // Vertical velocity for jumping
+                if (this.sprinting) {
+                    float yawRadians = this.yaw * ((float) Math.PI / 180.0F);
+                    float sin = (float) Math.sin(yawRadians);
+                    float cos = (float) Math.cos(yawRadians);
+                    this.xd += sin * 0.2F;
+                    this.zd -= cos * 0.2F;
+                }
             }
         }
 
-        float speed = this.onGround ? 0.1F : 0.02F;
+        float groundFriction = this.onGround ? this.getGroundFriction() : 1.0F;
+        float speed;
+        if (this.onGround) {
+            float baseSpeed = this.sprinting ? 0.13F : 0.1F;
+            float frictionScale = 0.21600002F / (groundFriction * groundFriction * groundFriction);
+            speed = baseSpeed * frictionScale;
+        } else {
+            // match vanilla Player#getFlyingSpeed(), sprinting gives 0.026 otherwise 0.02
+            speed = this.sprinting ? 0.025999999F : 0.02F;
+        }
 
         if (this.sneak) {
             this.sprinting = false;
             speed *= 0.3F;
         }
 
-        if (this.sprinting) {
-            speed *= 1.3F;
-        }
-
         // Enable safe walking when sneaking
         this.safeWalk = this.sneak;
 
         this.moveRelative(xa, ya, speed);
+
+        // Remember if we were on ground before this movement step
+        boolean wasOnGround = this.onGround;
 
         // Move based on current velocity
         this.move(this.xd, this.yd, this.zd);
@@ -216,11 +237,11 @@ public class EntityPlayer extends EntityLiving {
         this.distanceWalked += horizontalDelta * 0.6F;
 
         // Apply ground friction
-        if (this.onGround) {
-            float slipperyFactor = 0.6F;
-            this.xd *= slipperyFactor * 0.91F;
+        if (wasOnGround) {
+            float friction = groundFriction * 0.91F;
+            this.xd *= friction;
             this.yd *= 0.98F;
-            this.zd *= slipperyFactor * 0.91F;
+            this.zd *= friction;
         } else {
             // Apply air resistance
             this.xd *= 0.91F;
@@ -308,6 +329,54 @@ public class EntityPlayer extends EntityLiving {
                 this.swingAmount = (float) this.swingTime / (float) duration;
             }
         }
+    }
+
+    private void updateSprintingState() {
+        if (this.sprintToggleTimer > 0) {
+            --this.sprintToggleTimer;
+        }
+
+        boolean hasForwardImpulse = this.forward && !this.back;
+        boolean sprintAllowed = !this.sneak && !this.isCollidedHorizontally && hasForwardImpulse;
+
+        if (!this.sprinting && sprintAllowed) {
+            if (this.sprintKeyHeld) {
+                this.startSprinting();
+            } else if (this.doubleTapSprintReady && this.onGround) {
+                this.startSprinting();
+                this.doubleTapSprintReady = false;
+            }
+        } else if (!hasForwardImpulse) {
+            this.doubleTapSprintReady = false;
+        }
+
+        if (this.sprinting) {
+            boolean stopSprint = !hasForwardImpulse || this.back || this.sneak || this.isCollidedHorizontally;
+            if (stopSprint) {
+                this.stopSprinting();
+            }
+        }
+    }
+
+    private void startSprinting() {
+        this.sprinting = true;
+        this.sprintingTicksLeft = 600;
+    }
+
+    private void stopSprinting() {
+        this.sprinting = false;
+        this.sprintingTicksLeft = 0;
+    }
+
+    private float getGroundFriction() {
+        int blockX = MathUtils.floor(this.x);
+        int blockY = MathUtils.floor(this.y - 0.2F);
+        int blockZ = MathUtils.floor(this.z);
+        BlockState state = this.level.getBlockState(blockX, blockY, blockZ);
+        if (state != null && state.block != null) {
+            return state.block.getSlipperiness();
+        }
+        return 0.6F;
     }
 
     /**

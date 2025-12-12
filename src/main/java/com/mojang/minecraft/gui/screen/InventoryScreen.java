@@ -218,7 +218,7 @@ public class InventoryScreen extends GuiScreen {
 
         // draw selected item at cursor position
         {
-            // set terrain texture again after drawing labels & the player
+            // set terrain texture again after drawing labels and the player
             graphics.setShader(WORLD_SHADER);
             graphics.setTexture(textureManager.terrainTexture);
 

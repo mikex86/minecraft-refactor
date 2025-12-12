@@ -360,25 +360,8 @@ public class GameRenderer implements Disposable {
     private static float lerp(float delta, float start, float end) {
         return start + (end - start) * delta;
     }
-
-    public void setFpsDebugString(String fpsString) {
-        this.debugStrings[0] = fpsString;
-    }
-
-    public void setPositionString(String positionString) {
-        this.debugStrings[1] = positionString;
-    }
-
-    public void setMemoryString(String memoryString) {
-        this.debugStrings[2] = memoryString;
-    }
-
-    public void setMemoryString2(String memoryString) {
-        this.debugStrings[3] = memoryString;
-    }
-
-    public void setMemoryString3(String memoryString) {
-        this.debugStrings[4] = memoryString;
+    public void setDebugString(int index, String memoryString) {
+        this.debugStrings[index] = memoryString;
     }
 
     private void render(float partialTicks) {
