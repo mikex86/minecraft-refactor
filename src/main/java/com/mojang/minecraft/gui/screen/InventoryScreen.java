@@ -20,7 +20,9 @@ import com.mojang.minecraft.renderer.shader.impl.HudShader;
 import com.mojang.minecraft.renderer.shader.impl.WorldShader;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import static com.mojang.minecraft.entity.EntityPlayer.PLAYER_MODEL;
@@ -36,6 +38,8 @@ public class InventoryScreen extends GuiScreen {
     private float screenHeight;
     private float mouseX = -1;
     private float mouseY = -1;
+    private boolean rightMouseDown = false;
+    private final Set<Slot> rightClickVisitedSlots = new HashSet<>();
 
     private final List<Slot> slots = new ArrayList<>();
     private final TextLabel stackSizeSelectedItemLabel;
@@ -44,7 +48,7 @@ public class InventoryScreen extends GuiScreen {
     private static final WorldShader WORLD_SHADER = ShaderRegistry.getInstance().getWorldShader();
     private static final HudShader HUD_SHADER = ShaderRegistry.getInstance().getHudShader();
 
-    public InventoryScreen(TextureManager textureManager, Font font, EntityPlayer player, Inventory inventory) {
+    public InventoryScreen(TextureManager textureManager, Font font, Inventory inventory) {
         this.textureManager = textureManager;
         this.font = font;
 
@@ -65,14 +69,11 @@ public class InventoryScreen extends GuiScreen {
             for (int column = 0; column < inventory.getColumnCount(); column++) {
                 float slotOffsetX = baseX + 8 + ITEM_SLOT_SIZE * column;
                 float slotOffsetY = ITEM_SLOT_SIZE * row;
-                float itemRenderOffsetX = slotOffsetX + 8;
-                float itemRenderOffsetY = slotOffsetY + 7 + ITEM_SLOT_SIZE / 2f + 1;
-                float labelOffsetX = slotOffsetX + ITEM_SLOT_SIZE - 1;
-                float labelOffsetY = slotOffsetY + 10;
                 final int slotRow = row;
                 final int slotColumn = column;
                 this.slots.add(new Slot(() -> inventory.getInventoryItem(slotRow, slotColumn),
                         () -> inventory.clickItem(slotRow, slotColumn),
+                        () -> inventory.placeSingleInventoryItem(slotRow, slotColumn),
                         slotOffsetX, slotOffsetY));
             }
         }
@@ -86,6 +87,7 @@ public class InventoryScreen extends GuiScreen {
             final int slotColumn = column;
             this.slots.add(new Slot(() -> inventory.getInventoryItem(hotbarRow, slotColumn),
                     () -> inventory.clickItem(hotbarRow, slotColumn),
+                    () -> inventory.placeSingleInventoryItem(hotbarRow, slotColumn),
                     slotOffsetX, hotbarSlotOffsetY));
         }
     }
@@ -103,14 +105,11 @@ public class InventoryScreen extends GuiScreen {
             for (int column = 0; column < craftingColumns; column++) {
                 float slotOffsetX = craftingStartX + ITEM_SLOT_SIZE * column;
                 float slotOffsetY = bottomRowOffsetY - ITEM_SLOT_SIZE * (craftingRows - 1 - row);
-                float itemRenderOffsetX = slotOffsetX + 8;
-                float itemRenderOffsetY = slotOffsetY + 7 + ITEM_SLOT_SIZE / 2f + 1;
-                float labelOffsetX = slotOffsetX + ITEM_SLOT_SIZE - 1;
-                float labelOffsetY = slotOffsetY + 10;
                 final int craftingRow = row;
                 final int craftingColumn = column;
                 this.slots.add(new Slot(() -> inventory.getCraftingItem(craftingRow, craftingColumn),
                         () -> inventory.clickCraftingItem(craftingRow, craftingColumn),
+                        () -> inventory.placeSingleCraftingItem(craftingRow, craftingColumn),
                         slotOffsetX, slotOffsetY));
             }
         }
@@ -122,6 +121,7 @@ public class InventoryScreen extends GuiScreen {
         float resultSlotOffsetY = craftingTopY + craftingHeight / 2f - ITEM_SLOT_SIZE / 2f;
         this.slots.add(new Slot(inventory::getCraftingResultItem,
                 inventory::clickCraftingResultItem,
+                null,
                 resultSlotOffsetX, resultSlotOffsetY));
     }
 
@@ -130,14 +130,13 @@ public class InventoryScreen extends GuiScreen {
             return;
         }
         float slotOffsetX = baseX + 8;
-        float itemRenderOffsetX = slotOffsetX + 8;
-        float labelOffsetX = slotOffsetX + ITEM_SLOT_SIZE - 1;
         float slotOffsetY = -ITEM_SLOT_SIZE - 4;
         for (int armorIndex = 0; armorIndex < inventory.getArmorSlotCount(); armorIndex++) {
             final int slotIndex = armorIndex;
             float currentSlotOffsetY = slotOffsetY - ITEM_SLOT_SIZE * armorIndex;
             this.slots.add(new Slot(() -> inventory.getArmorItem(slotIndex),
                     () -> inventory.clickArmorItem(slotIndex),
+                    () -> inventory.placeSingleArmorItem(slotIndex),
                     slotOffsetX, currentSlotOffsetY));
         }
     }
@@ -294,17 +293,29 @@ public class InventoryScreen extends GuiScreen {
 
     @Override
     public void onMouseClicked(float mouseX, float mouseY, int button, boolean pressed) {
+        if (button == 1) {
+            if (pressed) {
+                rightMouseDown = true;
+                rightClickVisitedSlots.clear();
+                Slot slot = findSlotAt(mouseX, mouseY);
+                if (slot != null) {
+                    slot.placeOne();
+                    rightClickVisitedSlots.add(slot);
+                }
+            } else {
+                rightMouseDown = false;
+                rightClickVisitedSlots.clear();
+            }
+            return;
+        }
+
         if (button != 0 || pressed) { // only handle mouse 0 release
             return;
         }
 
-        float centerX = screenWidth / 2f;
-        float centerY = screenHeight / 2f;
-
-        for (Slot slot : slots) {
-            if (slot.contains(mouseX, mouseY, centerX, centerY)) {
-                slot.click();
-            }
+        Slot slot = findSlotAt(mouseX, mouseY);
+        if (slot != null) {
+            slot.click();
         }
     }
 
@@ -312,6 +323,13 @@ public class InventoryScreen extends GuiScreen {
     public void onMouseMove(float mouseX, float mouseY, float dX, float dY) {
         this.mouseX = mouseX;
         this.mouseY = mouseY;
+        if (rightMouseDown) {
+            Slot slot = findSlotAt(mouseX, mouseY);
+            if (slot != null && !rightClickVisitedSlots.contains(slot)) {
+                slot.placeOne();
+                rightClickVisitedSlots.add(slot);
+            }
+        }
     }
 
     @Override
@@ -344,13 +362,15 @@ public class InventoryScreen extends GuiScreen {
 
         private final Supplier<ItemStack> itemProvider;
         private final Runnable clickAction;
+        private final Runnable placeOneAction;
         private final float slotOffsetX;
         private final float slotOffsetY;
         private final TextLabel stackSizeLabel;
 
-        private Slot(Supplier<ItemStack> itemProvider, Runnable clickAction, float slotOffsetX, float slotOffsetY) {
+        private Slot(Supplier<ItemStack> itemProvider, Runnable clickAction, Runnable placeOneAction, float slotOffsetX, float slotOffsetY) {
             this.itemProvider = itemProvider;
             this.clickAction = clickAction;
+            this.placeOneAction = placeOneAction;
             this.slotOffsetX = slotOffsetX;
             this.slotOffsetY = slotOffsetY;
             this.stackSizeLabel = new TextLabel(font, 0xFFFFFF, true);
@@ -377,8 +397,7 @@ public class InventoryScreen extends GuiScreen {
         }
 
         private float getLabelX(float centerX) {
-            float expected = getSlotLeft(centerX) + SLOT_LABEL_RIGHT_OFFSET - this.stackSizeLabel.getWidth();
-            return expected;
+            return getSlotLeft(centerX) + SLOT_LABEL_RIGHT_OFFSET - this.stackSizeLabel.getWidth();
         }
 
         private float getLabelY(float centerY) {
@@ -399,5 +418,22 @@ public class InventoryScreen extends GuiScreen {
             this.stackSizeLabel.setText(StackCountStringPool.valueOf(count));
             this.stackSizeLabel.render(graphics, getLabelX(centerX), getLabelY(centerY));
         }
+
+        private void placeOne() {
+            if (placeOneAction != null) {
+                placeOneAction.run();
+            }
+        }
+    }
+
+    private Slot findSlotAt(float mouseX, float mouseY) {
+        float centerX = screenWidth / 2f;
+        float centerY = screenHeight / 2f;
+        for (Slot slot : slots) {
+            if (slot.contains(mouseX, mouseY, centerX, centerY)) {
+                return slot;
+            }
+        }
+        return null;
     }
 }

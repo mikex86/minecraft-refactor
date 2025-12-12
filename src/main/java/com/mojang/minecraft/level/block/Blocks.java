@@ -1,6 +1,11 @@
 package com.mojang.minecraft.level.block;
 
-import com.mojang.minecraft.level.block.impl.*;
+import com.mojang.minecraft.level.block.impl.CraftingTableBlock;
+import com.mojang.minecraft.level.block.impl.DirtBlock;
+import com.mojang.minecraft.level.block.impl.GlassBlock;
+import com.mojang.minecraft.level.block.impl.GrassBlock;
+import com.mojang.minecraft.level.block.impl.LeavesBlock;
+import com.mojang.minecraft.level.block.impl.WoodBlock;
 import com.mojang.minecraft.level.block.palette.BlockStatePalette;
 import com.mojang.minecraft.level.block.state.BlockState;
 
@@ -57,6 +62,11 @@ public class Blocks {
      * Glass
      */
     public static final GlassBlock glass = new GlassBlock();
+
+    /**
+     * Crafting table block
+     */
+    public static final Block craftingTable = new CraftingTableBlock();
 
     static {
         globalPalette = new BlockStatePalette(getValidBlockStates());

@@ -3,6 +3,8 @@ package com.mojang.minecraft.item.inventory;
 import com.mojang.minecraft.item.BlockItem;
 import com.mojang.minecraft.item.Item;
 import com.mojang.minecraft.item.ItemStack;
+import com.mojang.minecraft.item.crafting.CraftingManager;
+import com.mojang.minecraft.item.crafting.CraftingMatch;
 import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.level.block.Blocks;
 
@@ -18,6 +20,7 @@ public class Inventory {
     private final ItemStack[] armorSlots = new ItemStack[ARMOR_SLOT_COUNT];
     private final ItemStack[][] craftingSlots = new ItemStack[2][2];
     private ItemStack craftingResult = null;
+    private CraftingMatch cachedCraftingMatch = null;
     private ItemStack selectedItem = null;
 
     private int selectedItemSlotRow = -1, selectedItemSlotColumn = -1;
@@ -46,6 +49,10 @@ public class Inventory {
         inventoryBlocks[0][0] = new ItemStack(new BlockItem(Blocks.grass), 4);
         inventoryBlocks[1][1] = new ItemStack(new BlockItem(Blocks.stoneBrick), 2);
         inventoryBlocks[2][2] = new ItemStack(new BlockItem(Blocks.glass), 2);
+    }
+
+    public Inventory() {
+        updateCraftingResult();
     }
 
     public ItemStack getHotbarItem(int slotIndex) {
@@ -147,21 +154,27 @@ public class Inventory {
     }
 
     public void clickCraftingResultItem() {
-        ItemStack currentStack = getSelectedItem();
-        if (currentStack == null || craftingResult == null || !currentStack.getItem().equals(craftingResult.getItem())) {
-            ItemStack previousResult = craftingResult;
-            craftingResult = selectedItem;
-            selectedItem = previousResult;
-            setSelectedCraftingResult();
+        if (craftingResult == null || cachedCraftingMatch == null) {
+            return;
+        }
+
+        ItemStack resultCopy = new ItemStack(craftingResult.getItem(), craftingResult.getCount());
+        if (selectedItem == null) {
+            selectedItem = resultCopy;
         } else {
-            int increased = craftingResult.increaseAmount(currentStack.getCount(), false);
-            if (increased == currentStack.getCount()) {
-                selectedItem = null;
-                setSelectedCraftingResult();
-            } else {
-                currentStack.decreaseAmount(increased);
+            if (!selectedItem.getItem().equals(resultCopy.getItem())) {
+                return;
+            }
+            int increased = selectedItem.increaseAmount(resultCopy.getCount(), false);
+            if (increased != resultCopy.getCount()) {
+                selectedItem.decreaseAmount(increased);
+                return;
             }
         }
+
+        cachedCraftingMatch.getRecipe().consumeIngredients(craftingSlots, cachedCraftingMatch);
+        setSelectedCraftingResult();
+        updateCraftingResult();
     }
 
     public void clickCraftingItem(int row, int column) {
@@ -179,6 +192,35 @@ public class Inventory {
             } else {
                 currentStack.decreaseAmount(increased);
             }
+        }
+        updateCraftingResult();
+    }
+
+    public void placeSingleInventoryItem(int row, int column) {
+        if (placeSingleInGrid(inventoryBlocks, row, column)) {
+            // Nothing extra
+        }
+    }
+
+    public void placeSingleArmorItem(int slotIndex) {
+        if (selectedItem == null) {
+            return;
+        }
+        ItemStack stack = armorSlots[slotIndex];
+        if (stack == null) {
+            armorSlots[slotIndex] = new ItemStack(selectedItem.getItem(), 1);
+            decreaseSelectedItemCount(1);
+        } else if (stack.getItem().equals(selectedItem.getItem())) {
+            int increased = stack.increaseAmount(1, false);
+            if (increased == 1) {
+                decreaseSelectedItemCount(1);
+            }
+        }
+    }
+
+    public void placeSingleCraftingItem(int row, int column) {
+        if (placeSingleInGrid(craftingSlots, row, column)) {
+            updateCraftingResult();
         }
     }
 
@@ -204,6 +246,7 @@ public class Inventory {
         selectedCraftingSlotColumn = -1;
         selectedItemFromCrafting = false;
         selectedItemFromCraftingResult = false;
+        updateCraftingResult();
     }
 
     public ItemStack getSelectedItem() {
@@ -292,6 +335,55 @@ public class Inventory {
             selectedCraftingSlotRow = -1;
             selectedCraftingSlotColumn = -1;
             selectedItemFromCrafting = false;
+        }
+    }
+
+    private boolean placeSingleInGrid(ItemStack[][] grid, int row, int column) {
+        if (selectedItem == null) {
+            return false;
+        }
+        ItemStack target = grid[row][column];
+        if (target == null) {
+            grid[row][column] = new ItemStack(selectedItem.getItem(), 1);
+            decreaseSelectedItemCount(1);
+            return true;
+        }
+        if (target.getItem().equals(selectedItem.getItem())) {
+            int increased = target.increaseAmount(1, false);
+            if (increased == 1) {
+                decreaseSelectedItemCount(1);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void decreaseSelectedItemCount(int amount) {
+        if (selectedItem == null || amount <= 0) {
+            return;
+        }
+        selectedItem.decreaseAmount(amount);
+        if (selectedItem.getCount() <= 0) {
+            selectedItem = null;
+            selectedItemSlotRow = -1;
+            selectedItemSlotColumn = -1;
+            selectedArmorSlotIndex = -1;
+            selectedItemFromArmor = false;
+            selectedCraftingSlotRow = -1;
+            selectedCraftingSlotColumn = -1;
+            selectedItemFromCrafting = false;
+            selectedItemFromCraftingResult = false;
+        }
+    }
+
+    private void updateCraftingResult() {
+        CraftingMatch match = CraftingManager.getInstance().findMatch(craftingSlots);
+        if (match == null) {
+            craftingResult = null;
+            cachedCraftingMatch = null;
+        } else {
+            craftingResult = match.getResult();
+            cachedCraftingMatch = match;
         }
     }
 }

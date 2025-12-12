@@ -541,7 +541,7 @@ public class GameRenderer implements Disposable {
 
         if (player.isInventoryOpen()) {
             if (currentScreen == null) {
-                openScreen(new InventoryScreen(textureManager, font, player, player.getInventory()));
+                openScreen(new InventoryScreen(textureManager, font, player.getInventory()));
             }
         } else {
             if (currentScreen != null) {
