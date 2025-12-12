@@ -19,6 +19,10 @@ import com.mojang.minecraft.renderer.shader.impl.EntityShader;
 import com.mojang.minecraft.renderer.shader.impl.HudShader;
 import com.mojang.minecraft.renderer.shader.impl.WorldShader;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Supplier;
+
 import static com.mojang.minecraft.entity.EntityPlayer.PLAYER_MODEL;
 
 public class InventoryScreen extends GuiScreen {
@@ -33,8 +37,7 @@ public class InventoryScreen extends GuiScreen {
     private float mouseX = -1;
     private float mouseY = -1;
 
-    private final TextLabel[][] stackSizeMainInventoryLabels;
-    private final TextLabel[] stackSizeHotbarLabels;
+    private final List<Slot> slots = new ArrayList<>();
     private final TextLabel stackSizeSelectedItemLabel;
 
     private static final EntityShader ENTITY_SHADER = ShaderRegistry.getInstance().getEntityShader();
@@ -46,21 +49,97 @@ public class InventoryScreen extends GuiScreen {
         this.font = font;
 
         this.player = new EntityPlayer(null, false);
-        // TODO: transfer skin here
-
+        this.stackSizeSelectedItemLabel = new TextLabel(font, 0xFFFFFF, true);
         this.inventory = inventory;
-        this.stackSizeMainInventoryLabels = new TextLabel[inventory.getMainInventoryRowCount()][inventory.getColumnCount()];
 
+        float baseX = -INVENTORY_UI_WIDTH / 2f;
+
+        addMainInventorySlots(baseX);
+        addHotbarSlots(baseX);
+        addCraftingSlots(baseX);
+        addArmorSlots(baseX);
+    }
+
+    private void addMainInventorySlots(float baseX) {
         for (int row = 0; row < inventory.getMainInventoryRowCount(); row++) {
             for (int column = 0; column < inventory.getColumnCount(); column++) {
-                this.stackSizeMainInventoryLabels[row][column] = new TextLabel(font, 0xFFFFFF, true);
+                float slotOffsetX = baseX + 8 + ITEM_SLOT_SIZE * column;
+                float slotOffsetY = ITEM_SLOT_SIZE * row;
+                float itemRenderOffsetX = slotOffsetX + 8;
+                float itemRenderOffsetY = slotOffsetY + 7 + ITEM_SLOT_SIZE / 2f + 1;
+                float labelOffsetX = slotOffsetX + ITEM_SLOT_SIZE - 1;
+                float labelOffsetY = slotOffsetY + 10;
+                final int slotRow = row;
+                final int slotColumn = column;
+                this.slots.add(new Slot(() -> inventory.getInventoryItem(slotRow, slotColumn),
+                        () -> inventory.clickItem(slotRow, slotColumn),
+                        slotOffsetX, slotOffsetY));
             }
         }
-        this.stackSizeHotbarLabels = new TextLabel[inventory.getHotbarSize()];
-        for (int i = 0; i < inventory.getHotbarSize(); i++) {
-            this.stackSizeHotbarLabels[i] = new TextLabel(font, 0xFFFFFF, true);
+    }
+
+    private void addHotbarSlots(float baseX) {
+        int hotbarRow = inventory.getMainInventoryRowCount();
+        float hotbarSlotOffsetY = ITEM_SLOT_SIZE * hotbarRow + 4;
+        for (int column = 0; column < inventory.getHotbarSize(); column++) {
+            float slotOffsetX = baseX + 8 + ITEM_SLOT_SIZE * column;
+            final int slotColumn = column;
+            this.slots.add(new Slot(() -> inventory.getInventoryItem(hotbarRow, slotColumn),
+                    () -> inventory.clickItem(hotbarRow, slotColumn),
+                    slotOffsetX, hotbarSlotOffsetY));
         }
-        this.stackSizeSelectedItemLabel = new TextLabel(font, 0xFFFFFF, true);
+    }
+
+    private void addCraftingSlots(float baseX) {
+        int craftingRows = inventory.getCraftingRowCount();
+        int craftingColumns = inventory.getCraftingColumnCount();
+        if (craftingRows == 0 || craftingColumns == 0) {
+            return;
+        }
+        float fourthColumnLeft = baseX + 8 + ITEM_SLOT_SIZE * 3;
+        float craftingStartX = fourthColumnLeft + ITEM_SLOT_SIZE + 8;
+        float bottomRowOffsetY = -(22f + ITEM_SLOT_SIZE);
+        for (int row = 0; row < craftingRows; row++) {
+            for (int column = 0; column < craftingColumns; column++) {
+                float slotOffsetX = craftingStartX + ITEM_SLOT_SIZE * column;
+                float slotOffsetY = bottomRowOffsetY - ITEM_SLOT_SIZE * (craftingRows - 1 - row);
+                float itemRenderOffsetX = slotOffsetX + 8;
+                float itemRenderOffsetY = slotOffsetY + 7 + ITEM_SLOT_SIZE / 2f + 1;
+                float labelOffsetX = slotOffsetX + ITEM_SLOT_SIZE - 1;
+                float labelOffsetY = slotOffsetY + 10;
+                final int craftingRow = row;
+                final int craftingColumn = column;
+                this.slots.add(new Slot(() -> inventory.getCraftingItem(craftingRow, craftingColumn),
+                        () -> inventory.clickCraftingItem(craftingRow, craftingColumn),
+                        slotOffsetX, slotOffsetY));
+            }
+        }
+
+        float craftingGridWidth = ITEM_SLOT_SIZE * craftingColumns;
+        float resultSlotOffsetX = craftingStartX + craftingGridWidth + 20;
+        float craftingTopY = bottomRowOffsetY - ITEM_SLOT_SIZE * (craftingRows - 1) + 1;
+        float craftingHeight = ITEM_SLOT_SIZE * craftingRows;
+        float resultSlotOffsetY = craftingTopY + craftingHeight / 2f - ITEM_SLOT_SIZE / 2f;
+        this.slots.add(new Slot(inventory::getCraftingResultItem,
+                inventory::clickCraftingResultItem,
+                resultSlotOffsetX, resultSlotOffsetY));
+    }
+
+    private void addArmorSlots(float baseX) {
+        if (inventory.getArmorSlotCount() == 0) {
+            return;
+        }
+        float slotOffsetX = baseX + 8;
+        float itemRenderOffsetX = slotOffsetX + 8;
+        float labelOffsetX = slotOffsetX + ITEM_SLOT_SIZE - 1;
+        float slotOffsetY = -ITEM_SLOT_SIZE - 4;
+        for (int armorIndex = 0; armorIndex < inventory.getArmorSlotCount(); armorIndex++) {
+            final int slotIndex = armorIndex;
+            float currentSlotOffsetY = slotOffsetY - ITEM_SLOT_SIZE * armorIndex;
+            this.slots.add(new Slot(() -> inventory.getArmorItem(slotIndex),
+                    () -> inventory.clickArmorItem(slotIndex),
+                    slotOffsetX, currentSlotOffsetY));
+        }
     }
 
     private IndexedMesh inventoryQuadMesh;
@@ -110,27 +189,8 @@ public class InventoryScreen extends GuiScreen {
             // set terrain texture
             graphics.setTexture(textureManager.terrainTexture);
 
-            // draw main-inventory items
-            for (int row = 0; row < inventory.getMainInventoryRowCount(); row++) {
-                for (int column = 0; column < inventory.getColumnCount(); column++) {
-                    ItemStack itemStack = inventory.getInventoryItem(row, column);
-                    if (itemStack == null) {
-                        continue;
-                    }
-                    Item item = itemStack.getItem();
-                    if (item instanceof BlockItem) {
-                        BlockItem blockItem = (BlockItem) item;
-                        graphics.pushMatrix();
-                        graphics.translate(centerX - INVENTORY_UI_WIDTH / 2f + 16 + ITEM_SLOT_SIZE * column, centerY + 7 + ITEM_SLOT_SIZE * row + ITEM_SLOT_SIZE / 2f + 1, 0);
-                        BlockRenderer.renderBlockPreview(graphics, blockItem.getBlock(), ITEM_SIZE);
-                        graphics.popMatrix();
-                    }
-                }
-            }
-
-            // draw hot-bar items
-            for (int i = 0; i < inventory.getHotbarSize(); i++) {
-                ItemStack itemStack = inventory.getHotbarItem(i);
+            for (Slot slot : slots) {
+                ItemStack itemStack = slot.getItemStack();
                 if (itemStack == null) {
                     continue;
                 }
@@ -138,7 +198,7 @@ public class InventoryScreen extends GuiScreen {
                 if (item instanceof BlockItem) {
                     BlockItem blockItem = (BlockItem) item;
                     graphics.pushMatrix();
-                    graphics.translate(centerX - INVENTORY_UI_WIDTH / 2f + 16 + ITEM_SLOT_SIZE * i, centerY + INVENTORY_UI_HEIGHT / 2f - ITEM_SLOT_SIZE + ITEM_SLOT_SIZE / 2f + 1, 0);
+                    graphics.translate(slot.getItemRenderX(centerX), slot.getItemRenderY(centerY), 0);
                     BlockRenderer.renderBlockPreview(graphics, blockItem.getBlock(), ITEM_SIZE);
                     graphics.popMatrix();
                 }
@@ -149,31 +209,14 @@ public class InventoryScreen extends GuiScreen {
         {
             graphics.setShader(HUD_SHADER);
 
-            // draw main inventory stack size labels
-            for (int row = 0; row < inventory.getMainInventoryRowCount(); row++) {
-                for (int column = 0; column < inventory.getColumnCount(); column++) {
-                    ItemStack itemStack = inventory.getInventoryItem(row, column);
-                    if (itemStack == null) {
-                        continue;
-                    }
-                    int count = itemStack.getCount();
-                    if (count > 1) {
-                        this.stackSizeMainInventoryLabels[row][column].setText(StackCountStringPool.valueOf(count));
-                        this.stackSizeMainInventoryLabels[row][column].render(graphics, centerX - INVENTORY_UI_WIDTH / 2f + ITEM_SLOT_SIZE * column + 7 + ITEM_SLOT_SIZE - this.stackSizeMainInventoryLabels[row][column].getWidth(), centerY + 10 + ITEM_SLOT_SIZE * row);
-                    }
-                }
-            }
-
-            // draw hotbar stack size labels
-            for (int i = 0; i < inventory.getHotbarSize(); i++) {
-                ItemStack itemStack = inventory.getHotbarItem(i);
+            for (Slot slot : slots) {
+                ItemStack itemStack = slot.getItemStack();
                 if (itemStack == null) {
                     continue;
                 }
                 int count = itemStack.getCount();
                 if (count > 1) {
-                    this.stackSizeHotbarLabels[i].setText(StackCountStringPool.valueOf(count));
-                    this.stackSizeHotbarLabels[i].render(graphics, centerX - INVENTORY_UI_WIDTH / 2f + ITEM_SLOT_SIZE * i + 7 + ITEM_SLOT_SIZE - this.stackSizeHotbarLabels[i].getWidth(), centerY + INVENTORY_UI_HEIGHT / 2f - this.font.getFontHeight() - 7);
+                    slot.renderStackSize(graphics, centerX, centerY, count);
                 }
             }
         }
@@ -258,23 +301,9 @@ public class InventoryScreen extends GuiScreen {
         float centerX = screenWidth / 2f;
         float centerY = screenHeight / 2f;
 
-        // main inventory selection checking
-        for (int row = 0; row < inventory.getMainInventoryRowCount(); row++) {
-            for (int column = 0; column < inventory.getColumnCount(); column++) {
-                float x = centerX - INVENTORY_UI_WIDTH / 2f + 8 + ITEM_SLOT_SIZE * column;
-                float y = centerY + ITEM_SLOT_SIZE * row;
-                if (mouseX >= x && mouseX <= x + ITEM_SLOT_SIZE && mouseY >= y && mouseY <= y + ITEM_SLOT_SIZE) {
-                    inventory.clickItem(row, column);
-                }
-            }
-        }
-
-        // hotbar selection checking
-        for (int i = 0; i < inventory.getHotbarSize(); i++) {
-            float x = centerX - INVENTORY_UI_WIDTH / 2f + 8 + ITEM_SLOT_SIZE * i;
-            float y = centerY + ITEM_SLOT_SIZE * inventory.getMainInventoryRowCount();
-            if (mouseX >= x && mouseX <= x + ITEM_SLOT_SIZE && mouseY >= y && mouseY <= y + ITEM_SLOT_SIZE) {
-                inventory.clickItem(inventory.getMainInventoryRowCount(), i);
+        for (Slot slot : slots) {
+            if (slot.contains(mouseX, mouseY, centerX, centerY)) {
+                slot.click();
             }
         }
     }
@@ -304,5 +333,71 @@ public class InventoryScreen extends GuiScreen {
     @Override
     public void onClose() {
         inventory.resetSelectedItem();
+    }
+
+    private final class Slot {
+
+        private static final float SLOT_ITEM_RENDER_OFFSET_X = 8f;
+        private static final float SLOT_ITEM_RENDER_OFFSET_Y = 7 + ITEM_SLOT_SIZE / 2f + 1;
+        private static final float SLOT_LABEL_RIGHT_OFFSET = ITEM_SLOT_SIZE - 1;
+        private static final float SLOT_LABEL_OFFSET_Y = 10f;
+
+        private final Supplier<ItemStack> itemProvider;
+        private final Runnable clickAction;
+        private final float slotOffsetX;
+        private final float slotOffsetY;
+        private final TextLabel stackSizeLabel;
+
+        private Slot(Supplier<ItemStack> itemProvider, Runnable clickAction, float slotOffsetX, float slotOffsetY) {
+            this.itemProvider = itemProvider;
+            this.clickAction = clickAction;
+            this.slotOffsetX = slotOffsetX;
+            this.slotOffsetY = slotOffsetY;
+            this.stackSizeLabel = new TextLabel(font, 0xFFFFFF, true);
+        }
+
+        private ItemStack getItemStack() {
+            return itemProvider.get();
+        }
+
+        private float getSlotLeft(float centerX) {
+            return centerX + slotOffsetX;
+        }
+
+        private float getSlotTop(float centerY) {
+            return centerY + slotOffsetY;
+        }
+
+        private float getItemRenderX(float centerX) {
+            return getSlotLeft(centerX) + SLOT_ITEM_RENDER_OFFSET_X;
+        }
+
+        private float getItemRenderY(float centerY) {
+            return getSlotTop(centerY) + SLOT_ITEM_RENDER_OFFSET_Y;
+        }
+
+        private float getLabelX(float centerX) {
+            float expected = getSlotLeft(centerX) + SLOT_LABEL_RIGHT_OFFSET - this.stackSizeLabel.getWidth();
+            return expected;
+        }
+
+        private float getLabelY(float centerY) {
+            return getSlotTop(centerY) + SLOT_LABEL_OFFSET_Y;
+        }
+
+        private boolean contains(float mouseX, float mouseY, float centerX, float centerY) {
+            float x = getSlotLeft(centerX);
+            float y = getSlotTop(centerY);
+            return mouseX >= x && mouseX <= x + ITEM_SLOT_SIZE && mouseY >= y && mouseY <= y + ITEM_SLOT_SIZE;
+        }
+
+        private void click() {
+            clickAction.run();
+        }
+
+        private void renderStackSize(GraphicsAPI graphics, float centerX, float centerY, int count) {
+            this.stackSizeLabel.setText(StackCountStringPool.valueOf(count));
+            this.stackSizeLabel.render(graphics, getLabelX(centerX), getLabelY(centerY));
+        }
     }
 }

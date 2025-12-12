@@ -9,14 +9,23 @@ import com.mojang.minecraft.level.block.Blocks;
 public class Inventory {
 
     private static final int HOTBAR_SIZE = 9;
+    private static final int ARMOR_SLOT_COUNT = 4;
 
     /**
      * The inventory is a 2D array of ItemStacks in the shape [rows][columns].
      */
     private final ItemStack[][] inventoryBlocks = new ItemStack[4][9];
+    private final ItemStack[] armorSlots = new ItemStack[ARMOR_SLOT_COUNT];
+    private final ItemStack[][] craftingSlots = new ItemStack[2][2];
+    private ItemStack craftingResult = null;
     private ItemStack selectedItem = null;
 
-    private int selectedItemSlotRow, selectedItemSlotColumn;
+    private int selectedItemSlotRow = -1, selectedItemSlotColumn = -1;
+    private int selectedArmorSlotIndex = -1;
+    private int selectedCraftingSlotRow = -1, selectedCraftingSlotColumn = -1;
+    private boolean selectedItemFromArmor = false;
+    private boolean selectedItemFromCrafting = false;
+    private boolean selectedItemFromCraftingResult = false;
 
     {
         ItemStack[] hotbarBlocks = inventoryBlocks[3];
@@ -70,6 +79,32 @@ public class Inventory {
         return HOTBAR_SIZE;
     }
 
+    public int getArmorSlotCount() {
+        return ARMOR_SLOT_COUNT;
+    }
+
+    public ItemStack getArmorItem(int slotIndex) {
+        if (slotIndex < 0 || slotIndex >= ARMOR_SLOT_COUNT) {
+            throw new IndexOutOfBoundsException("Armor index " + slotIndex + " out of bounds");
+        }
+        return armorSlots[slotIndex];
+    }
+
+    public int getCraftingRowCount() {
+        return craftingSlots.length;
+    }
+
+    public int getCraftingColumnCount() {
+        return craftingSlots[0].length;
+    }
+
+    public ItemStack getCraftingItem(int row, int column) {
+        if (row < 0 || row >= craftingSlots.length || column < 0 || column >= craftingSlots[row].length) {
+            throw new IndexOutOfBoundsException("Crafting index [" + row + "][" + column + "] out of bounds");
+        }
+        return craftingSlots[row][column];
+    }
+
     public void clickItem(int row, int column) {
         ItemStack clickedStack = getInventoryItem(row, column);
         ItemStack currentStack = getSelectedItem();
@@ -77,8 +112,7 @@ public class Inventory {
             // swap stacks
             inventoryBlocks[row][column] = selectedItem;
             selectedItem = clickedStack;
-            selectedItemSlotColumn = column;
-            selectedItemSlotRow = row;
+            setSelectedInventorySlot(row, column);
         } else {
             // merge stacks
             int increased = inventoryBlocks[row][column].increaseAmount(currentStack.getCount(), false);
@@ -90,14 +124,86 @@ public class Inventory {
         }
     }
 
+    public void clickArmorItem(int slotIndex) {
+        ItemStack clickedStack = getArmorItem(slotIndex);
+        ItemStack currentStack = getSelectedItem();
+        if (currentStack == null || clickedStack == null || !currentStack.getItem().equals(clickedStack.getItem())) {
+            armorSlots[slotIndex] = selectedItem;
+            selectedItem = clickedStack;
+            setSelectedArmorSlot(slotIndex);
+        } else {
+            int increased = armorSlots[slotIndex].increaseAmount(currentStack.getCount(), false);
+            if (increased == currentStack.getCount()) {
+                selectedItem = null;
+                setSelectedArmorSlot(-1);
+            } else {
+                currentStack.decreaseAmount(increased);
+            }
+        }
+    }
+
+    public ItemStack getCraftingResultItem() {
+        return craftingResult;
+    }
+
+    public void clickCraftingResultItem() {
+        ItemStack currentStack = getSelectedItem();
+        if (currentStack == null || craftingResult == null || !currentStack.getItem().equals(craftingResult.getItem())) {
+            ItemStack previousResult = craftingResult;
+            craftingResult = selectedItem;
+            selectedItem = previousResult;
+            setSelectedCraftingResult();
+        } else {
+            int increased = craftingResult.increaseAmount(currentStack.getCount(), false);
+            if (increased == currentStack.getCount()) {
+                selectedItem = null;
+                setSelectedCraftingResult();
+            } else {
+                currentStack.decreaseAmount(increased);
+            }
+        }
+    }
+
+    public void clickCraftingItem(int row, int column) {
+        ItemStack clickedStack = getCraftingItem(row, column);
+        ItemStack currentStack = getSelectedItem();
+        if (currentStack == null || clickedStack == null || !currentStack.getItem().equals(clickedStack.getItem())) {
+            craftingSlots[row][column] = selectedItem;
+            selectedItem = clickedStack;
+            setSelectedCraftingSlot(row, column);
+        } else {
+            int increased = craftingSlots[row][column].increaseAmount(currentStack.getCount(), false);
+            if (increased == currentStack.getCount()) {
+                selectedItem = null;
+                setSelectedCraftingSlot(-1, -1);
+            } else {
+                currentStack.decreaseAmount(increased);
+            }
+        }
+    }
+
     public void resetSelectedItem() {
         if (selectedItem == null) {
             return;
         }
-        inventoryBlocks[selectedItemSlotRow][selectedItemSlotColumn] = selectedItem;
+        if (selectedItemFromArmor && selectedArmorSlotIndex >= 0) {
+            armorSlots[selectedArmorSlotIndex] = selectedItem;
+        } else if (selectedItemFromCrafting && selectedCraftingSlotRow >= 0 && selectedCraftingSlotColumn >= 0) {
+            craftingSlots[selectedCraftingSlotRow][selectedCraftingSlotColumn] = selectedItem;
+        } else if (selectedItemSlotRow >= 0 && selectedItemSlotColumn >= 0) {
+            inventoryBlocks[selectedItemSlotRow][selectedItemSlotColumn] = selectedItem;
+        } else if (selectedItemFromCraftingResult && craftingResult != null) {
+            craftingResult = selectedItem;
+        }
         selectedItem = null;
         selectedItemSlotRow = -1;
         selectedItemSlotColumn = -1;
+        selectedArmorSlotIndex = -1;
+        selectedItemFromArmor = false;
+        selectedCraftingSlotRow = -1;
+        selectedCraftingSlotColumn = -1;
+        selectedItemFromCrafting = false;
+        selectedItemFromCraftingResult = false;
     }
 
     public ItemStack getSelectedItem() {
@@ -139,5 +245,53 @@ public class Inventory {
         }
 
         return false;
+    }
+
+    private void setSelectedInventorySlot(int row, int column) {
+        selectedItemSlotRow = row;
+        selectedItemSlotColumn = column;
+        selectedArmorSlotIndex = -1;
+        selectedItemFromArmor = false;
+        selectedCraftingSlotRow = -1;
+        selectedCraftingSlotColumn = -1;
+        selectedItemFromCrafting = false;
+    }
+
+    private void setSelectedArmorSlot(int slotIndex) {
+        selectedArmorSlotIndex = slotIndex;
+        selectedItemSlotRow = -1;
+        selectedItemSlotColumn = -1;
+        selectedItemFromArmor = slotIndex >= 0;
+        if (slotIndex >= 0) {
+            selectedCraftingSlotRow = -1;
+            selectedCraftingSlotColumn = -1;
+            selectedItemFromCrafting = false;
+        }
+    }
+
+    private void setSelectedCraftingSlot(int row, int column) {
+        selectedCraftingSlotRow = row;
+        selectedCraftingSlotColumn = column;
+        selectedItemFromCrafting = row >= 0 && column >= 0;
+        if (selectedItemFromCrafting) {
+            selectedItemSlotRow = -1;
+            selectedItemSlotColumn = -1;
+            selectedArmorSlotIndex = -1;
+            selectedItemFromArmor = false;
+            selectedItemFromCraftingResult = false;
+        }
+    }
+
+    private void setSelectedCraftingResult() {
+        selectedItemFromCraftingResult = craftingResult != null;
+        if (selectedItemFromCraftingResult) {
+            selectedItemSlotRow = -1;
+            selectedItemSlotColumn = -1;
+            selectedArmorSlotIndex = -1;
+            selectedItemFromArmor = false;
+            selectedCraftingSlotRow = -1;
+            selectedCraftingSlotColumn = -1;
+            selectedItemFromCrafting = false;
+        }
     }
 }
