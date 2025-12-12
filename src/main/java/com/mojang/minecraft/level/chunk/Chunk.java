@@ -4,6 +4,7 @@ import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.Blocks;
 import com.mojang.minecraft.level.block.state.BlockState;
+import com.mojang.minecraft.optim.pools.BlockStateArrayPool;
 import com.mojang.minecraft.optim.pools.ChunkBuildTesselatorPool;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.ChunkMesh;
@@ -15,6 +16,7 @@ import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.util.math.MathUtils;
 import com.mojang.minecraft.util.nio.NativeByteArray;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -134,6 +136,16 @@ public final class Chunk implements Disposable {
         return Blocks.globalPalette.fromBlockStateId(blockStateId);
     }
 
+    /**
+     * Returns an array of block states in the specified local range.
+     * @param lx1 the x coordinate of the first block
+     * @param ly1 the y coordinate of the first block
+     * @param lz1 the z coordinate of the first block
+     * @param lx2 the x coordinate of the last block
+     * @param ly2 the y coordinate of the last block
+     * @param lz2 the z coordinate of the last block
+     * @return an array of block states in the specified local range. Allocated on the {@link BlockStateArrayPool}. Must be released with {@link BlockStateArrayPool#release(BlockState[])}.
+     */
     private BlockState[] batchGetBlockStatesInRange(int lx1, int ly1, int lz1, int lx2, int ly2, int lz2) {
         assert lx1 <= lx2 && ly1 <= ly2 && lz1 <= lz2;
 
@@ -147,7 +159,7 @@ public final class Chunk implements Disposable {
         int localY;
         int blockStateId;
         int idx;
-        BlockState[] blockStates = new BlockState[nx * ny * nz];
+        BlockState[] blockStates = BlockStateArrayPool.alloc(nx * ny * nz);
         for (int x = 0; x < nx; ++x) {
             for (int y = 0; y < ny; ++y) {
                 for (int z = 0; z < nz; ++z) {
@@ -366,6 +378,7 @@ public final class Chunk implements Disposable {
                 // Find the highest light-blocking block
                 int y;
                 y = CHUNK_HEIGHT - 1;
+
                 BlockState[] blockStates = batchGetBlockStatesInRange(x, 0, z, x, y, z);
                 while (y > 0) {
                     BlockState blockState = blockStates[y];
@@ -374,6 +387,8 @@ public final class Chunk implements Disposable {
                     }
                     --y;
                 }
+                BlockStateArrayPool.release(blockStates);
+
                 int oldDepth = this.skyLightDepths.getByte(x + z * CHUNK_SIZE);
                 if (oldDepth != y) {
                     changed = true;

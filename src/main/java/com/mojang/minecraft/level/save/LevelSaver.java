@@ -5,7 +5,7 @@ import com.mojang.minecraft.level.chunk.Chunk;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
