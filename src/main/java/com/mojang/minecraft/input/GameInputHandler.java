@@ -279,7 +279,6 @@ public class GameInputHandler {
      * @return true if the action was successful, false otherwise
      */
     private boolean handleMouseClick(HitResult hitResult, boolean isRightClick, boolean isRepeatEvent) {
-
         if (!isRightClick) {
             this.player.swing();
             if (hitResult == null) {
@@ -294,8 +293,6 @@ public class GameInputHandler {
             if (hitResult == null) {
                 return false;
             }
-
-            this.player.resetBreakingBlockPos();
 
             // Build mode
             int x = hitResult.x;

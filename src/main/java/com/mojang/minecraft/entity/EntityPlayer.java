@@ -426,15 +426,18 @@ public class EntityPlayer extends EntityLiving {
     private HitResult lastHitResultBlockBreaking = null;
 
     /**
-     * Called by Minecraft.java to update the block breaking progress for the single player.
+     * Called by Minecraft.java to update the block-breaking progress for the single player.
      *
      * @return true if the current block should be broken, false otherwise
      */
     public boolean updateBlockBreaking() {
         // Update block breaking progress
         if (this.breakingBlock) {
+            if (this.currentHitResult == null) {
+                resetBreakingBlockPos();
+            }
             // abort block breaking if the hit result changes block position
-            if (this.lastHitResultBlockBreaking != null && this.currentHitResult != null) {
+            else if (this.lastHitResultBlockBreaking != null) {
                 int lastX = this.lastHitResultBlockBreaking.x;
                 int lastY = this.lastHitResultBlockBreaking.y;
                 int lastZ = this.lastHitResultBlockBreaking.z;
@@ -447,13 +450,13 @@ public class EntityPlayer extends EntityLiving {
                     this.blockBreakingProgress = 0;
                 }
             }
-            if (this.breakingBlock) {
-                this.blockBreakingProgress++;
-                if (this.blockBreakingProgress >= 10) {
-                    this.blockBreakingProgress = 0;
-                    this.breakingBlock = false;
-                    return true;
-                }
+        }
+        if (this.breakingBlock) {
+            this.blockBreakingProgress++;
+            if (this.blockBreakingProgress >= 10) {
+                this.blockBreakingProgress = 0;
+                this.breakingBlock = false;
+                return true;
             }
         }
         this.lastHitResultBlockBreaking = this.currentHitResult;
@@ -462,6 +465,13 @@ public class EntityPlayer extends EntityLiving {
 
     public boolean isBreakingBlock() {
         return breakingBlock;
+    }
+
+    /**
+     * Current breaking progress stage (0-9) for the block being mined.
+     */
+    public int getBlockBreakingProgress() {
+        return this.blockBreakingProgress;
     }
 
     /**

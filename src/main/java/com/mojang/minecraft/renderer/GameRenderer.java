@@ -15,6 +15,7 @@ import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.level.block.Block;
+import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.optim.pools.StackCountStringPool;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.renderer.block.BlockRenderer;
@@ -54,6 +55,7 @@ public class GameRenderer implements Disposable {
     private final HudShader hudShader;
     private final HudNoTexShader hudNoTexShader;
     private final OutlineShader outlineShader;
+    private final Level level;
 
     // Font renderer
     private final Font font;
@@ -100,6 +102,7 @@ public class GameRenderer implements Disposable {
         this.graphics = GraphicsFactory.getGraphicsAPI();
 
         this.textureManager = textureManager;
+        this.level = level;
         this.levelRenderer = levelRenderer;
         this.gameInputHandler = gameInputHandler;
         this.particleEngine = particleEngine;
@@ -251,6 +254,8 @@ public class GameRenderer implements Disposable {
         this.levelRenderer.updateDirtyChunks(this.player);
 
         render(partialTicks);
+
+        renderBlockBreakingOverlay();
 
         // Render block selection highlight
         if (hitResult != null) {
@@ -439,6 +444,8 @@ public class GameRenderer implements Disposable {
     }
 
     private IndexedMesh blockOutlineMesh;
+    private static final int BLOCK_BREAKING_STAGES = 10; // vanilla stages (0-9)
+    private IndexedMesh[] blockBreakingMeshes;
 
     /**
      * Renders an outline around the selected block.
@@ -539,6 +546,112 @@ public class GameRenderer implements Disposable {
         graphics.setRasterizerState(GraphicsEnums.CullMode.BACK, GraphicsEnums.FillMode.SOLID);
 
         graphics.popMatrix();
+    }
+
+    private void renderBlockBreakingOverlay() {
+        if (!player.isBreakingBlock()) {
+            return;
+        }
+
+        BlockState state = level.getBlockState(player.breakingBlockX, player.breakingBlockY, player.breakingBlockZ);
+        if (state == null || state.block == null) {
+            return;
+        }
+
+        int stage = Math.min(BLOCK_BREAKING_STAGES - 1, Math.max(0, player.getBlockBreakingProgress()));
+
+        ensureBlockBreakingMeshes();
+        IndexedMesh breakingMesh = blockBreakingMeshes[stage];
+        if (breakingMesh == null) {
+            return;
+        }
+
+        graphics.pushMatrix();
+        graphics.translate(player.breakingBlockX, player.breakingBlockY, player.breakingBlockZ);
+
+        graphics.setShader(worldShader);
+        setupFog(worldShader);
+        graphics.setTexture(textureManager.terrainTexture);
+        graphics.setRasterizerState(GraphicsEnums.CullMode.NONE, GraphicsEnums.FillMode.SOLID);
+        graphics.setDepthState(true, false, GraphicsEnums.CompareFunc.LESS_EQUAL);
+
+        // Vanilla classic: modulate destination by crack texture (no alpha test)
+        graphics.setBlendState(true, GraphicsEnums.BlendFactor.DST_COLOR, GraphicsEnums.BlendFactor.SRC_COLOR);
+        graphics.updateShaderMatrices();
+
+        breakingMesh.draw(graphics);
+
+        graphics.setBlendState(false, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
+        graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS_EQUAL);
+        graphics.setRasterizerState(GraphicsEnums.CullMode.BACK, GraphicsEnums.FillMode.SOLID);
+
+        graphics.popMatrix();
+    }
+
+    private void ensureBlockBreakingMeshes() {
+        if (blockBreakingMeshes != null) {
+            return;
+        }
+
+        blockBreakingMeshes = new IndexedMesh[BLOCK_BREAKING_STAGES];
+        final float eps = 0.0025F;
+
+        for (int stage = 0; stage < BLOCK_BREAKING_STAGES; stage++) {
+            int textureIndex = 240 + stage;
+            float u0 = (textureIndex % 16) / 16.0F;
+            float u1 = u0 + 0.0624375F;
+            float v0 = (textureIndex / 16) / 16.0F;
+            float v1 = v0 + 0.0624375F;
+
+            Tesselator t = Tesselator.instance;
+            t.init();
+            t.grayScale(1.0F);
+
+            float x0 = 0.0F;
+            float x1 = 1.0F;
+            float y0 = 0.0F;
+            float y1 = 1.0F;
+            float z0 = 0.0F;
+            float z1 = 1.0F;
+
+            // bottom
+            t.vertexUV(x0, y0 - eps, z1, u0, v1);
+            t.vertexUV(x0, y0 - eps, z0, u0, v0);
+            t.vertexUV(x1, y0 - eps, z0, u1, v0);
+            t.vertexUV(x1, y0 - eps, z1, u1, v1);
+
+            // top
+            t.vertexUV(x1, y1 + eps, z1, u1, v1);
+            t.vertexUV(x1, y1 + eps, z0, u1, v0);
+            t.vertexUV(x0, y1 + eps, z0, u0, v0);
+            t.vertexUV(x0, y1 + eps, z1, u0, v1);
+
+            // north (negative z)
+            t.vertexUV(x0, y1, z0 - eps, u1, v0);
+            t.vertexUV(x1, y1, z0 - eps, u0, v0);
+            t.vertexUV(x1, y0, z0 - eps, u0, v1);
+            t.vertexUV(x0, y0, z0 - eps, u1, v1);
+
+            // south (positive z)
+            t.vertexUV(x0, y1, z1 + eps, u0, v0);
+            t.vertexUV(x0, y0, z1 + eps, u0, v1);
+            t.vertexUV(x1, y0, z1 + eps, u1, v1);
+            t.vertexUV(x1, y1, z1 + eps, u1, v0);
+
+            // west (negative x)
+            t.vertexUV(x0 - eps, y1, z1, u1, v0);
+            t.vertexUV(x0 - eps, y1, z0, u0, v0);
+            t.vertexUV(x0 - eps, y0, z0, u0, v1);
+            t.vertexUV(x0 - eps, y0, z1, u1, v1);
+
+            // east (positive x)
+            t.vertexUV(x1 + eps, y1, z1, u0, v0);
+            t.vertexUV(x1 + eps, y0, z1, u0, v1);
+            t.vertexUV(x1 + eps, y0, z0, u1, v1);
+            t.vertexUV(x1 + eps, y1, z0, u1, v0);
+
+            blockBreakingMeshes[stage] = t.createIndexedMesh(GraphicsEnums.BufferUsage.STATIC);
+        }
     }
 
     /**
