@@ -85,6 +85,17 @@ public interface GraphicsAPI {
     Texture createTexture(int width, int height, TextureFormat format, ByteBuffer data);
 
     /**
+     * Creates a texture and retains a host-side RGBA8 copy of the provided data.
+     *
+     * @param width        The texture width
+     * @param height       The texture height
+     * @param format       The texture format
+     * @param data         The raw image data
+     * @return A new host-accessible texture
+     */
+    Texture createTextureHostAccessible(int width, int height, TextureFormat format, ByteBuffer data);
+
+    /**
      * Sets the blend state.
      *
      * @param enabled   Whether blending is enabled

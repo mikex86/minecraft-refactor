@@ -128,9 +128,7 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     @Override
     public IndexBuffer createPooledIndexBuffer(int sizeInBytes) {
         allocCount++;
-        
         // Only log stats in createPooledVertexBuffer to avoid duplicate logs
-        
         OpenGLBufferPool.BufferRegion region = indexBufferPool.allocate(sizeInBytes);
         if (region == null) {
             LOGGER.warning("Failed to allocate pooled index buffer of size " + sizeInBytes + " bytes");
@@ -151,8 +149,16 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
 
     @Override
     public Texture createTexture(int width, int height, TextureFormat format, ByteBuffer data) {
-        OpenGLTexture texture = new OpenGLTexture(width, height, format);
+        OpenGLTexture texture = new OpenGLTexture(width, height, format, false);
         texture.update(0, 0, width, height, data);
+        return texture;
+    }
+
+    @Override
+    public Texture createTextureHostAccessible(int width, int height, TextureFormat format, ByteBuffer data) {
+        OpenGLTexture texture = new OpenGLTexture(width, height, format, true);
+        texture.update(0, 0, width, height, data);
+        texture.initializeHostCopy(data);
         return texture;
     }
 

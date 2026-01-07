@@ -1,8 +1,9 @@
 package com.mojang.minecraft.item.inventory;
 
-import com.mojang.minecraft.item.BlockItem;
+import com.mojang.minecraft.item.BlockItems;
 import com.mojang.minecraft.item.Item;
 import com.mojang.minecraft.item.ItemStack;
+import com.mojang.minecraft.item.Items;
 import com.mojang.minecraft.item.crafting.CraftingManager;
 import com.mojang.minecraft.item.crafting.CraftingMatch;
 import com.mojang.minecraft.level.block.Block;
@@ -16,7 +17,7 @@ public class Inventory {
     /**
      * The inventory is a 2D array of ItemStacks in the shape [rows][columns].
      */
-    private final ItemStack[][] inventoryBlocks = new ItemStack[4][9];
+    private final ItemStack[][] inventorySlots = new ItemStack[4][9];
     private final ItemStack[] armorSlots = new ItemStack[ARMOR_SLOT_COUNT];
     private final ItemStack[][] craftingSlots = new ItemStack[2][2];
     private ItemStack craftingResult = null;
@@ -31,7 +32,7 @@ public class Inventory {
     private boolean selectedItemFromCraftingResult = false;
 
     {
-        ItemStack[] hotbarBlocks = inventoryBlocks[3];
+        ItemStack[] hotbarBlocks = inventorySlots[3];
         Block[] defaultBlocks = new Block[]{
                 Blocks.grass,
                 Blocks.dirt,
@@ -43,12 +44,15 @@ public class Inventory {
                 Blocks.leaves,
         };
         for (int i = 0; i < defaultBlocks.length; i++) {
-            hotbarBlocks[i] = new ItemStack(new BlockItem(defaultBlocks[i]), 62);
+            Item blockItem = BlockItems.getBlockItemForBlockOrNull(defaultBlocks[i]);
+            assert blockItem != null; // debug only and also code is to be removed anyways
+            hotbarBlocks[i] = new ItemStack(blockItem, 62);
         }
 
-        inventoryBlocks[0][0] = new ItemStack(new BlockItem(Blocks.grass), 4);
-        inventoryBlocks[1][1] = new ItemStack(new BlockItem(Blocks.stoneBrick), 2);
-        inventoryBlocks[2][2] = new ItemStack(new BlockItem(Blocks.glass), 2);
+        inventorySlots[0][0] = new ItemStack(BlockItems.grass, 4);
+        inventorySlots[1][1] = new ItemStack(BlockItems.stoneBrick, 2);
+        inventorySlots[2][2] = new ItemStack(BlockItems.glass, 2);
+        inventorySlots[2][4] = new ItemStack(Items.diamondSword, 1);
     }
 
     public Inventory() {
@@ -59,27 +63,27 @@ public class Inventory {
         if (slotIndex < 0 || slotIndex >= HOTBAR_SIZE) {
             throw new IndexOutOfBoundsException("Hotbar index " + slotIndex + " out of bounds");
         }
-        ItemStack[] hotbarBlocks = getHotBarBlocks();
+        ItemStack[] hotbarBlocks = getHotBarSlots();
         return hotbarBlocks[slotIndex];
     }
 
-    private ItemStack[] getHotBarBlocks() {
-        return inventoryBlocks[3];
+    private ItemStack[] getHotBarSlots() {
+        return inventorySlots[3];
     }
 
     public ItemStack getInventoryItem(int row, int column) {
-        if (row < 0 || row >= inventoryBlocks.length || column < 0 || column >= inventoryBlocks[row].length) {
+        if (row < 0 || row >= inventorySlots.length || column < 0 || column >= inventorySlots[row].length) {
             throw new IndexOutOfBoundsException("Inventory index [" + row + "][" + column + "] out of bounds");
         }
-        return inventoryBlocks[row][column];
+        return inventorySlots[row][column];
     }
 
     public int getMainInventoryRowCount() {
-        return inventoryBlocks.length - 1;
+        return inventorySlots.length - 1;
     }
 
     public int getColumnCount() {
-        return inventoryBlocks[0].length;
+        return inventorySlots[0].length;
     }
 
     public int getHotbarSize() {
@@ -117,12 +121,12 @@ public class Inventory {
         ItemStack currentStack = getSelectedItem();
         if (currentStack == null || clickedStack == null || !currentStack.getItem().equals(clickedStack.getItem())) {
             // swap stacks
-            inventoryBlocks[row][column] = selectedItem;
+            inventorySlots[row][column] = selectedItem;
             selectedItem = clickedStack;
             setSelectedInventorySlot(row, column);
         } else {
             // merge stacks
-            int increased = inventoryBlocks[row][column].increaseAmount(currentStack.getCount(), false);
+            int increased = inventorySlots[row][column].increaseAmount(currentStack.getCount(), false);
             if (increased == currentStack.getCount()) {
                 selectedItem = null;
             } else {
@@ -197,7 +201,7 @@ public class Inventory {
     }
 
     public void placeSingleInventoryItem(int row, int column) {
-        if (placeSingleInGrid(inventoryBlocks, row, column)) {
+        if (placeSingleInGrid(inventorySlots, row, column)) {
             // Nothing extra
         }
     }
@@ -233,7 +237,7 @@ public class Inventory {
         } else if (selectedItemFromCrafting && selectedCraftingSlotRow >= 0 && selectedCraftingSlotColumn >= 0) {
             craftingSlots[selectedCraftingSlotRow][selectedCraftingSlotColumn] = selectedItem;
         } else if (selectedItemSlotRow >= 0 && selectedItemSlotColumn >= 0) {
-            inventoryBlocks[selectedItemSlotRow][selectedItemSlotColumn] = selectedItem;
+            inventorySlots[selectedItemSlotRow][selectedItemSlotColumn] = selectedItem;
         } else if (selectedItemFromCraftingResult && craftingResult != null) {
             craftingResult = selectedItem;
         }
@@ -258,7 +262,7 @@ public class Inventory {
         if (hotbarItem != null) {
             hotbarItem.decreaseAmount(amount);
             if (hotbarItem.getCount() <= 0) {
-                ItemStack[] hotbarBlocks = getHotBarBlocks();
+                ItemStack[] hotbarBlocks = getHotBarSlots();
                 hotbarBlocks[hotbarSlotIndex] = null;
             }
         }
@@ -266,9 +270,9 @@ public class Inventory {
 
     public boolean addItem(Item item, boolean isItemPickup) {
         // add items to inventory in reverse row priority
-        for (int i = inventoryBlocks.length - 1; i >= 0; i--) {
-            for (int j = 0, m = inventoryBlocks[i].length; j < m; j++) {
-                ItemStack itemStack = inventoryBlocks[i][j];
+        for (int i = inventorySlots.length - 1; i >= 0; i--) {
+            for (int j = 0, m = inventorySlots[i].length; j < m; j++) {
+                ItemStack itemStack = inventorySlots[i][j];
                 if (itemStack != null && itemStack.getItem().equals(item)) {
                     if (itemStack.increaseAmount(1, isItemPickup) == 1) {
                         return true;
@@ -277,11 +281,11 @@ public class Inventory {
             }
         }
 
-        for (int i = inventoryBlocks.length - 1; i >= 0; i--) {
-            for (int j = 0, m = inventoryBlocks[i].length; j < m; j++) {
-                ItemStack itemStack = inventoryBlocks[i][j];
+        for (int i = inventorySlots.length - 1; i >= 0; i--) {
+            for (int j = 0, m = inventorySlots[i].length; j < m; j++) {
+                ItemStack itemStack = inventorySlots[i][j];
                 if (itemStack == null) {
-                    inventoryBlocks[i][j] = new ItemStack(item, 1);
+                    inventorySlots[i][j] = new ItemStack(item, 1);
                     return true;
                 }
             }

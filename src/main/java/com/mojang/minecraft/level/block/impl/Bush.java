@@ -23,7 +23,7 @@ public class Bush extends Block {
      * @param id The tile ID
      */
     protected Bush(int id) {
-        super(16);
+        super("bush", 16);
     }
 
     /**

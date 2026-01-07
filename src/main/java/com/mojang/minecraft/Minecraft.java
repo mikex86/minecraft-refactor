@@ -38,7 +38,6 @@ public class Minecraft implements Runnable {
 
     // Game flags
     private volatile boolean running = false;
-    public volatile boolean pause = false;
 
     /**
      * Creates a new Minecraft game instance.
@@ -135,55 +134,50 @@ public class Minecraft implements Runnable {
         try {
             // Main game loop
             while (this.running) {
-                if (this.pause) {
-                    // When paused, sleep to avoid using CPU resources
-                    Thread.sleep(100L);
-                } else {
-                    // Check if window is closed
-                    if (!engine.update()) {
-                        this.stop();
-                    }
+                // Check if window is closed
+                if (!engine.update()) {
+                    this.stop();
+                }
 
-                    // Get time information from engine
-                    int ticksToProcess = engine.getTicksToProcess();
-                    float partialTick = engine.getPartialTick();
+                // Get time information from engine
+                int ticksToProcess = engine.getTicksToProcess();
+                float partialTick = engine.getPartialTick();
 
-                    // Process input
-                    HitResult hitResult = this.gameState.getLevel().raycast(this.gameState.getPlayer(), partialTick);
-                    this.gameState.getPlayer().setCurrentHitResult(hitResult);
-                    gameInputHandler.processInput(hitResult, this.engine.getWidth(), this.engine.getHeight());
+                // Process input
+                HitResult hitResult = this.gameState.getLevel().raycast(this.gameState.getPlayer(), partialTick);
+                this.gameState.getPlayer().setCurrentHitResult(hitResult);
+                gameInputHandler.processInput(hitResult, this.engine.getWidth(), this.engine.getHeight());
 
-                    // Update client player
-                    if (ticksToProcess > 0) {
-                        updateClientPlayer(partialTick);
-                    }
+                // Update client player
+                if (ticksToProcess > 0) {
+                    updateClientPlayer(partialTick);
+                }
 
-                    // Process game ticks
-                    for (int i = 0; i < ticksToProcess; ++i) {
-                        tick();
-                    }
+                // Process game ticks
+                for (int i = 0; i < ticksToProcess; ++i) {
+                    tick();
+                }
 
-                    // Handle mouse look
-                    gameInputHandler.processMouseLook(this.engine.getWidth(), this.engine.getHeight());
-                    engine.resetMouse();
+                // Handle mouse look
+                gameInputHandler.processMouseLook(this.engine.getWidth(), this.engine.getHeight());
+                engine.resetMouse();
 
-                    // Render the frame
-                    this.renderer.render(
-                            partialTick,
-                            hitResult
-                    );
+                // Render the frame
+                this.renderer.render(
+                        partialTick,
+                        hitResult
+                );
 
-                    // Check for window size changes
-                    if (engine.hasResized()) {
-                        int newWidth = engine.getWidth();
-                        int newHeight = engine.getHeight();
-                        renderer.setScreenSize(newWidth, newHeight);
-                    }
+                // Check for window size changes
+                if (engine.hasResized()) {
+                    int newWidth = engine.getWidth();
+                    int newHeight = engine.getHeight();
+                    renderer.setScreenSize(newWidth, newHeight);
+                }
 
-                    // Handle window focus change
-                    if (!engine.hasFocus()) {
-                        gameInputHandler.handleFocusChange(false);
-                    }
+                // Handle window focus change
+                if (!engine.hasFocus()) {
+                    gameInputHandler.handleFocusChange(false);
                 }
             }
         } catch (Exception e) {

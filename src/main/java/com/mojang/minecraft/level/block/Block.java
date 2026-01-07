@@ -1,7 +1,7 @@
 package com.mojang.minecraft.level.block;
 
 import com.mojang.minecraft.entity.EntityItem;
-import com.mojang.minecraft.item.BlockItem;
+import com.mojang.minecraft.item.BlockItems;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.level.chunk.Chunk;
@@ -21,19 +21,26 @@ import java.util.concurrent.ThreadLocalRandom;
 public class Block {
 
     /**
+     * Unique, untranslated name key of the tile.
+     */
+    public final String name;
+
+    /**
      * Texture index for the tile
      */
-    public final int tex;
-    public final int id;
+    protected final int tex;
+    private final int id;
 
     private static int idctr = 0;
 
     /**
      * Creates a new tile with the specified ID and texture.
      *
+     * @param name The unique, untranslated name key of the tile.
      * @param tex The texture index
      */
-    protected Block(int tex) {
+    protected Block(String name, int tex) {
+        this.name = name;
         this.id = idctr++;
         this.tex = tex;
         Blocks.registerBlock(this);
@@ -548,7 +555,7 @@ public class Block {
                 }
             }
         }
-        EntityItem entityItem = new EntityItem(level, new BlockItem(this));
+        EntityItem entityItem = new EntityItem(level, BlockItems.getBlockItemForBlockOrNull(this));
         entityItem.setPosition(x + 0.25f, y + 0.01f, z + 0.25f);
         entityItem.xd = (float) (ThreadLocalRandom.current().nextGaussian() * 0.05F);
         entityItem.yd = (float) (ThreadLocalRandom.current().nextGaussian() * 0.05F + 0.2F);
@@ -579,5 +586,9 @@ public class Block {
 
     public float getSlipperiness() {
         return 0.6F;
+    }
+
+    public int getId() {
+        return id;
     }
 }

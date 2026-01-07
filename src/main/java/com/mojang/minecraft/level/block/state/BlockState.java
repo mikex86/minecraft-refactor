@@ -33,7 +33,7 @@ public class BlockState {
 
     @Override
     public int hashCode() {
-        return this.block.id * 31 + this.variantIndex;
+        return this.block.getId() * 31 + this.variantIndex;
     }
 
     @Override
@@ -41,7 +41,7 @@ public class BlockState {
         if (this == obj) return true;
         if (obj == null || getClass() != obj.getClass()) return false;
         BlockState that = (BlockState) obj;
-        return this.block.id == that.block.id &&
+        return this.block.getId() == that.block.getId() &&
                 this.variantIndex == that.variantIndex;
     }
 }

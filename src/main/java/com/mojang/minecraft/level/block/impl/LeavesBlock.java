@@ -5,7 +5,7 @@ import com.mojang.minecraft.level.block.Block;
 public class LeavesBlock extends Block {
 
     public LeavesBlock() {
-        super(52);
+        super("leaves", 52);
     }
 
     @Override

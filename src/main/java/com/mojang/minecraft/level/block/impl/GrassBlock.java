@@ -13,13 +13,8 @@ import java.util.Random;
  */
 public class GrassBlock extends Block {
 
-    /**
-     * Creates a new grass tile with the specified ID.
-     *
-     * @param id The tile ID
-     */
-    public GrassBlock(int id) {
-        super(3); // Side texture (grass side)
+    public GrassBlock() {
+        super("grass", 3); // Side texture (grass side)
     }
 
     /**

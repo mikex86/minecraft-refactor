@@ -20,11 +20,13 @@ import static org.lwjgl.stb.STBImage.*;
  * Manages texture loading and caching for OpenGL rendering using STBImage
  */
 public class TextureManager implements Disposable {
+
     private final GraphicsAPI graphics = GraphicsFactory.getGraphicsAPI();
     private final Map<String, Texture> textureCache = new HashMap<>();
 
     public Texture charTexture;
     public Texture terrainTexture;
+    public Texture itemsTexture;
     public Texture fontTexture;
     public Texture guiTexture;
     public Texture inventoryTexture;
@@ -32,6 +34,7 @@ public class TextureManager implements Disposable {
     public void loadTextures() {
         charTexture = loadTexture("/char.png", Texture.FilterMode.NEAREST);
         terrainTexture = loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
+        itemsTexture = loadTexture("/items.png", Texture.FilterMode.NEAREST);
         fontTexture = loadTexture("/default.gif", Texture.FilterMode.NEAREST);
         guiTexture = loadTexture("/gui.png", Texture.FilterMode.NEAREST);
         inventoryTexture = loadTexture("/inventory.png", Texture.FilterMode.NEAREST);
@@ -43,13 +46,6 @@ public class TextureManager implements Disposable {
         if (textureCache.containsKey(resourcePath))
             return textureCache.get(resourcePath);
 
-        byte[] bytes;
-        try {
-            bytes = IOUtils.readAllBytes(Objects.requireNonNull(getClass().getResourceAsStream(resourcePath)));
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to load texture: " + resourcePath, e);
-        }
-
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer w = stack.mallocInt(1);
             IntBuffer h = stack.mallocInt(1);
@@ -57,6 +53,13 @@ public class TextureManager implements Disposable {
 
             // Flip vertically if your textures expect bottom‐up origin:
             stbi_set_flip_vertically_on_load(false);
+
+            byte[] bytes;
+            try {
+                bytes = IOUtils.readAllBytes(Objects.requireNonNull(getClass().getResourceAsStream(resourcePath)));
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to load texture: " + resourcePath, e);
+            }
 
             ByteBuffer imageBuffer = ByteBuffer.allocateDirect(bytes.length);
             imageBuffer.put(bytes);
@@ -69,14 +72,13 @@ public class TextureManager implements Disposable {
             int width = w.get(0);
             int height = h.get(0);
 
-            Texture texture = graphics.createTexture(
+            Texture texture = graphics.createTextureHostAccessible(
                     width,
                     height,
                     GraphicsEnums.TextureFormat.RGBA8,
                     decoded
             );
             texture.setFiltering(filterMode, filterMode);
-
 
             textureCache.put(resourcePath, texture);
             System.out.println("Loaded texture: " + resourcePath +

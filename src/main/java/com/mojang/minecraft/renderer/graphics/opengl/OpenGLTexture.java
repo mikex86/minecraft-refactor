@@ -2,6 +2,8 @@ package com.mojang.minecraft.renderer.graphics.opengl;
 
 import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.TextureFormat;
+import org.lwjgl.system.MemoryUtil;
+import org.lwjgl.system.jemalloc.JEmalloc;
 
 import java.nio.ByteBuffer;
 
@@ -22,6 +24,12 @@ public class OpenGLTexture implements Texture {
     private final int width;
     private final int height;
     private final TextureFormat format;
+    private final boolean keepHostCopy;
+
+    // Optional CPU-side copy of texture data (stored in the texture's native format)
+    private long cpuDataPtr = 0L;
+    private int cpuDataCapacity = 0;
+    private ByteBuffer cpuData;
     
     // State tracking
     private boolean disposed = false;
@@ -34,9 +42,14 @@ public class OpenGLTexture implements Texture {
      * @param format The texture format
      */
     public OpenGLTexture(int width, int height, TextureFormat format) {
+        this(width, height, format, false);
+    }
+
+    public OpenGLTexture(int width, int height, TextureFormat format, boolean keepHostCopy) {
         this.width = width;
         this.height = height;
         this.format = format;
+        this.keepHostCopy = keepHostCopy;
         
         // Generate texture
         this.textureId = glGenTextures();
@@ -97,6 +110,22 @@ public class OpenGLTexture implements Texture {
         glBindTexture(GL_TEXTURE_2D, textureId);
         glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, glFormat, glType, data);
         glBindTexture(GL_TEXTURE_2D, 0);
+
+        if (keepHostCopy && cpuData != null) {
+            // Keep CPU copy in sync for CPU-accessible textures
+            int bpp = getBytesPerPixel(format);
+            int rowBytes = width * bpp;
+            ByteBuffer srcBase = data.duplicate();
+            for (int row = 0; row < height; row++) {
+                int srcPos = data.position() + row * rowBytes;
+                int dstPos = ((y + row) * this.width + x) * bpp;
+                ByteBuffer srcRow = srcBase.duplicate();
+                srcRow.position(srcPos).limit(srcPos + rowBytes);
+                ByteBuffer dstRow = cpuData.duplicate();
+                dstRow.position(dstPos).limit(dstPos + rowBytes);
+                dstRow.put(srcRow);
+            }
+        }
     }
     
     @Override
@@ -129,6 +158,12 @@ public class OpenGLTexture implements Texture {
             glDeleteTextures(textureId);
             textureId = 0;
             disposed = true;
+            if (cpuDataPtr != 0L) {
+                JEmalloc.nje_free(cpuDataPtr);
+                cpuDataPtr = 0L;
+                cpuDataCapacity = 0;
+                cpuData = null;
+            }
         }
     }
     
@@ -156,6 +191,41 @@ public class OpenGLTexture implements Texture {
      */
     int getTextureId() {
         return textureId;
+    }
+
+    @Override
+    public ByteBuffer getHostRgbaData() {
+        if (cpuData == null) {
+            return null;
+        }
+        ByteBuffer view = cpuData.asReadOnlyBuffer();
+        view.clear();
+        return view;
+    }
+
+    @Override
+    public boolean isHostAccessible() {
+        return cpuData != null;
+    }
+
+    void initializeHostCopy(ByteBuffer data) {
+        if (!keepHostCopy) {
+            return;
+        }
+        if (cpuDataPtr != 0L) {
+            JEmalloc.nje_free(cpuDataPtr);
+            cpuDataPtr = 0L;
+            cpuDataCapacity = 0;
+            cpuData = null;
+        }
+        ByteBuffer src = data.duplicate();
+        src.clear();
+        cpuDataCapacity = src.remaining();
+        cpuDataPtr = JEmalloc.nje_calloc(cpuDataCapacity, 1);
+        cpuData = MemoryUtil.memByteBuffer(cpuDataPtr, cpuDataCapacity);
+        cpuData.clear();
+        cpuData.put(src);
+        cpuData.clear();
     }
     
     //--------------------------------------------------

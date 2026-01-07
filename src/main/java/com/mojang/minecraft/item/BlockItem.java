@@ -6,8 +6,8 @@ public class BlockItem extends Item {
 
     private final Block block;
 
-    public BlockItem(Block block) {
-        super(64);
+    BlockItem(Block block) {
+        super(block.name, 64);
         this.block = block;
     }
 

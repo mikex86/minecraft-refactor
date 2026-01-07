@@ -9,7 +9,7 @@ import com.mojang.minecraft.level.chunk.Chunk;
 public class GlassBlock extends Block {
 
     public GlassBlock() {
-        super(49);
+        super("grass", 49);
     }
 
     @Override

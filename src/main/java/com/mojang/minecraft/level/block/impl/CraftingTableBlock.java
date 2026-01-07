@@ -9,7 +9,7 @@ import com.mojang.minecraft.level.block.EnumFacing;
 public class CraftingTableBlock extends Block {
 
     public CraftingTableBlock() {
-        super(43);
+        super("crafting_table", 43);
     }
 
     @Override

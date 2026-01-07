@@ -16,7 +16,7 @@ public class WoodBlock extends Block {
      *
      */
     public WoodBlock() {
-        super(21);
+        super("wood", 21);
     }
 
     @Override

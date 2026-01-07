@@ -1,12 +1,14 @@
 package com.mojang.minecraft.item.crafting;
 
 import com.mojang.minecraft.item.BlockItem;
+import com.mojang.minecraft.item.BlockItems;
 import com.mojang.minecraft.item.Item;
 import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.level.block.Blocks;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public final class CraftingManager {
@@ -38,16 +40,16 @@ public final class CraftingManager {
     }
 
     private void registerDefaultRecipes() {
-        Item wood = new BlockItem(Blocks.wood);
-        ItemStack planksOutput = new ItemStack(new BlockItem(Blocks.planks), 4);
-        addRecipe(new ShapelessCraftingRecipe(planksOutput, Arrays.asList(wood)));
+        Item wood = BlockItems.wood;
+        ItemStack planksOutput = new ItemStack(BlockItems.planks, 4);
+        addRecipe(new ShapelessCraftingRecipe(planksOutput, Collections.singletonList(wood)));
 
-        Item plankItem = new BlockItem(Blocks.planks);
+        Item plankItem = BlockItems.planks;
         Item[][] craftingTablePattern = new Item[][]{
                 {plankItem, plankItem},
                 {plankItem, plankItem}
         };
-        ItemStack craftingTableOutput = new ItemStack(new BlockItem(Blocks.craftingTable), 1);
+        ItemStack craftingTableOutput = new ItemStack(BlockItems.craftingTable, 1);
         addRecipe(new ShapedCraftingRecipe(craftingTableOutput, craftingTablePattern));
     }
 }

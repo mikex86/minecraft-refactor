@@ -29,6 +29,17 @@ public interface Texture extends GraphicsResource {
      * @return The texture format
      */
     TextureFormat getFormat();
+
+    /**
+     * Returns a read-only RGBA8 host buffer if the texture was created with a
+     * host copy retained; otherwise returns null.
+     */
+    ByteBuffer getHostRgbaData();
+
+    /**
+     * Indicates whether this texture retains host-accessible RGBA texels.
+     */
+    boolean isHostAccessible();
     
     /**
      * Updates a region of this texture with new data.

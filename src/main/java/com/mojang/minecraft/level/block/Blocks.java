@@ -26,27 +26,27 @@ public class Blocks {
     /**
      * Rock/stone tile
      */
-    public static final Block rock = new Block(1);
+    public static final Block rock = new Block("rock", 1);
 
     /**
      * Grass tile
      */
-    public static final Block grass = new GrassBlock(2);
+    public static final Block grass = new GrassBlock();
 
     /**
      * Dirt tile
      */
-    public static final Block dirt = new DirtBlock(3, 2);
+    public static final Block dirt = new DirtBlock();
 
     /**
      * Stone brick tile
      */
-    public static final Block stoneBrick = new Block(16);
+    public static final Block stoneBrick = new Block("stone_brick", 16);
 
     /**
      * Wooden planks tile
      */
-    public static final Block planks = new Block(4);
+    public static final Block planks = new Block("wooden_planks", 4);
 
     /**
      * Leaves

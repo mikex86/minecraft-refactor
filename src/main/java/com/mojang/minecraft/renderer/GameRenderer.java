@@ -9,6 +9,7 @@ import com.mojang.minecraft.gui.screen.GuiScreen;
 import com.mojang.minecraft.gui.screen.InventoryScreen;
 import com.mojang.minecraft.input.GameInputHandler;
 import com.mojang.minecraft.item.BlockItem;
+import com.mojang.minecraft.item.HeldItem;
 import com.mojang.minecraft.item.Item;
 import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.level.Level;
@@ -21,6 +22,7 @@ import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
+import com.mojang.minecraft.renderer.item.HeldItemRenderer;
 import com.mojang.minecraft.renderer.shader.ShaderRegistry;
 import com.mojang.minecraft.renderer.shader.impl.*;
 import com.mojang.minecraft.world.HitResult;
@@ -61,6 +63,7 @@ public class GameRenderer implements Disposable {
     private final ParticleEngine particleEngine;
     private final GameInputHandler gameInputHandler;
     private final EntityPlayer player;
+    private final HeldItemRenderer heldItemRenderer;
 
     // Window dimensions
     private int width;
@@ -103,6 +106,7 @@ public class GameRenderer implements Disposable {
         this.player = player;
         this.width = width;
         this.height = height;
+        this.heldItemRenderer = new HeldItemRenderer(textureManager.itemsTexture);
 
         // Create game resources
         this.font = new Font("/default.gif", textureManager);
@@ -278,7 +282,6 @@ public class GameRenderer implements Disposable {
 
         // Calculate aspect ratio
         graphics.setShader(worldShader);
-        graphics.setTexture(textureManager.terrainTexture);
 
         float handFov = 70.0F * player.getInterpolatedFOV(partialTicks);
         graphics.setPerspectiveProjection(handFov, aspectRatio, 0.05F, 4096.0F);
@@ -287,8 +290,11 @@ public class GameRenderer implements Disposable {
         try {
             graphics.loadIdentity();
 
+            // clear depth test because items shouldn't intersect with world geometry such as blocks
             graphics.clear(false, true, 0.0F, 0.0F, 0.0F, 0.0F);
-            graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
+
+            // re-enable depth testing for the hand/item
+            graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS_EQUAL);
 
             // In vanilla the hurt tilt is applied before bobbing. The clone currently has no hurt tilt data.
             bobView(player, partialTicks);
@@ -319,17 +325,28 @@ public class GameRenderer implements Disposable {
 
             graphics.pushMatrix();
             try {
-                applyBlockFirstPersonTransform(handSign);
-                graphics.updateShaderMatrices();
                 Item item = itemStack.getItem();
                 if (item instanceof BlockItem) {
+                    graphics.setTexture(textureManager.terrainTexture);
+                    applyBlockFirstPersonTransform(handSign);
+                    graphics.updateShaderMatrices();
                     BlockItem blockItem = (BlockItem) item;
                     Block block = blockItem.getBlock();
                     BlockRenderer.getBlockMesh(block).draw(graphics);
+                } else if (item instanceof HeldItem) {
+                    // Disable face culling so both sides of thin item pixels render.
+                    graphics.setRasterizerState(GraphicsEnums.CullMode.NONE, GraphicsEnums.FillMode.SOLID);
+                    graphics.setTexture(textureManager.itemsTexture);
+                    graphics.setShader(hudShader);
+                    applyHeldItemFirstPersonTransform(handSign);
+                    graphics.updateShaderMatrices();
+                    heldItemRenderer.renderHeldItemModel(graphics, (HeldItem) item, 1);
                 }
             } finally {
                 graphics.popMatrix();
             }
+            // Restore default culling so subsequent 2D inventory rendering is unaffected.
+            graphics.setRasterizerState(GraphicsEnums.CullMode.BACK, GraphicsEnums.FillMode.SOLID);
         } finally {
             graphics.popMatrix();
         }
@@ -341,6 +358,19 @@ public class GameRenderer implements Disposable {
         graphics.rotateY(handSign * 45.0F);
         graphics.scale(0.4F, 0.4F, 0.4F);
         graphics.translate(-0.5F, -0.5F, -0.5F);
+    }
+
+    private void applyHeldItemFirstPersonTransform(float handSign) {
+        // Matches the default handheld first-person transform used by vanilla item models.
+        final float handheldScale = 0.68F;
+        final float handheldTranslateY = 4.0F / 16.0F;
+        final float halfThickness = -(1.0F / 16.0F) * 0.5F;
+
+        graphics.translate(0.0F, handheldTranslateY, 0.0F);
+        graphics.rotateY(handSign * -90.0F);
+        graphics.rotateZ(handSign * 25.0F);
+        graphics.scale(handheldScale, handheldScale, handheldScale);
+        graphics.translate(-0.5F, -0.5F, halfThickness);
     }
 
     private void applyViewDriftCompensation(float partialTicks) {
@@ -360,6 +390,7 @@ public class GameRenderer implements Disposable {
     private static float lerp(float delta, float start, float end) {
         return start + (end - start) * delta;
     }
+
     public void setDebugString(int index, String memoryString) {
         this.debugStrings[index] = memoryString;
     }
@@ -598,7 +629,8 @@ public class GameRenderer implements Disposable {
     private static final int HOTBAR_WIDTH = 92 * 2;
     private static final int HOTBAR_SELECTOR_SIZE = 24;
     private static final int HOTBAR_SLOT_WIDTH = 20;
-    private static final int ITEM_SIZE = 10;
+    private static final int BLOCK_ITEM_SIZE = 10;
+    private static final int HELD_ITEM_SIZE = 16;
 
     private TextLabel[] stackSizeHotbarLabels;
 
@@ -638,7 +670,7 @@ public class GameRenderer implements Disposable {
         graphics.updateShaderMatrices();
         hotbarMesh.draw(graphics);
 
-        // draw hot-bar items
+        // draw hot-bar blocks
         graphics.setTexture(textureManager.terrainTexture);
         graphics.setShader(worldShader);
         worldShader.setFogUniforms(0.0F, 0.0F, 10.0F,
@@ -654,24 +686,35 @@ public class GameRenderer implements Disposable {
             if (item instanceof BlockItem) {
                 BlockItem blockItem = (BlockItem) item;
                 graphics.pushMatrix();
-                graphics.translate(centerX - HOTBAR_WIDTH / 2f + (i * HOTBAR_SLOT_WIDTH) + HOTBAR_SLOT_WIDTH / 2f + 1, screenHeight - HOTBAR_SELECTOR_SIZE + ITEM_SIZE * 2 + 1, 0);
-
+                graphics.translate(centerX - HOTBAR_WIDTH / 2f + (i * HOTBAR_SLOT_WIDTH) + HOTBAR_SLOT_WIDTH / 2f + 1, screenHeight - HOTBAR_SELECTOR_SIZE + BLOCK_ITEM_SIZE * 2 + 1, 0);
 
                 // render item pickup animation
-                {
-                    // real mc has a tick-updated animation counter here, we don't do that.
-                    // we just use time millis
-                    double ticksPassed = (System.currentTimeMillis() - itemStack.lastPickupTimeMs) / 50.0;
-                    double animTicks = Math.min(ticksPassed, 8.0);
-                    double anim = 8.0 - animTicks;
-                    float f = (float) (anim / 8.0);
-                    float scaleFactor = 1.0f + f * f * 0.5f;
-                    if (anim > 0) {
-                        graphics.scale(1.0f / scaleFactor, (scaleFactor + 1.0f) / 2.0f, 1.0f);
-                    }
-                }
+                renderPickupAnimation(itemStack);
 
-                BlockRenderer.renderBlockPreview(graphics, blockItem.getBlock(), ITEM_SIZE);
+                BlockRenderer.renderBlockPreview(graphics, blockItem.getBlock(), BLOCK_ITEM_SIZE);
+                graphics.popMatrix();
+            }
+        }
+
+        // draw hot-bar items
+        graphics.setTexture(textureManager.itemsTexture);
+        graphics.setShader(hudShader);
+
+        for (int i = 0; i < hotBarSize; i++) {
+            ItemStack itemStack = player.getInventory().getHotbarItem(i);
+            if (itemStack == null) {
+                continue;
+            }
+            Item item = itemStack.getItem();
+            if (item instanceof HeldItem) {
+                HeldItem heldItem = (HeldItem) item;
+                graphics.pushMatrix();
+                graphics.translate(centerX - HOTBAR_WIDTH / 2f + (i * HOTBAR_SLOT_WIDTH) + HOTBAR_SLOT_WIDTH / 2f + 1 - HELD_ITEM_SIZE / 2f, screenHeight - HOTBAR_HEIGHT / 2f - HELD_ITEM_SIZE / 2f, 0);
+
+                // render item pickup animation
+                renderPickupAnimation(itemStack);
+
+                heldItemRenderer.renderHeldItemPreview(graphics, heldItem, HELD_ITEM_SIZE);
                 graphics.popMatrix();
             }
         }
@@ -707,6 +750,20 @@ public class GameRenderer implements Disposable {
                 }
             }
         }
+    }
+
+    private void renderPickupAnimation(ItemStack itemStack) {
+        // real mc has a tick-updated animation counter here, we don't do that.
+        // we just use time millis
+        double ticksPassed = (System.currentTimeMillis() - itemStack.lastPickupTimeMs) / 50.0;
+        double animTicks = Math.min(ticksPassed, 8.0);
+        double anim = 8.0 - animTicks;
+        float f = (float) (anim / 8.0);
+        float scaleFactor = 1.0f + f * f * 0.5f;
+        if (anim > 0) {
+            graphics.scale(1.0f / scaleFactor, (scaleFactor + 1.0f) / 2.0f, 1.0f);
+        }
+
     }
 
     private void drawDebugText(GraphicsAPI graphics, String[] debugStrings) {

@@ -4,6 +4,7 @@ import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.gui.Font;
 import com.mojang.minecraft.gui.TextLabel;
 import com.mojang.minecraft.item.BlockItem;
+import com.mojang.minecraft.item.HeldItem;
 import com.mojang.minecraft.item.Item;
 import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.item.inventory.Inventory;
@@ -14,6 +15,7 @@ import com.mojang.minecraft.renderer.block.BlockRenderer;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
+import com.mojang.minecraft.renderer.item.HeldItemRenderer;
 import com.mojang.minecraft.renderer.shader.ShaderRegistry;
 import com.mojang.minecraft.renderer.shader.impl.EntityShader;
 import com.mojang.minecraft.renderer.shader.impl.HudShader;
@@ -33,6 +35,7 @@ public class InventoryScreen extends GuiScreen {
     private final Inventory inventory;
     private final TextureManager textureManager;
     private final Font font;
+    private final HeldItemRenderer heldItemRenderer;
 
     private float screenWidth;
     private float screenHeight;
@@ -51,6 +54,7 @@ public class InventoryScreen extends GuiScreen {
     public InventoryScreen(TextureManager textureManager, Font font, Inventory inventory) {
         this.textureManager = textureManager;
         this.font = font;
+        this.heldItemRenderer = new HeldItemRenderer(textureManager.itemsTexture);
 
         this.player = new EntityPlayer(null, false);
         this.stackSizeSelectedItemLabel = new TextLabel(font, 0xFFFFFF, true);
@@ -145,7 +149,8 @@ public class InventoryScreen extends GuiScreen {
 
     private static final int INVENTORY_UI_WIDTH = 176;
     private static final int INVENTORY_UI_HEIGHT = 166;
-    private static final int ITEM_SIZE = 10;
+    private static final int BLOCK_ITEM_SCALE_FACTOR = 10;
+    private static final int HELD_ITEM_SCALE_FACTOR = 16;
 
     private static final int ITEM_SLOT_SIZE = 18;
 
@@ -194,13 +199,32 @@ public class InventoryScreen extends GuiScreen {
                     continue;
                 }
                 Item item = itemStack.getItem();
+                graphics.pushMatrix();
+                graphics.translate(slot.getItemRenderX(centerX), slot.getItemRenderY(centerY), 0);
                 if (item instanceof BlockItem) {
                     BlockItem blockItem = (BlockItem) item;
-                    graphics.pushMatrix();
-                    graphics.translate(slot.getItemRenderX(centerX), slot.getItemRenderY(centerY), 0);
-                    BlockRenderer.renderBlockPreview(graphics, blockItem.getBlock(), ITEM_SIZE);
-                    graphics.popMatrix();
+                    BlockRenderer.renderBlockPreview(graphics, blockItem.getBlock(), BLOCK_ITEM_SCALE_FACTOR);
                 }
+                graphics.popMatrix();
+            }
+
+            // set items texture
+            graphics.setTexture(textureManager.itemsTexture);
+            graphics.setShader(HUD_SHADER);
+
+            for (Slot slot : slots) {
+                ItemStack itemStack = slot.getItemStack();
+                if (itemStack == null) {
+                    continue;
+                }
+                Item item = itemStack.getItem();
+                graphics.pushMatrix();
+                graphics.translate(slot.getItemRenderX(centerX) - HELD_ITEM_SCALE_FACTOR / 2f, slot.getItemRenderY(centerY) - HELD_ITEM_SCALE_FACTOR, 0);
+                if (item instanceof HeldItem) {
+                    HeldItem blockItem = (HeldItem) item;
+                    heldItemRenderer.renderHeldItemPreview(graphics, blockItem, HELD_ITEM_SCALE_FACTOR);
+                }
+                graphics.popMatrix();
             }
         }
 
@@ -261,17 +285,25 @@ public class InventoryScreen extends GuiScreen {
         // draw selected item at cursor position
         {
             // set terrain texture again after drawing labels and the player
-            graphics.setShader(WORLD_SHADER);
-            graphics.setTexture(textureManager.terrainTexture);
 
             ItemStack selectedItem = inventory.getSelectedItem();
             if (selectedItem != null) {
                 Item item = selectedItem.getItem();
                 if (item instanceof BlockItem) {
+                    graphics.setShader(WORLD_SHADER);
+                    graphics.setTexture(textureManager.terrainTexture);
                     BlockItem blockItem = (BlockItem) item;
                     graphics.pushMatrix();
                     graphics.translate(mouseX, mouseY + ITEM_SLOT_SIZE / 2f, 0);
-                    BlockRenderer.renderBlockPreview(graphics, blockItem.getBlock(), ITEM_SIZE);
+                    BlockRenderer.renderBlockPreview(graphics, blockItem.getBlock(), BLOCK_ITEM_SCALE_FACTOR);
+                    graphics.popMatrix();
+                } else if (item instanceof HeldItem) {
+                    graphics.setShader(HUD_SHADER);
+                    graphics.setTexture(textureManager.itemsTexture);
+                    HeldItem heldItem = (HeldItem) item;
+                    graphics.pushMatrix();
+                    graphics.translate(mouseX - HELD_ITEM_SCALE_FACTOR / 2f, mouseY - HELD_ITEM_SCALE_FACTOR / 2f, 0);
+                    heldItemRenderer.renderHeldItemPreview(graphics, heldItem, HELD_ITEM_SCALE_FACTOR);
                     graphics.popMatrix();
                 }
             }
