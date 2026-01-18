@@ -27,4 +27,8 @@ public class GuiScreen implements Disposable {
      */
     public void onClose() {
     }
+
+    public enum Kind {
+        INVENTORY, CRAFTING
+    }
 }

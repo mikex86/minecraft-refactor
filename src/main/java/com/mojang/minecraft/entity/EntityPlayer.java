@@ -37,6 +37,8 @@ public class EntityPlayer extends EntityLiving {
     private boolean doubleTapSprintReady = false;
     private int sprintToggleTimer = 0;
 
+    public int hotbarSlotIndex = 0;
+
     /**
      * State whether this player instance is the local input-controlled player.
      */
@@ -404,7 +406,6 @@ public class EntityPlayer extends EntityLiving {
         this.breakingBlockY = 0;
         this.breakingBlockZ = 0;
         this.breakingBlock = false;
-        System.out.println("Resetting breaking block position");
     }
 
     public void setBreakingBlockPos(int x, int y, int z) {

@@ -3,6 +3,8 @@ package com.mojang.minecraft.input;
 import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.gui.scaling.ScaledResolution;
 import com.mojang.minecraft.gui.screen.GuiScreen;
+import com.mojang.minecraft.gui.screen.InventoryScreen;
+import com.mojang.minecraft.gui.screen.ScreenManager;
 import com.mojang.minecraft.item.BlockItem;
 import com.mojang.minecraft.item.Item;
 import com.mojang.minecraft.item.ItemStack;
@@ -18,14 +20,12 @@ import com.mojang.minecraft.world.HitResult;
  * This separates input handling logic from the main game class.
  */
 public class GameInputHandler {
-    // Reference to low-level input handler
     private final InputHandler inputHandler;
+    private final ScreenManager screenManager;
 
     // Input state
     private boolean mouseGrabbed = false;
     private final int yMouseAxis = 1;  // Controls if mouse Y axis is inverted
-
-    private int hotbarSlotIndex = 0;
 
     // Game references needed for input processing
     private final EntityPlayer player;
@@ -56,11 +56,13 @@ public class GameInputHandler {
      */
     public GameInputHandler(
             InputHandler inputHandler,
+            ScreenManager screenManager,
             EntityPlayer player,
             Level level,
             ParticleEngine particleEngine,
             boolean fullscreen) {
         this.inputHandler = inputHandler;
+        this.screenManager = screenManager;
         this.player = player;
         this.level = level;
         this.fullscreen = fullscreen;
@@ -109,9 +111,12 @@ public class GameInputHandler {
             boolean pressed = event.isPressed();
 
             if (pressed) {
-                // Escape key - release mouse in windowed mode
-                if (key == InputHandler.Keys.KEY_ESCAPE && !this.fullscreen) {
-                    this.releaseMouse();
+                if (key == InputHandler.Keys.KEY_ESCAPE) {
+                    if (this.currentScreen != null) {
+                        closeScreen();
+                    } else {
+                        releaseMouse();
+                    }
                 }
 
                 // Enter key - save level
@@ -121,35 +126,44 @@ public class GameInputHandler {
 
                 // Block selection keys
                 if (key == InputHandler.Keys.KEY_1) {
-                    hotbarSlotIndex = 0;
+                    player.hotbarSlotIndex = 0;
                 }
                 if (key == InputHandler.Keys.KEY_2) {
-                    hotbarSlotIndex = 1;
+                    player.hotbarSlotIndex = 1;
                 }
                 if (key == InputHandler.Keys.KEY_3) {
-                    hotbarSlotIndex = 2;
+                    player.hotbarSlotIndex = 2;
                 }
                 if (key == InputHandler.Keys.KEY_4) {
-                    hotbarSlotIndex = 3;
+                    player.hotbarSlotIndex = 3;
                 }
                 if (key == InputHandler.Keys.KEY_5) {
-                    hotbarSlotIndex = 4;
+                    player.hotbarSlotIndex = 4;
                 }
                 if (key == InputHandler.Keys.KEY_6) {
-                    hotbarSlotIndex = 5;
+                    player.hotbarSlotIndex = 5;
                 }
                 if (key == InputHandler.Keys.KEY_7) {
-                    hotbarSlotIndex = 6;
+                    player.hotbarSlotIndex = 6;
                 }
                 if (key == InputHandler.Keys.KEY_8) {
-                    hotbarSlotIndex = 7;
+                    player.hotbarSlotIndex = 7;
                 }
                 if (key == InputHandler.Keys.KEY_9) {
-                    hotbarSlotIndex = 8;
+                    player.hotbarSlotIndex = 8;
                 }
 
                 if (key == InputHandler.Keys.KEY_E) {
-                    this.player.toggleInventory();
+                    if (this.currentScreen == null || this.currentScreen instanceof InventoryScreen) {
+                        this.player.toggleInventory();
+                        if (this.player.isInventoryOpen()) {
+                            this.openScreen(GuiScreen.Kind.INVENTORY);
+                        } else {
+                            this.closeScreen();
+                        }
+                    } else {
+                        this.closeScreen();
+                    }
                 }
             }
         }
@@ -205,14 +219,14 @@ public class GameInputHandler {
         if (currentScreen == null) {
             // process hotbar scroll
             if (scrollDelta < 0) {
-                this.hotbarSlotIndex += 1;
+                this.player.hotbarSlotIndex += 1;
             } else if (scrollDelta > 0) {
-                this.hotbarSlotIndex -= 1;
+                this.player.hotbarSlotIndex -= 1;
             }
             int hotBarSize = player.getInventory().getHotbarSize();
-            this.hotbarSlotIndex %= hotBarSize;
-            if (this.hotbarSlotIndex < 0) {
-                this.hotbarSlotIndex += hotBarSize;
+            this.player.hotbarSlotIndex %= hotBarSize;
+            if (this.player.hotbarSlotIndex < 0) {
+                this.player.hotbarSlotIndex += hotBarSize;
             }
         }
 
@@ -294,40 +308,62 @@ public class GameInputHandler {
                 return false;
             }
 
-            // Build mode
             int x = hitResult.x;
             int y = hitResult.y;
             int z = hitResult.z;
 
-            // Adjust coordinates based on which face was hit
-            if (hitResult.face == 0) {
-                --y; // Bottom face
-            } else if (hitResult.face == 1) {
-                ++y; // Top face
-            } else if (hitResult.face == 2) {
-                --z; // North face
-            } else if (hitResult.face == 3) {
-                ++z; // South face
-            } else if (hitResult.face == 4) {
-                --x; // West face
-            } else if (hitResult.face == 5) {
-                ++x; // East face
+            // check if block at hit result is an interactable block
+            BlockState blockState = this.level.getBlockState(x, y, z);
+            assert blockState != null; // this should never happen
+            if (blockState.block.isInteractable()) {
+                // check if is crafting table
+                if (blockState.block.getId() == Blocks.craftingTable.getId()) {
+                    openScreen(GuiScreen.Kind.CRAFTING);
+                    return true;
+                } else {
+                    throw new IllegalStateException("No right click handling code for interactable block " + blockState.block + " exists");
+                }
+            } else {
+                return this.placeBlock(hitResult);
             }
 
-            // Check if we can place a block here
-            BlockState blockState = this.level.getBlockState(x, y, z);
-            AABB aabb = (blockState == null ? Blocks.rock : blockState.block).getAABB(x, y, z);
-            ItemStack itemStack = this.player.getInventory().getHotbarItem(this.hotbarSlotIndex);
-            if (itemStack != null) {
-                Item item = itemStack.getItem();
-                if (item instanceof BlockItem) {
-                    BlockItem blockItem = (BlockItem) item;
-                    if (this.level.isFreeFromEntities(aabb)) {
-                        this.level.setBlockState(x, y, z, blockItem.getBlock().getBlockState(hitResult.facingDirection), true);
-                        this.player.getInventory().decreaseHotbarItem(this.hotbarSlotIndex, 1);
-                        this.player.swing();
-                        return true;
-                    }
+        }
+        return false;
+    }
+
+    private boolean placeBlock(HitResult hitResult) {
+        int x = hitResult.x;
+        int y = hitResult.y;
+        int z = hitResult.z;
+
+        // Adjust coordinates based on which face was hit
+        if (hitResult.face == 0) {
+            --y; // Bottom face
+        } else if (hitResult.face == 1) {
+            ++y; // Top face
+        } else if (hitResult.face == 2) {
+            --z; // North face
+        } else if (hitResult.face == 3) {
+            ++z; // South face
+        } else if (hitResult.face == 4) {
+            --x; // West face
+        } else if (hitResult.face == 5) {
+            ++x; // East face
+        }
+
+        // Check if we can place a block here
+        BlockState blockState = this.level.getBlockState(x, y, z);
+        AABB aabb = (blockState == null ? Blocks.rock : blockState.block).getAABB(x, y, z);
+        ItemStack itemStack = this.player.getInventory().getHotbarItem(this.player.hotbarSlotIndex);
+        if (itemStack != null) {
+            Item item = itemStack.getItem();
+            if (item instanceof BlockItem) {
+                BlockItem blockItem = (BlockItem) item;
+                if (this.level.isFreeFromEntities(aabb)) {
+                    this.level.setBlockState(x, y, z, blockItem.getBlock().getBlockState(hitResult.facingDirection), true);
+                    this.player.getInventory().decreaseHotbarItem(this.player.hotbarSlotIndex, 1);
+                    this.player.swing();
+                    return true;
                 }
             }
         }
@@ -395,14 +431,20 @@ public class GameInputHandler {
         }
     }
 
-    /**
-     * @return the current hotbar slot index
-     */
-    public int getHotbarSlotIndex() {
-        return hotbarSlotIndex;
+    public void openScreen(GuiScreen.Kind screenKind) {
+        GuiScreen screen = this.screenManager.openScreen(screenKind);
+        int width = this.screenManager.lastWidth, height = this.screenManager.lastHeight;
+        setLockMouseReleased(true);
+        releaseMouse();
+        setMousePosition(width / 2f, height / 2f);
+
+        this.currentScreen = screen;
     }
 
-    public void setCurrentScreen(GuiScreen screen) {
-        this.currentScreen = screen;
+    public void closeScreen() {
+        this.screenManager.closeScreen();
+        this.currentScreen = null;
+        setLockMouseReleased(false);
+        grabMouse();
     }
 }

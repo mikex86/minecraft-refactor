@@ -6,8 +6,6 @@ import com.mojang.minecraft.gui.Font;
 import com.mojang.minecraft.gui.TextLabel;
 import com.mojang.minecraft.gui.scaling.ScaledResolution;
 import com.mojang.minecraft.gui.screen.GuiScreen;
-import com.mojang.minecraft.gui.screen.InventoryScreen;
-import com.mojang.minecraft.input.GameInputHandler;
 import com.mojang.minecraft.item.BlockItem;
 import com.mojang.minecraft.item.HeldItem;
 import com.mojang.minecraft.item.Item;
@@ -58,21 +56,20 @@ public class GameRenderer implements Disposable {
     private final Level level;
 
     // Font renderer
-    private final Font font;
+    public final Font font;
 
     // Game components
     private final LevelRenderer levelRenderer;
     private final ParticleEngine particleEngine;
-    private final GameInputHandler gameInputHandler;
     private final EntityPlayer player;
-    private final HeldItemRenderer heldItemRenderer;
+    public final HeldItemRenderer heldItemRenderer;
 
     // Window dimensions
-    private int width;
-    private int height;
+    public int width;
+    public int height;
 
     // The current gui screen (if any)
-    private GuiScreen currentScreen;
+    public GuiScreen currentScreen;
 
     private final TextLabel versionStringLabel;
     private final TextLabel fpsStringLabel;
@@ -87,7 +84,6 @@ public class GameRenderer implements Disposable {
      *
      * @param textureManager   The texture manager
      * @param shaderRegistry   The shader registry
-     * @param gameInputHandler The game input handler
      * @param level            The level
      * @param levelRenderer    The level renderer
      * @param particleEngine   The particle engine
@@ -95,7 +91,7 @@ public class GameRenderer implements Disposable {
      * @param width            The initial window width
      * @param height           The initial window height
      */
-    public GameRenderer(TextureManager textureManager, ShaderRegistry shaderRegistry, GameInputHandler gameInputHandler,
+    public GameRenderer(TextureManager textureManager, ShaderRegistry shaderRegistry,
                         Level level, LevelRenderer levelRenderer,
                         ParticleEngine particleEngine, EntityPlayer player, int width, int height) {
         // Get graphics API instance
@@ -104,7 +100,6 @@ public class GameRenderer implements Disposable {
         this.textureManager = textureManager;
         this.level = level;
         this.levelRenderer = levelRenderer;
-        this.gameInputHandler = gameInputHandler;
         this.particleEngine = particleEngine;
         this.player = player;
         this.width = width;
@@ -267,7 +262,7 @@ public class GameRenderer implements Disposable {
 
         // Render HUD elements
         {
-            drawUI(graphics, debugStrings, gameInputHandler, partialTicks);
+            drawUI(graphics, debugStrings, partialTicks);
         }
     }
 
@@ -279,7 +274,7 @@ public class GameRenderer implements Disposable {
      */
     private void renderHeldItem(float partialTicks) {
         float aspectRatio = (float) (this.width) / this.height;
-        int hotbarItem = gameInputHandler.getHotbarSlotIndex();
+        int hotbarItem = player.hotbarSlotIndex;
         ItemStack itemStack = player.getInventory().getHotbarItem(hotbarItem);
         if (itemStack == null) {
             return;
@@ -659,10 +654,9 @@ public class GameRenderer implements Disposable {
      *
      * @param graphics         The graphics api
      * @param debugStrings     the debug strings to display
-     * @param gameInputHandler The game input handler
      * @param partialTicks     The partial ticks for animation
      */
-    private void drawUI(GraphicsAPI graphics, String[] debugStrings, GameInputHandler gameInputHandler, float partialTicks) {
+    private void drawUI(GraphicsAPI graphics, String[] debugStrings, float partialTicks) {
         graphics.setShader(hudShader);
 
         // disable depth test
@@ -683,18 +677,8 @@ public class GameRenderer implements Disposable {
 
         drawDebugText(graphics, debugStrings);
 
-        if (player.isInventoryOpen()) {
-            if (currentScreen == null) {
-                openScreen(new InventoryScreen(textureManager, font, player.getInventory()));
-            }
-        } else {
-            if (currentScreen != null) {
-                closeScreen();
-            }
-        }
-
         // Draw hotbar
-        drawHotbar(graphics, scaledWidth, scaledHeight, gameInputHandler.getHotbarSlotIndex());
+        drawHotbar(graphics, scaledWidth, scaledHeight, player.hotbarSlotIndex);
 
         graphics.setBlendState(false, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
 
@@ -714,12 +698,6 @@ public class GameRenderer implements Disposable {
     }
 
     public void openScreen(GuiScreen screen) {
-        if (this.currentScreen == null) {
-            this.gameInputHandler.setLockMouseReleased(true);
-            this.gameInputHandler.releaseMouse();
-            this.gameInputHandler.setMousePosition(this.width / 2f, this.height / 2f);
-        }
-        this.gameInputHandler.setCurrentScreen(screen);
         this.currentScreen = screen;
         this.currentScreen.onResized(this.width, this.height);
     }
@@ -729,9 +707,6 @@ public class GameRenderer implements Disposable {
             this.currentScreen.onClose();
             this.currentScreen.dispose();
             this.currentScreen = null;
-            this.gameInputHandler.setCurrentScreen(null);
-            this.gameInputHandler.setLockMouseReleased(false);
-            this.gameInputHandler.grabMouse();
         }
     }
 

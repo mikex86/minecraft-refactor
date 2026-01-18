@@ -30,6 +30,7 @@ public class TextureManager implements Disposable {
     public Texture fontTexture;
     public Texture guiTexture;
     public Texture inventoryTexture;
+    public Texture craftingTexture;
 
     public void loadTextures() {
         charTexture = loadTexture("/char.png", Texture.FilterMode.NEAREST);
@@ -38,6 +39,7 @@ public class TextureManager implements Disposable {
         fontTexture = loadTexture("/default.gif", Texture.FilterMode.NEAREST);
         guiTexture = loadTexture("/gui.png", Texture.FilterMode.NEAREST);
         inventoryTexture = loadTexture("/inventory.png", Texture.FilterMode.NEAREST);
+        craftingTexture = loadTexture("/crafting.png", Texture.FilterMode.NEAREST);
     }
 
     private Texture loadTexture(String resourcePath, Texture.FilterMode filterMode) {

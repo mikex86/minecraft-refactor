@@ -66,7 +66,7 @@ public class Blocks {
     /**
      * Crafting table block
      */
-    public static final Block craftingTable = new CraftingTableBlock();
+    public static final Block craftingTable = new CraftingTableBlock().setInteractable(true);
 
     static {
         globalPalette = new BlockStatePalette(getValidBlockStates());

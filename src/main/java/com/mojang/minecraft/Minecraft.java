@@ -3,6 +3,7 @@ package com.mojang.minecraft;
 import com.mojang.minecraft.crash.CrashReporter;
 import com.mojang.minecraft.engine.GameEngine;
 import com.mojang.minecraft.entity.EntityPlayer;
+import com.mojang.minecraft.gui.screen.ScreenManager;
 import com.mojang.minecraft.input.GameInputHandler;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.state.BlockState;
@@ -29,6 +30,8 @@ public class Minecraft implements Runnable {
     private final ShaderRegistry shaderRegistry;
     private GameInputHandler gameInputHandler;
     private GameRenderer renderer;
+    private ScreenManager screenManager;
+
 
     // Game state
     private GameState gameState;
@@ -38,6 +41,7 @@ public class Minecraft implements Runnable {
 
     // Game flags
     private volatile boolean running = false;
+
 
     /**
      * Creates a new Minecraft game instance.
@@ -72,26 +76,28 @@ public class Minecraft implements Runnable {
             this.gameState = new GameState(this.textureManager);
             this.gameState.initialize();
 
-            // Initialize game input handler
-            this.gameInputHandler = new GameInputHandler(
-                    engine.getInputHandler(),
-                    gameState.getPlayer(),
-                    gameState.getLevel(),
-                    gameState.getParticleEngine(),
-                    engine.isFullscreen()
-            );
-
             // Create renderer
             this.renderer = new GameRenderer(
                     this.textureManager,
                     this.shaderRegistry,
-                    this.gameInputHandler,
                     this.gameState.getLevel(),
                     gameState.getLevelRenderer(),
                     gameState.getParticleEngine(),
                     gameState.getPlayer(),
                     engine.getWidth(),
                     engine.getHeight()
+            );
+
+            this.screenManager = new ScreenManager(gameState.getPlayer(), this.textureManager, this.renderer);
+
+            // Initialize game input handler
+            this.gameInputHandler = new GameInputHandler(
+                    engine.getInputHandler(),
+                    this.screenManager,
+                    gameState.getPlayer(),
+                    gameState.getLevel(),
+                    gameState.getParticleEngine(),
+                    engine.isFullscreen()
             );
 
             this.engine.postInit();

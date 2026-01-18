@@ -34,10 +34,15 @@ public class Block {
     private static int idctr = 0;
 
     /**
+     * Whether the block can be interacted with via right click
+     */
+    private boolean interactable = false;
+
+    /**
      * Creates a new tile with the specified ID and texture.
      *
      * @param name The unique, untranslated name key of the tile.
-     * @param tex The texture index
+     * @param tex  The texture index
      */
     protected Block(String name, int tex) {
         this.name = name;
@@ -50,7 +55,7 @@ public class Block {
      * Renders the tile in the world.
      *
      * @param t                   The tesselator for rendering
-     * @param currentSection             The current chunk section
+     * @param currentSection      The current chunk section
      * @param neighboringSections The neighboring sections. Layout:
      *                            Layout:
      *                            [0]: neighborSectionNX: (-1, 0, 0)
@@ -470,6 +475,11 @@ public class Block {
         t.vertexUV(v3x, v3y, v3z, v3u, v3v);
     }
 
+    public Block setInteractable(boolean interactable) {
+        this.interactable = interactable;
+        return this;
+    }
+
     /**
      * Gets the tile's bounding box with standard dimensions.
      *
@@ -590,5 +600,9 @@ public class Block {
 
     public int getId() {
         return id;
+    }
+
+    public boolean isInteractable() {
+        return interactable;
     }
 }

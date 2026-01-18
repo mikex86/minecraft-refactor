@@ -52,7 +52,7 @@ public class Inventory {
         inventorySlots[0][0] = new ItemStack(BlockItems.grass, 4);
         inventorySlots[1][1] = new ItemStack(BlockItems.stoneBrick, 2);
         inventorySlots[2][2] = new ItemStack(BlockItems.glass, 2);
-        inventorySlots[2][4] = new ItemStack(Items.diamondSword, 1);
+        inventorySlots[2][4] = new ItemStack(Items.diamond, 1);
     }
 
     public Inventory() {

@@ -36,7 +36,7 @@ public class GameEngine {
     private long lastFpsUpdateTime = 0;
     private int framesCounter = 0;
 
-    private static final int MAX_FPS = -1;
+    private static final int MAX_FPS = 120;
     private int yieldThresholdNs = 1_000;
 
     private final int[] yieldDurations = new int[1024];
