@@ -5,6 +5,13 @@ import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 
 public class GuiScreen implements Disposable {
 
+    /**
+     * Called when the gui screen opens. This is always the first method ever to be invoked on a freshly created instance.
+     * No other virtual method may ever run first before onInit.
+     */
+    public void onInit() {
+    }
+
     public void drawScreen(GraphicsAPI graphics, float screenWidth, float screenHeight, float partialTicks) {
     }
 

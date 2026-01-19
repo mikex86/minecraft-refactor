@@ -18,7 +18,10 @@ public class InventoryScreen extends AbstractInventoryScreen {
 
     public InventoryScreen(TextureManager textureManager, HeldItemRenderer heldItemRenderer, Font font, Inventory inventory) {
         super(textureManager, heldItemRenderer, font, inventory);
+    }
 
+    @Override
+    public void onInit() {
         addMainInventorySlots();
         addHotbarSlots();
         addPortableCraftingSlots();
@@ -48,6 +51,11 @@ public class InventoryScreen extends AbstractInventoryScreen {
 
         this.screenWidth = screenWidth;
         this.screenHeight = screenHeight;
+    }
+
+    @Override
+    public void onClose() {
+        inventory.resetCrafting(Inventory.CraftingKind.PORTABLE);
     }
 
     private void drawPlayerModel(GraphicsAPI graphics, float partialTicks, float centerX, float centerY) {
@@ -88,8 +96,8 @@ public class InventoryScreen extends AbstractInventoryScreen {
     }
 
     protected void addPortableCraftingSlots() {
-        int craftingRows = inventory.getCraftingRowCount();
-        int craftingColumns = inventory.getCraftingColumnCount();
+        int craftingRows = inventory.getCraftingRowCount(Inventory.CraftingKind.PORTABLE);
+        int craftingColumns = inventory.getCraftingColumnCount(Inventory.CraftingKind.PORTABLE);
         if (craftingRows == 0 || craftingColumns == 0) {
             return;
         }
@@ -102,9 +110,9 @@ public class InventoryScreen extends AbstractInventoryScreen {
                 float slotOffsetY = bottomRowOffsetY - ITEM_SLOT_SIZE * (craftingRows - 1 - row);
                 final int craftingRow = row;
                 final int craftingColumn = column;
-                this.slots.add(new Slot(() -> inventory.getCraftingItem(craftingRow, craftingColumn),
-                        () -> inventory.clickCraftingItem(craftingRow, craftingColumn),
-                        () -> inventory.placeSingleCraftingItem(craftingRow, craftingColumn),
+                this.slots.add(new Slot(() -> inventory.getCraftingItem(Inventory.CraftingKind.PORTABLE, craftingRow, craftingColumn),
+                        () -> inventory.clickCraftingItem(Inventory.CraftingKind.PORTABLE, craftingRow, craftingColumn),
+                        () -> inventory.placeSingleCraftingItem(Inventory.CraftingKind.PORTABLE, craftingRow, craftingColumn),
                         slotOffsetX, slotOffsetY));
             }
         }
@@ -115,7 +123,7 @@ public class InventoryScreen extends AbstractInventoryScreen {
         float craftingHeight = ITEM_SLOT_SIZE * craftingRows;
         float resultSlotOffsetY = craftingTopY + craftingHeight / 2f - ITEM_SLOT_SIZE / 2f;
         this.slots.add(new Slot(inventory::getCraftingResultItem,
-                inventory::clickCraftingResultItem,
+                () -> inventory.clickCraftingResultItem(Inventory.CraftingKind.PORTABLE),
                 null,
                 resultSlotOffsetX, resultSlotOffsetY));
     }

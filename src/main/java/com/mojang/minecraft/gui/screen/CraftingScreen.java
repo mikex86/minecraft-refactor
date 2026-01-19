@@ -5,7 +5,6 @@ import com.mojang.minecraft.gui.screen.renderer.InventoryItemRenderer;
 import com.mojang.minecraft.item.inventory.Inventory;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
-import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
 
 public class CraftingScreen extends AbstractInventoryScreen {
@@ -14,23 +13,20 @@ public class CraftingScreen extends AbstractInventoryScreen {
 
     public CraftingScreen(TextureManager textureManager, HeldItemRenderer heldItemRenderer, Font font, Inventory inventory) {
         super(textureManager, heldItemRenderer, font, inventory);
+    }
 
+    @Override
+    public void onInit() {
         addMainInventorySlots();
         addHotbarSlots();
         addCraftingSlots();
     }
-
 
     @Override
     public void onMouseMove(float mouseX, float mouseY, float dX, float dY) {
         this.mouseX = mouseX;
         this.mouseY = mouseY;
     }
-
-    private IndexedMesh inventoryQuadMesh;
-
-    private static final int INVENTORY_UI_WIDTH = 176;
-    private static final int INVENTORY_UI_HEIGHT = 166;
 
     @Override
     public void drawScreen(GraphicsAPI graphics, float screenWidth, float screenHeight, float partialTicks) {
@@ -46,7 +42,6 @@ public class CraftingScreen extends AbstractInventoryScreen {
 
         drawInventoryScreenBackground(graphics, centerX, centerY, textureManager.craftingTexture);
 
-
         InventoryItemRenderer.renderInventoryItems(graphics, textureManager, heldItemRenderer, this, centerX, centerY);
         InventoryItemRenderer.drawSelectedItem(graphics, textureManager, heldItemRenderer, inventory, mouseX, mouseY, stackSizeSelectedItemLabel);
 
@@ -54,7 +49,41 @@ public class CraftingScreen extends AbstractInventoryScreen {
         this.screenHeight = screenHeight;
     }
 
-    private void addCraftingSlots() {
+    @Override
+    public void onClose() {
+        inventory.resetCrafting(Inventory.CraftingKind.TABLE);
+    }
 
+    protected void addCraftingSlots() {
+        int craftingRows = inventory.getCraftingRowCount(Inventory.CraftingKind.TABLE);
+        int craftingColumns = inventory.getCraftingColumnCount(Inventory.CraftingKind.TABLE);
+        if (craftingRows == 0 || craftingColumns == 0) {
+            return;
+        }
+        float fourthColumnLeft = BASE_X + 4;
+        float craftingStartX = fourthColumnLeft + ITEM_SLOT_SIZE + 8;
+        float bottomRowOffsetY = -(13f + ITEM_SLOT_SIZE);
+        for (int row = 0; row < craftingRows; row++) {
+            for (int column = 0; column < craftingColumns; column++) {
+                float slotOffsetX = craftingStartX + ITEM_SLOT_SIZE * column;
+                float slotOffsetY = bottomRowOffsetY - ITEM_SLOT_SIZE * (craftingRows - 1 - row);
+                final int craftingRow = row;
+                final int craftingColumn = column;
+                this.slots.add(new Slot(() -> inventory.getCraftingItem(Inventory.CraftingKind.TABLE, craftingRow, craftingColumn),
+                        () -> inventory.clickCraftingItem(Inventory.CraftingKind.TABLE, craftingRow, craftingColumn),
+                        () -> inventory.placeSingleCraftingItem(Inventory.CraftingKind.TABLE, craftingRow, craftingColumn),
+                        slotOffsetX, slotOffsetY));
+            }
+        }
+
+        float craftingGridWidth = ITEM_SLOT_SIZE * craftingColumns;
+        float resultSlotOffsetX = craftingStartX + craftingGridWidth + 40;
+        float craftingTopY = bottomRowOffsetY - ITEM_SLOT_SIZE * (craftingRows - 1);
+        float craftingHeight = ITEM_SLOT_SIZE * craftingRows;
+        float resultSlotOffsetY = craftingTopY + craftingHeight / 2f - ITEM_SLOT_SIZE / 2f;
+        this.slots.add(new Slot(inventory::getCraftingResultItem,
+                () -> inventory.clickCraftingResultItem(Inventory.CraftingKind.TABLE),
+                null,
+                resultSlotOffsetX, resultSlotOffsetY));
     }
 }

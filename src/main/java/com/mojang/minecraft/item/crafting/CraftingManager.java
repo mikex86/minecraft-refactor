@@ -1,9 +1,6 @@
 package com.mojang.minecraft.item.crafting;
 
-import com.mojang.minecraft.item.BlockItem;
-import com.mojang.minecraft.item.BlockItems;
-import com.mojang.minecraft.item.Item;
-import com.mojang.minecraft.item.ItemStack;
+import com.mojang.minecraft.item.*;
 import com.mojang.minecraft.level.block.Blocks;
 
 import java.util.ArrayList;
@@ -40,16 +37,22 @@ public final class CraftingManager {
     }
 
     private void registerDefaultRecipes() {
-        Item wood = BlockItems.wood;
         ItemStack planksOutput = new ItemStack(BlockItems.planks, 4);
-        addRecipe(new ShapelessCraftingRecipe(planksOutput, Collections.singletonList(wood)));
+        addRecipe(new ShapelessCraftingRecipe(planksOutput, Collections.singletonList(BlockItems.wood)));
 
-        Item plankItem = BlockItems.planks;
-        Item[][] craftingTablePattern = new Item[][]{
-                {plankItem, plankItem},
-                {plankItem, plankItem}
-        };
-        ItemStack craftingTableOutput = new ItemStack(BlockItems.craftingTable, 1);
-        addRecipe(new ShapedCraftingRecipe(craftingTableOutput, craftingTablePattern));
+        addRecipe(new ShapedCraftingRecipe(new ItemStack(BlockItems.craftingTable, 1), new Item[][]{
+                {BlockItems.planks, BlockItems.planks},
+                {BlockItems.planks, BlockItems.planks}
+        }));
+        addRecipe(new ShapedCraftingRecipe(new ItemStack(Items.stick, 4), new Item[][]{
+                {BlockItems.planks},
+                {BlockItems.planks}
+        }));
+
+        addRecipe(new ShapedCraftingRecipe(new ItemStack(Items.diamondSword, 1), new Item[][]{
+                {Items.diamond},
+                {Items.diamond},
+                {Items.stick}
+        }));
     }
 }

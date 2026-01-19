@@ -1,6 +1,6 @@
 package com.mojang.minecraft.entity;
 
-import com.mojang.minecraft.item.Item;
+import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.item.inventory.Inventory;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.state.BlockState;
@@ -10,11 +10,12 @@ import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.model.Model;
 import com.mojang.minecraft.renderer.model.ModelRegistry;
 import com.mojang.minecraft.renderer.model.impl.PlayerModel;
-import com.mojang.minecraft.world.HitResult;
 import com.mojang.minecraft.util.math.MathUtils;
+import com.mojang.minecraft.world.HitResult;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Queue;
 import java.util.Random;
 
 import static java.lang.Math.abs;
@@ -120,7 +121,7 @@ public class EntityPlayer extends EntityLiving {
      * @param sprinting Whether the sprinting key is pressed
      */
     public void setInput(boolean forward, boolean back, boolean left, boolean right, boolean jump, boolean sneak, boolean sprinting) {
-        if (this.inventoryOpen) {
+        if (this.screenOpen) {
             return;
         }
         boolean wasForward = this.forward;
@@ -171,7 +172,7 @@ public class EntityPlayer extends EntityLiving {
         float xa = 0.0F; // X movement input
         float ya = 0.0F; // Z movement input (forward/backward)
 
-        if (!this.inventoryOpen) {
+        if (!this.screenOpen) {
             // Apply movement based on input state
             if (forward) {
                 --ya;
@@ -384,11 +385,11 @@ public class EntityPlayer extends EntityLiving {
     /**
      * Attempts to pick up an item.
      *
-     * @param item The item to pick up
+     * @param itemStack The item to pick up
      * @return true if the item was picked up, false otherwise
      */
-    public boolean attemptPickupItem(Item item) {
-        return inventory.addItem(item, true);
+    public boolean attemptPickupItem(ItemStack itemStack) {
+        return inventory.addItem(itemStack, true);
     }
 
     /**
@@ -679,25 +680,47 @@ public class EntityPlayer extends EntityLiving {
         return inventory;
     }
 
-    private boolean inventoryOpen = false;
+    private boolean screenOpen = false;
 
-    public void toggleInventory() {
-        if (!this.inventoryOpen) {
-            this.inventoryOpen = true;
-            this.sprinting = false;
-            this.forward = false;
-            this.back = false;
-            this.left = false;
-            this.right = false;
-            this.jump = false;
-            this.sneak = false;
-        } else {
-            this.inventoryOpen = false;
+    public void openScreen() {
+        this.screenOpen = true;
+        this.sprinting = false;
+        this.forward = false;
+        this.back = false;
+        this.left = false;
+        this.right = false;
+        this.jump = false;
+        this.sneak = false;
+    }
+
+    public void closeScreen() {
+        this.screenOpen = false;
+        Queue<ItemStack> pendingItemsToDrop = inventory.getPendingItemsToDrop();
+
+        while (!pendingItemsToDrop.isEmpty()) {
+            ItemStack itemStack = pendingItemsToDrop.remove();
+            dropItem(itemStack);
         }
     }
 
-    public boolean isInventoryOpen() {
-        return inventoryOpen;
+    private void dropItem(ItemStack itemStack) {
+        EntityItem entityItem = new EntityItem(level, itemStack);
+        entityItem.setPosition(x, y, z);
+        float yawRadians = this.yaw * ((float) Math.PI / 180.0F);
+        float sin = (float) Math.sin(yawRadians);
+        float cos = (float) Math.cos(yawRadians);
+        float xd = sin * 0.2F;
+        float zd = cos * 0.2F;
+
+        // TODO: revisit this
+        entityItem.xd = xd;
+        entityItem.yd = 0;
+        entityItem.zd = zd;
+        level.spawnEntity(entityItem);
+    }
+
+    public boolean isScreenOpen() {
+        return screenOpen;
     }
 
     /**

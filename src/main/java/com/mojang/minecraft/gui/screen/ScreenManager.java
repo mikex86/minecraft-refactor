@@ -32,7 +32,7 @@ public class ScreenManager {
                 throw new IllegalArgumentException("Unknown gui screen kind provided: " + kind);
             }
         }
-        gameRenderer.openScreen(screen);
+        this.gameRenderer.openScreen(screen);
         this.lastWidth = gameRenderer.width;
         this.lastHeight = gameRenderer.height;
         return screen;

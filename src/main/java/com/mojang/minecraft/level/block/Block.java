@@ -1,7 +1,10 @@
 package com.mojang.minecraft.level.block;
 
 import com.mojang.minecraft.entity.EntityItem;
+import com.mojang.minecraft.item.BlockItem;
 import com.mojang.minecraft.item.BlockItems;
+import com.mojang.minecraft.item.Item;
+import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.level.chunk.Chunk;
@@ -565,7 +568,8 @@ public class Block {
                 }
             }
         }
-        EntityItem entityItem = new EntityItem(level, BlockItems.getBlockItemForBlockOrNull(this));
+        BlockItem blockItem = BlockItems.getBlockItemForBlockOrNull(this);
+        EntityItem entityItem = new EntityItem(level, new ItemStack(blockItem, 1));
         entityItem.setPosition(x + 0.25f, y + 0.01f, z + 0.25f);
         entityItem.xd = (float) (ThreadLocalRandom.current().nextGaussian() * 0.05F);
         entityItem.yd = (float) (ThreadLocalRandom.current().nextGaussian() * 0.05F + 0.2F);

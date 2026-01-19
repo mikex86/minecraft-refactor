@@ -3,7 +3,6 @@ package com.mojang.minecraft.input;
 import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.gui.scaling.ScaledResolution;
 import com.mojang.minecraft.gui.screen.GuiScreen;
-import com.mojang.minecraft.gui.screen.InventoryScreen;
 import com.mojang.minecraft.gui.screen.ScreenManager;
 import com.mojang.minecraft.item.BlockItem;
 import com.mojang.minecraft.item.Item;
@@ -154,13 +153,8 @@ public class GameInputHandler {
                 }
 
                 if (key == InputHandler.Keys.KEY_E) {
-                    if (this.currentScreen == null || this.currentScreen instanceof InventoryScreen) {
-                        this.player.toggleInventory();
-                        if (this.player.isInventoryOpen()) {
-                            this.openScreen(GuiScreen.Kind.INVENTORY);
-                        } else {
-                            this.closeScreen();
-                        }
+                    if (!this.player.isScreenOpen()) {
+                        this.openScreen(GuiScreen.Kind.INVENTORY);
                     } else {
                         this.closeScreen();
                     }
@@ -434,11 +428,14 @@ public class GameInputHandler {
     public void openScreen(GuiScreen.Kind screenKind) {
         GuiScreen screen = this.screenManager.openScreen(screenKind);
         int width = this.screenManager.lastWidth, height = this.screenManager.lastHeight;
+
         setLockMouseReleased(true);
         releaseMouse();
         setMousePosition(width / 2f, height / 2f);
 
         this.currentScreen = screen;
+
+        this.player.openScreen();
     }
 
     public void closeScreen() {
@@ -446,5 +443,7 @@ public class GameInputHandler {
         this.currentScreen = null;
         setLockMouseReleased(false);
         grabMouse();
+
+        this.player.closeScreen();
     }
 }

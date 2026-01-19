@@ -72,6 +72,7 @@ public class ShapedCraftingRecipe implements CraftingRecipe {
                 }
                 int gridRow = row + match.getOffsetRow();
                 int gridColumn = column + match.getOffsetColumn();
+
                 ItemStack stack = grid[gridRow][gridColumn];
                 if (stack != null) {
                     stack.decreaseAmount(1);

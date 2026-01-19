@@ -82,14 +82,14 @@ public class GameRenderer implements Disposable {
     /**
      * Creates a new graphics renderer.
      *
-     * @param textureManager   The texture manager
-     * @param shaderRegistry   The shader registry
-     * @param level            The level
-     * @param levelRenderer    The level renderer
-     * @param particleEngine   The particle engine
-     * @param player           The player
-     * @param width            The initial window width
-     * @param height           The initial window height
+     * @param textureManager The texture manager
+     * @param shaderRegistry The shader registry
+     * @param level          The level
+     * @param levelRenderer  The level renderer
+     * @param particleEngine The particle engine
+     * @param player         The player
+     * @param width          The initial window width
+     * @param height         The initial window height
      */
     public GameRenderer(TextureManager textureManager, ShaderRegistry shaderRegistry,
                         Level level, LevelRenderer levelRenderer,
@@ -652,9 +652,9 @@ public class GameRenderer implements Disposable {
     /**
      * Draws all UI elements, including the hotbar and crosshair.
      *
-     * @param graphics         The graphics api
-     * @param debugStrings     the debug strings to display
-     * @param partialTicks     The partial ticks for animation
+     * @param graphics     The graphics api
+     * @param debugStrings the debug strings to display
+     * @param partialTicks The partial ticks for animation
      */
     private void drawUI(GraphicsAPI graphics, String[] debugStrings, float partialTicks) {
         graphics.setShader(hudShader);
@@ -699,6 +699,7 @@ public class GameRenderer implements Disposable {
 
     public void openScreen(GuiScreen screen) {
         this.currentScreen = screen;
+        this.currentScreen.onInit();
         this.currentScreen.onResized(this.width, this.height);
     }
 

@@ -2,6 +2,7 @@ package com.mojang.minecraft.entity;
 
 import com.mojang.minecraft.item.BlockItem;
 import com.mojang.minecraft.item.Item;
+import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.block.BlockRenderer;
@@ -15,7 +16,7 @@ public class EntityItem extends Entity {
 
     private static final WorldShader WORLD_SHADER = ShaderRegistry.getInstance().getWorldShader();
 
-    private final Item item;
+    private final ItemStack itemStack;
 
     private final float hoverPhase;
 
@@ -26,12 +27,12 @@ public class EntityItem extends Entity {
     /**
      * Creates a new entity in the specified level.
      *
-     * @param level The level this entity belongs to
-     * @param item  the item to be represented by this entity
+     * @param level     The level this entity belongs to
+     * @param itemStack the item stack to render
      */
-    public EntityItem(Level level, Item item) {
+    public EntityItem(Level level, ItemStack itemStack) {
         super(level);
-        this.item = item;
+        this.itemStack = itemStack;
         this.hoverPhase = (float) (Math.random() * Math.PI * 2.0D);
         this.bbWidth = 0.25f;
         this.bbHeight = 0.25f;
@@ -80,6 +81,7 @@ public class EntityItem extends Entity {
 
     @Override
     public void render(GraphicsAPI graphics, TextureManager textureManager, float partialTick) {
+        Item item = itemStack.getItem(); // TODO: RENDER > STACK SIZE AS ITEM BUNDLE
         if (item instanceof BlockItem) {
             renderBlockItem((BlockItem) item, graphics, textureManager, partialTick);
         }
@@ -124,13 +126,13 @@ public class EntityItem extends Entity {
             return;
         }
         if (this.target == null) {
-            if (player.attemptPickupItem(item)) {
+            if (player.attemptPickupItem(itemStack)) {
                 this.target = player;
             }
         }
         if (this.target != null) {
             float dx = player.x - this.x;
-            float dy = (player.y + player.getHeightOffset()/2) - this.y;
+            float dy = (player.y + player.getHeightOffset() / 2) - this.y;
             float dz = player.z - this.z;
             this.xd += dx / 8.0f;
             this.yd += dy / 8.0f;

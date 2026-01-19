@@ -9,6 +9,10 @@ import com.mojang.minecraft.item.crafting.CraftingMatch;
 import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.level.block.Blocks;
 
+import java.util.ArrayDeque;
+import java.util.Arrays;
+import java.util.Queue;
+
 public class Inventory {
 
     private static final int HOTBAR_SIZE = 9;
@@ -19,17 +23,24 @@ public class Inventory {
      */
     private final ItemStack[][] inventorySlots = new ItemStack[4][9];
     private final ItemStack[] armorSlots = new ItemStack[ARMOR_SLOT_COUNT];
-    private final ItemStack[][] craftingSlots = new ItemStack[2][2];
+
+    private final ItemStack[][] portableCraftingSlots = new ItemStack[2][2];
+    private final ItemStack[][] tableCraftingSlots = new ItemStack[3][3];
+
     private ItemStack craftingResult = null;
     private CraftingMatch cachedCraftingMatch = null;
     private ItemStack selectedItem = null;
 
     private int selectedItemSlotRow = -1, selectedItemSlotColumn = -1;
     private int selectedArmorSlotIndex = -1;
+
+    // is used for both portable & table crafting
     private int selectedCraftingSlotRow = -1, selectedCraftingSlotColumn = -1;
     private boolean selectedItemFromArmor = false;
     private boolean selectedItemFromCrafting = false;
     private boolean selectedItemFromCraftingResult = false;
+    private CraftingKind selectedItemFromCraftingKind = null;
+    private final Queue<ItemStack> pendingItemsToDrop = new ArrayDeque<>();
 
     {
         ItemStack[] hotbarBlocks = inventorySlots[3];
@@ -52,11 +63,42 @@ public class Inventory {
         inventorySlots[0][0] = new ItemStack(BlockItems.grass, 4);
         inventorySlots[1][1] = new ItemStack(BlockItems.stoneBrick, 2);
         inventorySlots[2][2] = new ItemStack(BlockItems.glass, 2);
-        inventorySlots[2][4] = new ItemStack(Items.diamond, 1);
+        inventorySlots[2][4] = new ItemStack(Items.diamond, 2);
     }
 
     public Inventory() {
-        updateCraftingResult();
+    }
+
+    public void resetCrafting(CraftingKind craftingKind) {
+        resetSelectedItem(craftingKind);
+        resetCraftingGrid(craftingKind);
+        resetCraftingResult();
+    }
+
+    private void resetCraftingGrid(CraftingKind craftingKind) {
+        ItemStack[][] grid = getCraftingGrid(craftingKind);
+        for (ItemStack[] row : grid) {
+            for (ItemStack stack : row) {
+                if (stack == null) {
+                    continue;
+                }
+                scheduleItemDrop(stack);
+            }
+            Arrays.fill(row, null); // clear row of crafting grid after scheduling the stack to drop
+        }
+    }
+
+    /**
+     * Schedules the given item stack to be dropped
+     *
+     * @param stack the item stack to be drooped
+     */
+    private void scheduleItemDrop(ItemStack stack) {
+        pendingItemsToDrop.add(stack);
+    }
+
+    public enum CraftingKind {
+        PORTABLE, TABLE
     }
 
     public ItemStack getHotbarItem(int slotIndex) {
@@ -101,19 +143,45 @@ public class Inventory {
         return armorSlots[slotIndex];
     }
 
-    public int getCraftingRowCount() {
-        return craftingSlots.length;
-    }
-
-    public int getCraftingColumnCount() {
-        return craftingSlots[0].length;
-    }
-
-    public ItemStack getCraftingItem(int row, int column) {
-        if (row < 0 || row >= craftingSlots.length || column < 0 || column >= craftingSlots[row].length) {
-            throw new IndexOutOfBoundsException("Crafting index [" + row + "][" + column + "] out of bounds");
+    public int getCraftingRowCount(CraftingKind craftingKind) {
+        switch (craftingKind) {
+            case PORTABLE:
+                return portableCraftingSlots.length;
+            case TABLE:
+                return tableCraftingSlots.length;
+            default:
+                throw new IllegalArgumentException("Illegal crafting kind supplied: " + craftingKind);
         }
-        return craftingSlots[row][column];
+    }
+
+    public int getCraftingColumnCount(CraftingKind craftingKind) {
+        switch (craftingKind) {
+            case PORTABLE:
+                return portableCraftingSlots[0].length;
+            case TABLE:
+                return tableCraftingSlots[0].length;
+            default:
+                throw new IllegalArgumentException("Illegal crafting kind supplied: " + craftingKind);
+        }
+    }
+
+    public ItemStack getCraftingItem(CraftingKind craftingKind, int row, int column) {
+        switch (craftingKind) {
+            case PORTABLE: {
+                if (row < 0 || row >= portableCraftingSlots.length || column < 0 || column >= portableCraftingSlots[row].length) {
+                    throw new IndexOutOfBoundsException("Crafting index [" + row + "][" + column + "] out of bounds for kind " + craftingKind);
+                }
+                return portableCraftingSlots[row][column];
+            }
+            case TABLE: {
+                if (row < 0 || row >= tableCraftingSlots.length || column < 0 || column >= tableCraftingSlots[row].length) {
+                    throw new IndexOutOfBoundsException("Crafting index [" + row + "][" + column + "] out of bounds for kind " + craftingKind);
+                }
+                return tableCraftingSlots[row][column];
+            }
+            default:
+                throw new IllegalArgumentException("Illegal crafting kind supplied: " + craftingKind);
+        }
     }
 
     public void clickItem(int row, int column) {
@@ -157,7 +225,7 @@ public class Inventory {
         return craftingResult;
     }
 
-    public void clickCraftingResultItem() {
+    public void clickCraftingResultItem(CraftingKind craftingKind) {
         if (craftingResult == null || cachedCraftingMatch == null) {
             return;
         }
@@ -176,28 +244,30 @@ public class Inventory {
             }
         }
 
-        cachedCraftingMatch.getRecipe().consumeIngredients(craftingSlots, cachedCraftingMatch);
+        ItemStack[][] grid = getCraftingGrid(craftingKind);
+        cachedCraftingMatch.getRecipe().consumeIngredients(grid, cachedCraftingMatch);
         setSelectedCraftingResult();
-        updateCraftingResult();
+        updateCraftingResult(craftingKind);
     }
 
-    public void clickCraftingItem(int row, int column) {
-        ItemStack clickedStack = getCraftingItem(row, column);
+    public void clickCraftingItem(CraftingKind craftingKind, int row, int column) {
+        ItemStack[][] grid = getCraftingGrid(craftingKind);
+        ItemStack clickedStack = getCraftingItem(craftingKind, row, column);
         ItemStack currentStack = getSelectedItem();
         if (currentStack == null || clickedStack == null || !currentStack.getItem().equals(clickedStack.getItem())) {
-            craftingSlots[row][column] = selectedItem;
+            grid[row][column] = selectedItem;
             selectedItem = clickedStack;
-            setSelectedCraftingSlot(row, column);
+            setSelectedCraftingSlot(craftingKind, row, column);
         } else {
-            int increased = craftingSlots[row][column].increaseAmount(currentStack.getCount(), false);
+            int increased = grid[row][column].increaseAmount(currentStack.getCount(), false);
             if (increased == currentStack.getCount()) {
                 selectedItem = null;
-                setSelectedCraftingSlot(-1, -1);
+                setSelectedCraftingSlot(craftingKind, -1, -1);
             } else {
                 currentStack.decreaseAmount(increased);
             }
         }
-        updateCraftingResult();
+        updateCraftingResult(craftingKind);
     }
 
     public void placeSingleInventoryItem(int row, int column) {
@@ -222,20 +292,21 @@ public class Inventory {
         }
     }
 
-    public void placeSingleCraftingItem(int row, int column) {
-        if (placeSingleInGrid(craftingSlots, row, column)) {
-            updateCraftingResult();
+    public void placeSingleCraftingItem(CraftingKind craftingKind, int row, int column) {
+        if (placeSingleInCraftingGrid(craftingKind, row, column)) {
+            updateCraftingResult(craftingKind);
         }
     }
 
-    public void resetSelectedItem() {
+    public void resetSelectedItem(CraftingKind craftingKind) {
         if (selectedItem == null) {
             return;
         }
         if (selectedItemFromArmor && selectedArmorSlotIndex >= 0) {
             armorSlots[selectedArmorSlotIndex] = selectedItem;
         } else if (selectedItemFromCrafting && selectedCraftingSlotRow >= 0 && selectedCraftingSlotColumn >= 0) {
-            craftingSlots[selectedCraftingSlotRow][selectedCraftingSlotColumn] = selectedItem;
+            ItemStack[][] grid = getCraftingGrid(craftingKind);
+            grid[selectedCraftingSlotRow][selectedCraftingSlotColumn] = selectedItem;
         } else if (selectedItemSlotRow >= 0 && selectedItemSlotColumn >= 0) {
             inventorySlots[selectedItemSlotRow][selectedItemSlotColumn] = selectedItem;
         } else if (selectedItemFromCraftingResult && craftingResult != null) {
@@ -250,7 +321,12 @@ public class Inventory {
         selectedCraftingSlotColumn = -1;
         selectedItemFromCrafting = false;
         selectedItemFromCraftingResult = false;
-        updateCraftingResult();
+        selectedItemFromCraftingKind = null;
+        updateCraftingResult(craftingKind);
+    }
+
+    private void resetCraftingResult() {
+        craftingResult = null;
     }
 
     public ItemStack getSelectedItem() {
@@ -268,13 +344,18 @@ public class Inventory {
         }
     }
 
-    public boolean addItem(Item item, boolean isItemPickup) {
+    public boolean addItem(ItemStack newItemStack, boolean isItemPickup) {
+        Item item = newItemStack.getItem();
+        int toDistribute = newItemStack.getCount();
+
         // add items to inventory in reverse row priority
         for (int i = inventorySlots.length - 1; i >= 0; i--) {
             for (int j = 0, m = inventorySlots[i].length; j < m; j++) {
                 ItemStack itemStack = inventorySlots[i][j];
                 if (itemStack != null && itemStack.getItem().equals(item)) {
-                    if (itemStack.increaseAmount(1, isItemPickup) == 1) {
+                    int distributed = itemStack.increaseAmount(1, isItemPickup);
+                    toDistribute -= distributed;
+                    if (toDistribute <= 0) {
                         return true;
                     }
                 }
@@ -285,7 +366,7 @@ public class Inventory {
             for (int j = 0, m = inventorySlots[i].length; j < m; j++) {
                 ItemStack itemStack = inventorySlots[i][j];
                 if (itemStack == null) {
-                    inventorySlots[i][j] = new ItemStack(item, 1);
+                    inventorySlots[i][j] = newItemStack;
                     return true;
                 }
             }
@@ -316,16 +397,18 @@ public class Inventory {
         }
     }
 
-    private void setSelectedCraftingSlot(int row, int column) {
+    private void setSelectedCraftingSlot(CraftingKind craftingKind, int row, int column) {
         selectedCraftingSlotRow = row;
         selectedCraftingSlotColumn = column;
         selectedItemFromCrafting = row >= 0 && column >= 0;
+        selectedItemFromCraftingKind = craftingKind;
         if (selectedItemFromCrafting) {
             selectedItemSlotRow = -1;
             selectedItemSlotColumn = -1;
             selectedArmorSlotIndex = -1;
             selectedItemFromArmor = false;
             selectedItemFromCraftingResult = false;
+            selectedItemFromCraftingKind = null;
         }
     }
 
@@ -340,6 +423,11 @@ public class Inventory {
             selectedCraftingSlotColumn = -1;
             selectedItemFromCrafting = false;
         }
+    }
+
+    private boolean placeSingleInCraftingGrid(CraftingKind craftingKind, int row, int column) {
+        ItemStack[][] grid = getCraftingGrid(craftingKind);
+        return placeSingleInGrid(grid, row, column);
     }
 
     private boolean placeSingleInGrid(ItemStack[][] grid, int row, int column) {
@@ -380,8 +468,9 @@ public class Inventory {
         }
     }
 
-    private void updateCraftingResult() {
-        CraftingMatch match = CraftingManager.getInstance().findMatch(craftingSlots);
+    private void updateCraftingResult(CraftingKind craftingKind) {
+        ItemStack[][] grid = getCraftingGrid(craftingKind);
+        CraftingMatch match = CraftingManager.getInstance().findMatch(grid);
         if (match == null) {
             craftingResult = null;
             cachedCraftingMatch = null;
@@ -389,5 +478,22 @@ public class Inventory {
             craftingResult = match.getResult();
             cachedCraftingMatch = match;
         }
+    }
+
+    private ItemStack[][] getCraftingGrid(CraftingKind craftingKind) {
+        switch (craftingKind) {
+            case PORTABLE: {
+                return portableCraftingSlots;
+            }
+            case TABLE: {
+                return tableCraftingSlots;
+            }
+            default:
+                throw new IllegalArgumentException("Illegal crafting kind provided: " + craftingKind);
+        }
+    }
+
+    public Queue<ItemStack> getPendingItemsToDrop() {
+        return pendingItemsToDrop;
     }
 }

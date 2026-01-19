@@ -169,11 +169,6 @@ public class AbstractInventoryScreen extends GuiScreen {
         }
     }
 
-    @Override
-    public void onClose() {
-        inventory.resetSelectedItem();
-    }
-
 
     public final class Slot {
 
