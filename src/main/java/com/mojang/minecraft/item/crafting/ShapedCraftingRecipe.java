@@ -15,6 +15,17 @@ public class ShapedCraftingRecipe implements CraftingRecipe {
         this.pattern = pattern;
         this.height = pattern.length;
         this.width = pattern.length == 0 ? 0 : pattern[0].length;
+
+        int rowSize = -1;
+        for (Item[] row : pattern) {
+            if (rowSize == -1) {
+                rowSize = row.length;
+            } else {
+                if (row.length != rowSize) {
+                    throw new IllegalArgumentException("Illegal shaped crafting recipe! Provided grid must be square");
+                }
+            }
+        }
     }
 
     @Override

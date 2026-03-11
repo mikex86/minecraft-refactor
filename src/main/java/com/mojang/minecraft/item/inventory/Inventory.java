@@ -41,6 +41,7 @@ public class Inventory {
     private boolean selectedItemFromCraftingResult = false;
     private CraftingKind selectedItemFromCraftingKind = null;
     private final Queue<ItemStack> pendingItemsToDrop = new ArrayDeque<>();
+    private final CraftingManager craftingManager;
 
     {
         ItemStack[] hotbarBlocks = inventorySlots[3];
@@ -63,10 +64,11 @@ public class Inventory {
         inventorySlots[0][0] = new ItemStack(BlockItems.grass, 4);
         inventorySlots[1][1] = new ItemStack(BlockItems.stoneBrick, 2);
         inventorySlots[2][2] = new ItemStack(BlockItems.glass, 2);
-        inventorySlots[2][4] = new ItemStack(Items.diamond, 2);
+        inventorySlots[2][4] = new ItemStack(Items.woodenSword, 1);
     }
 
-    public Inventory() {
+    public Inventory(CraftingManager craftingManager) {
+        this.craftingManager = craftingManager;
     }
 
     public void resetCrafting(CraftingKind craftingKind) {
@@ -470,7 +472,7 @@ public class Inventory {
 
     private void updateCraftingResult(CraftingKind craftingKind) {
         ItemStack[][] grid = getCraftingGrid(craftingKind);
-        CraftingMatch match = CraftingManager.getInstance().findMatch(grid);
+        CraftingMatch match = craftingManager.findMatch(grid);
         if (match == null) {
             craftingResult = null;
             cachedCraftingMatch = null;

@@ -1,6 +1,7 @@
 package com.mojang.minecraft.entity;
 
 import com.mojang.minecraft.item.ItemStack;
+import com.mojang.minecraft.item.crafting.CraftingManager;
 import com.mojang.minecraft.item.inventory.Inventory;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.state.BlockState;
@@ -76,7 +77,7 @@ public class EntityPlayer extends EntityLiving {
     public float viewYawBob = 0.0F;
     public float prevViewYawBob = 0.0F;
 
-    private final Inventory inventory = new Inventory();
+    private final Inventory inventory;
 
     // Animation constants
     public static final float MODEL_SIZE = 0.058333334F;
@@ -102,11 +103,12 @@ public class EntityPlayer extends EntityLiving {
      *
      * @param level The level in which the player exists
      */
-    public EntityPlayer(Level level, boolean isThePlayer) {
+    public EntityPlayer(Level level, CraftingManager craftingManager, boolean isThePlayer) {
         super(level);
         this.heightOffset = 1.62F; // Eye height offset
         this.prevHeightOffset = this.heightOffset;
         this.isThePlayer = isThePlayer;
+        this.inventory = new Inventory(craftingManager);
     }
 
     /**

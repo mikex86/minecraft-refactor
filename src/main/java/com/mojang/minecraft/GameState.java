@@ -1,6 +1,7 @@
 package com.mojang.minecraft;
 
 import com.mojang.minecraft.entity.EntityPlayer;
+import com.mojang.minecraft.item.crafting.CraftingManager;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.particle.ParticleEngine;
@@ -12,6 +13,9 @@ import com.mojang.minecraft.renderer.model.ModelRegistry;
  * Centralizes game state management and updates.
  */
 public class GameState {
+    // Crafting Manager
+    private CraftingManager craftingManager;
+
     // Level and rendering
     private Level level;
     private LevelRenderer levelRenderer;
@@ -41,12 +45,15 @@ public class GameState {
      * Initializes the game state, creating the level, player, and entities.
      */
     public void initialize() {
+        // Initialize Crafting manager
+        this.craftingManager = new CraftingManager();
+
         // Create level and renderer
         this.level = new Level();
         this.levelRenderer = new LevelRenderer(this.level, this.textureManager);
 
         // Create player
-        this.player = new EntityPlayer(this.level, true);
+        this.player = new EntityPlayer(this.level, craftingManager, true);
         this.player.setPosition(0.0F, 128, 0.0F);
         this.level.spawnEntity(this.player);
 

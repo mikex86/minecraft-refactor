@@ -45,7 +45,7 @@ public class AbstractInventoryScreen extends GuiScreen {
     protected IndexedMesh inventoryQuadMesh;
 
     public AbstractInventoryScreen(TextureManager textureManager, HeldItemRenderer heldItemRenderer, Font font, Inventory inventory) {
-        this.player = new EntityPlayer(null, false);
+        this.player = new EntityPlayer(null, null, false);
         this.inventory = inventory;
         this.textureManager = textureManager;
         this.font = font;

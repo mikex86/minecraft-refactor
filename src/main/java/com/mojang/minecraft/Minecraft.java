@@ -21,8 +21,8 @@ import java.io.IOException;
 
 public class Minecraft implements Runnable {
     // Constants
-    public static final String VERSION_STRING = "0.0.11a";
-    public static final String MINECRAFT_VERSION_STRING = "Minecraft " + VERSION_STRING;
+    public static final String VERSION_STRING = "0.0.1";
+    public static final String MINECRAFT_VERSION_STRING = "reMinecraft " + VERSION_STRING;
     public static final boolean DEBUG = false;
 
     // Core systems
