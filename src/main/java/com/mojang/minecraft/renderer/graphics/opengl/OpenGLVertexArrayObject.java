@@ -104,7 +104,7 @@ public class OpenGLVertexArrayObject implements VertexArrayObject {
             offset += 3L * format.getColorDataType().getSize(); // 3 scalars
         } else if (format.hasGrayScale()) {
             glEnableVertexAttribArray(1);
-            glVertexAttribPointer(1, 1, format.getGrayScaleDataType().getGLType(), false, stride, offset);
+            glVertexAttribIPointer(1, 1, format.getGrayScaleDataType().getGLType(), stride, offset);
             offset += format.getGrayScaleDataType().getSize(); // 1 scalar
         }
         

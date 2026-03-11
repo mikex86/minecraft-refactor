@@ -1,2 +1,2 @@
-rootProject.name = "minecraft-decompiled"
+rootProject.name = "minecraft-refactor"
 

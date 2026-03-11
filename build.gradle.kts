@@ -15,13 +15,12 @@ java {
     targetCompatibility = JavaVersion.VERSION_1_8
 }
 
-val lwjglVersion = "3.3.3"
+val lwjglVersion = "3.4.1"
 val lwjglNatives = when (System.getProperty("os.name")) {
     "Mac OS X", "Darwin" -> if (System.getProperty("os.arch") == "aarch64") "natives-macos-arm64" else "natives-macos"
     "Linux" -> "natives-linux"
     else -> "natives-windows"
 }
-
 dependencies {
     // LWJGL 3 core dependencies
     implementation(platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))

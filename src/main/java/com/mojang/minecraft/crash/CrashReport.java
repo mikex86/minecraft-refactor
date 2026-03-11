@@ -149,9 +149,26 @@ public class CrashReport {
                 "I feel sad now :(",
                 "My bad.",
                 "I just don't know what went wrong :(",
-                "You're mean."
+                "You're mean.",
+                "Don't let it get to you.",
+                "Don't be sad. I'll do better next time, I promise!",
+                "Well, this is embarrassing.",
+                "Huh. That didn't work.",
+                "What were you doing when this happened?",
+                "I'm sorry for the inconvenience.",
+                "Don't let it ruin your day!",
+                "Everything will be okay.",
+                "I hope you didn't do anything to cause this.",
+                "This is a surprise to me too.",
+                "Can you reproduce this? That would help a lot!",
+                "I'm not sure what went wrong, but I'm working on it.",
+                "This is a bug in the game, not your computer.",
+                "Don't worry, we'll fix this in the next update.",
+                "Thanks for your patience while we work on this.",
+                "I hope this doesn't ruin your experience with the game.",
         };
-
-        return comments[(int) (Math.random() * comments.length)];
+        int index = (int) (Math.random() * comments.length);
+        index = Math.max(0, Math.min(index, comments.length - 1)); // Ensure index is within bounds
+        return comments[index];
     }
 } 
