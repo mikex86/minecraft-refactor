@@ -27,6 +27,10 @@ public class GameWindow implements Disposable {
     // Window dimensions
     private int width;
     private int height;
+    private int windowWidth;
+    private int windowHeight;
+    private double mouseToFramebufferScaleX = 1.0;
+    private double mouseToFramebufferScaleY = 1.0;
 
     // Input callbacks
     private KeyboardCallback keyboardCallback;
@@ -105,11 +109,17 @@ public class GameWindow implements Disposable {
         try (MemoryStack stack = stackPush()) {
             IntBuffer pWidth = stack.mallocInt(1);
             IntBuffer pHeight = stack.mallocInt(1);
+            IntBuffer pWindowWidth = stack.mallocInt(1);
+            IntBuffer pWindowHeight = stack.mallocInt(1);
 
             glfwGetFramebufferSize(window, pWidth, pHeight);
+            glfwGetWindowSize(window, pWindowWidth, pWindowHeight);
 
             this.width = pWidth.get(0);
             this.height = pHeight.get(0);
+            this.windowWidth = pWindowWidth.get(0);
+            this.windowHeight = pWindowHeight.get(0);
+            updateMouseToFramebufferScale();
             System.out.println("Framebuffer size: " + this.width + "x" + this.height);
         }
 
@@ -194,17 +204,29 @@ public class GameWindow implements Disposable {
         try (MemoryStack stack = stackPush()) {
             IntBuffer pWidth = stack.mallocInt(1);
             IntBuffer pHeight = stack.mallocInt(1);
+            IntBuffer pWindowWidth = stack.mallocInt(1);
+            IntBuffer pWindowHeight = stack.mallocInt(1);
 
             glfwGetFramebufferSize(window, pWidth, pHeight);
+            glfwGetWindowSize(window, pWindowWidth, pWindowHeight);
 
             int newWidth = pWidth.get(0);
             int newHeight = pHeight.get(0);
+            int newWindowWidth = pWindowWidth.get(0);
+            int newWindowHeight = pWindowHeight.get(0);
 
             if (newWidth != width || newHeight != height) {
                 width = newWidth;
                 height = newHeight;
                 graphics.setViewport(0, 0, width, height);
             }
+
+            if (newWindowWidth != windowWidth || newWindowHeight != windowHeight) {
+                windowWidth = newWindowWidth;
+                windowHeight = newWindowHeight;
+            }
+
+            updateMouseToFramebufferScale();
         }
 
         // Check if window should close
@@ -309,6 +331,36 @@ public class GameWindow implements Disposable {
 
     public void setCursorCaptured(boolean captured) {
         glfwSetInputMode(window, GLFW_CURSOR, !captured ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+    }
+
+    /**
+     * Returns the current ratio from window (screen coordinates) to framebuffer pixels on X.
+     * This is more reliable than static content scale values across platforms/window systems.
+     */
+    public double getMouseToFramebufferScaleX() {
+        return mouseToFramebufferScaleX;
+    }
+
+    /**
+     * Returns the current ratio from window (screen coordinates) to framebuffer pixels on Y.
+     * This is more reliable than static content scale values across platforms/window systems.
+     */
+    public double getMouseToFramebufferScaleY() {
+        return mouseToFramebufferScaleY;
+    }
+
+    private void updateMouseToFramebufferScale() {
+        if (windowWidth > 0) {
+            mouseToFramebufferScaleX = (double) width / (double) windowWidth;
+        } else {
+            mouseToFramebufferScaleX = 1.0;
+        }
+
+        if (windowHeight > 0) {
+            mouseToFramebufferScaleY = (double) height / (double) windowHeight;
+        } else {
+            mouseToFramebufferScaleY = 1.0;
+        }
     }
 
     public void requestFocus() {

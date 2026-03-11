@@ -157,7 +157,7 @@ public class InputHandler {
      * @return Mouse X position in pixels
      */
     public double getMouseX() {
-        return mouseX * window.contentScaleX;
+        return mouseX * window.getMouseToFramebufferScaleX();
     }
     /**
      * Gets the current mouse Y position.
@@ -165,7 +165,7 @@ public class InputHandler {
      * @return Mouse Y position in pixels
      */
     public double getMouseY() {
-        return mouseY * window.contentScaleY;
+        return mouseY * window.getMouseToFramebufferScaleY();
     }
 
     /**
@@ -176,7 +176,7 @@ public class InputHandler {
     public double getMouseDX() {
         double dx = mouseDX;
         mouseDX = 0;
-        return dx * window.contentScaleX;
+        return dx * window.getMouseToFramebufferScaleX();
     }
 
     /**
@@ -187,7 +187,7 @@ public class InputHandler {
     public double getMouseDY() {
         double dy = mouseDY;
         mouseDY = 0;
-        return dy * window.contentScaleY;
+        return dy * window.getMouseToFramebufferScaleY();
     }
 
     /**
@@ -205,7 +205,10 @@ public class InputHandler {
      * @param y Y position in pixels
      */
     public void setMousePosition(double x, double y) {
-        this.window.setCursorPosition(x, y);
+        this.window.setCursorPosition(
+                x / window.getMouseToFramebufferScaleX(),
+                y / window.getMouseToFramebufferScaleY()
+        );
     }
 
     /**
