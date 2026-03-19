@@ -13,7 +13,7 @@ public class GuiScreen implements Disposable {
     public void onInit() {
     }
 
-    public void drawScreen(CommandBuffer graphics, MatrixStack matrixStack, float screenWidth, float screenHeight, float partialTicks) {
+    public void drawScreen(CommandBuffer commandBuffer, MatrixStack matrixStack, float screenWidth, float screenHeight, float partialTicks) {
     }
 
     public void onResized(float screenWidth, float screenHeight) {

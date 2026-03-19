@@ -32,7 +32,7 @@ public class InventoryScreen extends AbstractInventoryScreen {
     }
 
     @Override
-    public void drawScreen(CommandBuffer graphics, MatrixStack matrixStack, float screenWidth, float screenHeight, float partialTicks) {
+    public void drawScreen(CommandBuffer commandBuffer, MatrixStack matrixStack, float screenWidth, float screenHeight, float partialTicks) {
         float centerX = (float) (int) screenWidth / 2;
         float centerY = (float) (int) screenHeight / 2;
 
@@ -43,14 +43,14 @@ public class InventoryScreen extends AbstractInventoryScreen {
             mouseY = centerY;
         }
 
-        drawInventoryScreenBackground(graphics, centerX, centerY, textureManager.inventoryTexture);
+        drawInventoryScreenBackground(commandBuffer, centerX, centerY, textureManager.inventoryTexture);
 
         // draw items
-        InventoryItemRenderer.renderInventoryItems(graphics, matrixStack, textureManager, heldItemRenderer, this, centerX, centerY);
+        InventoryItemRenderer.renderInventoryItems(commandBuffer, matrixStack, textureManager, heldItemRenderer, this, centerX, centerY);
 
-        drawPlayerModel(graphics, matrixStack, partialTicks, centerX, centerY);
+        drawPlayerModel(commandBuffer, matrixStack, partialTicks, centerX, centerY);
 
-        InventoryItemRenderer.drawSelectedItem(graphics, matrixStack, textureManager, heldItemRenderer, inventory, mouseX, mouseY, stackSizeSelectedItemLabel);
+        InventoryItemRenderer.drawSelectedItem(commandBuffer, matrixStack, textureManager, heldItemRenderer, inventory, mouseX, mouseY, stackSizeSelectedItemLabel);
 
         this.screenWidth = screenWidth;
         this.screenHeight = screenHeight;
@@ -61,10 +61,10 @@ public class InventoryScreen extends AbstractInventoryScreen {
         inventory.resetCrafting(Inventory.CraftingKind.PORTABLE);
     }
 
-    private void drawPlayerModel(CommandBuffer graphics, MatrixStack matrixStack, float partialTicks, float centerX, float centerY) {
-        graphics.setPipeline(ENTITY_PIPELINE);
+    private void drawPlayerModel(CommandBuffer commandBuffer, MatrixStack matrixStack, float partialTicks, float centerX, float centerY) {
+        commandBuffer.setPipeline(ENTITY_PIPELINE);
         ENTITY_SHADER.setFogUniforms(0f, 0f, 0f, 0f, 0f, 0f, 0f);
-        graphics.setTexture(textureManager.charTexture);
+        commandBuffer.bindTexture(0, textureManager.charTexture);
         matrixStack.pushMatrix();
 
         // Apply scaling and orientation
@@ -91,8 +91,8 @@ public class InventoryScreen extends AbstractInventoryScreen {
         matrixStack.rotateX(-mousePitch);
 
         // Render the model
-        PLAYER_MODEL.render(graphics, matrixStack, this.player, partialTicks);
-        graphics.setPipeline(HUD_PIPELINE);
+        PLAYER_MODEL.render(commandBuffer, matrixStack, this.player, partialTicks);
+        commandBuffer.setPipeline(HUD_PIPELINE);
 
         matrixStack.popMatrix();
     }

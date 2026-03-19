@@ -32,8 +32,13 @@ public interface CommandBuffer {
     void draw(PrimitiveType type, VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int start, int count);
 
     /**
-     * Sets the active texture.
+     * Binds a texture resource to a texture binding slot.
      */
-    void setTexture(Texture texture);
+    void bindTexture(int binding, Texture texture);
+
+    /**
+     * Binds a reusable uniform object for the currently bound pipeline.
+     */
+    void bindUniform(Uniform uniform);
 
 }

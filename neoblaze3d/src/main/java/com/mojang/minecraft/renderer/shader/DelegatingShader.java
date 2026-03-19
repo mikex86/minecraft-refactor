@@ -3,12 +3,12 @@ package com.mojang.minecraft.renderer.shader;
 import java.nio.FloatBuffer;
 
 /**
- * Helper base class for typed shader wrappers that delegate to a concrete {@link IShader} instance.
+ * Helper base class for typed shader wrappers backed by an OpenGL {@link Shader}.
  */
 public abstract class DelegatingShader implements IShader {
-    protected final IShader delegate;
+    protected final Shader delegate;
 
-    protected DelegatingShader(IShader delegate) {
+    protected DelegatingShader(Shader delegate) {
         this.delegate = delegate;
     }
 
@@ -22,43 +22,35 @@ public abstract class DelegatingShader implements IShader {
         delegate.detach();
     }
 
-    @Override
-    public void setUniform(String name, boolean value) {
+    protected final void setUniform(String name, boolean value) {
         delegate.setUniform(name, value);
     }
 
-    @Override
-    public void setUniform(String name, int value) {
+    protected final void setUniform(String name, int value) {
         delegate.setUniform(name, value);
     }
 
-    @Override
-    public void setUniform(String name, float value) {
+    protected final void setUniform(String name, float value) {
         delegate.setUniform(name, value);
     }
 
-    @Override
-    public void setUniform(String name, float x, float y) {
+    protected final void setUniform(String name, float x, float y) {
         delegate.setUniform(name, x, y);
     }
 
-    @Override
-    public void setUniform(String name, float x, float y, float z) {
+    protected final void setUniform(String name, float x, float y, float z) {
         delegate.setUniform(name, x, y, z);
     }
 
-    @Override
-    public void setUniform(String name, float x, float y, float z, float w) {
+    protected final void setUniform(String name, float x, float y, float z, float w) {
         delegate.setUniform(name, x, y, z, w);
     }
 
-    @Override
-    public void setUniform4fv(String name, FloatBuffer buffer) {
+    protected final void setUniform4fv(String name, FloatBuffer buffer) {
         delegate.setUniform4fv(name, buffer);
     }
 
-    @Override
-    public void setUniformMatrix4fv(String name, FloatBuffer matrix) {
+    protected final void setUniformMatrix4fv(String name, FloatBuffer matrix) {
         delegate.setUniformMatrix4fv(name, matrix);
     }
 

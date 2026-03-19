@@ -104,15 +104,15 @@ public class Font {
     /**
      * Draws text with a drop shadow.
      *
-     * @param graphics        The graphics API to use for rendering
+     * @param commandBuffer        The commandBuffer API to use for rendering
      * @param text            The text to draw
      * @param x               The x position
      * @param y               The y position
      * @param color           The color of the text (RGB format)
      */
-    public void drawShadow(CommandBuffer graphics, String text, int x, int y, int color) {
-        this.draw(graphics, text, x + 1, y + 1, color, true, true);
-        this.draw(graphics, text, x, y, color);
+    public void drawShadow(CommandBuffer commandBuffer, String text, int x, int y, int color) {
+        this.draw(commandBuffer, text, x + 1, y + 1, color, true, true);
+        this.draw(commandBuffer, text, x, y, color);
     }
 
     /**
@@ -123,14 +123,14 @@ public class Font {
      * @param y     The y position
      * @param color The color of the text (RGB format)
      */
-    public void draw(CommandBuffer graphics, String text, int x, int y, int color) {
-        this.draw(graphics, text, x, y, color, false, true);
+    public void draw(CommandBuffer commandBuffer, String text, int x, int y, int color) {
+        this.draw(commandBuffer, text, x, y, color, false, true);
     }
 
     /**
      * Internal method to draw text with optional shadow effect.
      *
-     * @param graphics        The graphics API to use for rendering
+     * @param commandBuffer        The commandBuffer API to use for rendering
      * @param text            The text to draw
      * @param x               The x position
      * @param y               The y position
@@ -138,13 +138,13 @@ public class Font {
      * @param darken          Whether to darken the color (for shadow effect)
      * @param flushTesselator Whether to immediately render the text on screen or keep it buffered in the tesselator
      */
-    public void draw(CommandBuffer graphics, String text, int x, int y, int color, boolean darken, boolean flushTesselator) {
+    public void draw(CommandBuffer commandBuffer, String text, int x, int y, int color, boolean darken, boolean flushTesselator) {
         char[] chars = text.toCharArray();
         if (darken) {
             color = (color & COLOR_DARKEN_MASK) >> 2;
         }
 
-        graphics.setTexture(this.fontTexture);
+        commandBuffer.bindTexture(0, this.fontTexture);
 
         // Initialize the tessellator for rendering
         tessellator.init();
@@ -220,7 +220,7 @@ public class Font {
 
         // Render the text and clean up OpenGL state
         if (flushTesselator) {
-            tessellator.flush(graphics);
+            tessellator.flush(commandBuffer);
         }
     }
 

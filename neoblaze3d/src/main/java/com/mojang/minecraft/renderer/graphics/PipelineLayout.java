@@ -27,6 +27,11 @@ public interface PipelineLayout extends GraphicsResource {
      */
     int findBinding(BindingSemantic semantic);
 
+    /**
+     * Returns whether this layout declares the given numeric binding.
+     */
+    boolean hasBinding(int binding);
+
     enum ResourceType {
         UNIFORM_BUFFER,
         STORAGE_BUFFER,

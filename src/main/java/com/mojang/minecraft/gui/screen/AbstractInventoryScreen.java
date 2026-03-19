@@ -134,7 +134,7 @@ public class AbstractInventoryScreen extends GuiScreen {
         }
     }
 
-    protected void drawInventoryScreenBackground(CommandBuffer graphics, float centerX, float centerY, Texture texture) {
+    protected void drawInventoryScreenBackground(CommandBuffer commandBuffer, float centerX, float centerY, Texture texture) {
         if (inventoryQuadMesh == null) {
             Tesselator t = Tesselator.instance;
             t.init();
@@ -150,8 +150,8 @@ public class AbstractInventoryScreen extends GuiScreen {
         }
 
         // draw inventory background
-        graphics.setTexture(texture);
-        inventoryQuadMesh.draw(graphics);
+        commandBuffer.bindTexture(0, texture);
+        inventoryQuadMesh.draw(commandBuffer);
     }
 
     @Override
@@ -232,9 +232,9 @@ public class AbstractInventoryScreen extends GuiScreen {
             clickAction.run();
         }
 
-        public void renderStackSize(CommandBuffer graphics, MatrixStack matrixStack, float centerX, float centerY, int count) {
+        public void renderStackSize(CommandBuffer commandBuffer, MatrixStack matrixStack, float centerX, float centerY, int count) {
             this.stackSizeLabel.setText(StackCountStringPool.valueOf(count));
-            this.stackSizeLabel.render(graphics, matrixStack, getLabelX(centerX), getLabelY(centerY));
+            this.stackSizeLabel.render(commandBuffer, matrixStack, getLabelX(centerX), getLabelY(centerY));
         }
 
         void placeOne() {

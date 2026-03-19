@@ -426,10 +426,10 @@ public class Entity {
     /**
      * Default render method. Override in subclasses to provide specific rendering.
      *
-     * @param graphics    The graphics api
+     * @param commandBuffer    The commandBuffer api
      * @param partialTick Partial tick time for smooth animation
      */
-    public void render(CommandBuffer graphics, MatrixStack matrixStack, TextureManager textureManager, float partialTick) {
+    public void render(CommandBuffer commandBuffer, MatrixStack matrixStack, TextureManager textureManager, float partialTick) {
         // Default implementation does nothing
     }
 }

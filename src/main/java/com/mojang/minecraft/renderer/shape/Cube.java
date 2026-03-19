@@ -1,9 +1,10 @@
 package com.mojang.minecraft.renderer.shape;
 
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
-import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
+import com.mojang.minecraft.renderer.graphics.MatrixUniformBinder;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.model.ModelMesh;
+import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 
 /**
  * Represents a 3D cube with texture mapping for character models.
@@ -178,7 +179,7 @@ public class Cube {
      *
      * @param graphics the graphics API to render with
      */
-    public void render(CommandBuffer graphics, MatrixStack matrixStack) {
+    public void render(CommandBuffer commandBuffer, MatrixStack matrixStack) {
         // Build the mesh if needed
         if (this.dirty) {
             buildMesh();
@@ -191,8 +192,8 @@ public class Cube {
         matrixStack.rotateX(this.xRot * RADIANS_TO_DEGREES);
 
         // Render the mesh
-        GraphicsFactory.getGraphicsAPI().bindCurrentMatrices(matrixStack);
-        this.mesh.render(graphics);
+        MatrixUniformBinder.bindStandardMatrices(commandBuffer, PipelineRegistry.getInstance().getSharedUniforms(), matrixStack);
+        this.mesh.render(commandBuffer);
 
         matrixStack.popMatrix();
     }

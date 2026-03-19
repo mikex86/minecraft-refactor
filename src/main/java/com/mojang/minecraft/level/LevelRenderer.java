@@ -60,10 +60,10 @@ public class LevelRenderer implements Disposable {
     /**
      * Renders the level
      */
-    public void render(CommandBuffer graphics, MatrixStack matrixStack, float partialTicks) {
+    public void render(CommandBuffer commandBuffer, MatrixStack matrixStack, float partialTicks) {
         // Enable texturing and bind the terrain texture
         Texture texture = textureManager.terrainTexture;
-        graphics.setTexture(texture);
+        commandBuffer.bindTexture(0, texture);
 
         // Get the current view frustum
         Frustum frustum = Frustum.getFrustum(matrixStack);
@@ -72,12 +72,12 @@ public class LevelRenderer implements Disposable {
         numSectionDrawCalls = 0;
         for (Chunk chunk : this.level.getLoadedChunks()) {
             if (frustum.isVisible(chunk.aabb)) {
-                numSectionDrawCalls += chunk.render(graphics, frustum);
+                numSectionDrawCalls += chunk.render(commandBuffer, frustum);
             }
         }
     }
 
-    public void renderEntities(CommandBuffer graphics, MatrixStack matrixStack, float partialTicks) {
+    public void renderEntities(CommandBuffer commandBuffer, MatrixStack matrixStack, float partialTicks) {
         // Get the current view frustum
         Frustum frustum = Frustum.getFrustum(matrixStack);
 
@@ -90,7 +90,7 @@ public class LevelRenderer implements Disposable {
                 }
             }
             if (frustum.isVisible(entity.boundingBox)) {
-                entity.render(graphics, matrixStack, textureManager, partialTicks);
+                entity.render(commandBuffer, matrixStack, textureManager, partialTicks);
             }
         }
     }
@@ -144,7 +144,7 @@ public class LevelRenderer implements Disposable {
     /**
      * Update chunks that need to be rebuilt.
      */
-    public void updateDirtyChunks(CommandBuffer graphics, MatrixStack matrixStack, EntityPlayer player) {
+    public void updateDirtyChunks(CommandBuffer commandBuffer, MatrixStack matrixStack, EntityPlayer player) {
         Frustum frustum = Frustum.getFrustum(matrixStack);
         if (rebuildQueue == null) {
             rebuildQueue = new PriorityBlockingQueue<>(512, new DirtyChunkSorter(player, frustum));

@@ -30,7 +30,7 @@ public class CraftingScreen extends AbstractInventoryScreen {
     }
 
     @Override
-    public void drawScreen(CommandBuffer graphics, MatrixStack matrixStack, float screenWidth, float screenHeight, float partialTicks) {
+    public void drawScreen(CommandBuffer commandBuffer, MatrixStack matrixStack, float screenWidth, float screenHeight, float partialTicks) {
         float centerX = (float) (int) screenWidth / 2;
         float centerY = (float) (int) screenHeight / 2;
 
@@ -41,10 +41,10 @@ public class CraftingScreen extends AbstractInventoryScreen {
             mouseY = centerY;
         }
 
-        drawInventoryScreenBackground(graphics, centerX, centerY, textureManager.craftingTexture);
+        drawInventoryScreenBackground(commandBuffer, centerX, centerY, textureManager.craftingTexture);
 
-        InventoryItemRenderer.renderInventoryItems(graphics, matrixStack, textureManager, heldItemRenderer, this, centerX, centerY);
-        InventoryItemRenderer.drawSelectedItem(graphics, matrixStack, textureManager, heldItemRenderer, inventory, mouseX, mouseY, stackSizeSelectedItemLabel);
+        InventoryItemRenderer.renderInventoryItems(commandBuffer, matrixStack, textureManager, heldItemRenderer, this, centerX, centerY);
+        InventoryItemRenderer.drawSelectedItem(commandBuffer, matrixStack, textureManager, heldItemRenderer, inventory, mouseX, mouseY, stackSizeSelectedItemLabel);
 
         this.screenWidth = screenWidth;
         this.screenHeight = screenHeight;

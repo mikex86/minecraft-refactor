@@ -2,6 +2,7 @@ package com.mojang.minecraft.renderer.graphics.opengl;
 
 import com.mojang.minecraft.renderer.graphics.PipelineLayout;
 
+import java.util.BitSet;
 import java.util.EnumMap;
 import java.util.List;
 
@@ -11,6 +12,7 @@ import java.util.List;
 public final class OpenGLPipelineLayout implements PipelineLayout {
     private final Descriptor descriptor;
     private final EnumMap<BindingSemantic, Integer> semanticBindings;
+    private final BitSet declaredBindings;
     private boolean disposed;
 
     public OpenGLPipelineLayout(Descriptor descriptor) {
@@ -19,7 +21,9 @@ public final class OpenGLPipelineLayout implements PipelineLayout {
         }
         this.descriptor = descriptor;
         this.semanticBindings = new EnumMap<>(BindingSemantic.class);
+        this.declaredBindings = new BitSet();
         for (Binding binding : descriptor.getBindings()) {
+            declaredBindings.set(binding.getBinding());
             BindingSemantic semantic = binding.getSemantic();
             if (semantic == BindingSemantic.NONE) {
                 continue;
@@ -48,6 +52,11 @@ public final class OpenGLPipelineLayout implements PipelineLayout {
             return -1;
         }
         return binding;
+    }
+
+    @Override
+    public boolean hasBinding(int binding) {
+        return binding >= 0 && declaredBindings.get(binding);
     }
 
     @Override

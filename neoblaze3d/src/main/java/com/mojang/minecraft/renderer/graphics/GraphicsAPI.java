@@ -117,11 +117,8 @@ public interface GraphicsAPI {
     Pipeline createPipeline(Pipeline.Descriptor descriptor);
 
     /**
-     * Uploads current model-view/projection matrices for the currently bound pipeline.
-     * The matrix stack is owned and managed by the caller.
-     *
-     * @param matrixStack User-managed matrix stack to source matrices from
+     * Creates a reusable uniform object bound to a numeric shader location.
      */
-    void bindCurrentMatrices(MatrixStack matrixStack);
+    Uniform createUniform(int binding, Uniform.ValueType type);
 
 }

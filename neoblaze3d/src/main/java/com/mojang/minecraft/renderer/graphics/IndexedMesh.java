@@ -33,7 +33,7 @@ public class IndexedMesh implements Disposable {
     /**
      * Creates a new indexed mesh.
      *
-     * @param graphics     The graphics API
+     * @param commandBuffer     The commandBuffer API
      * @param vertexBuffer The vertex buffer
      * @param indexBuffer  The index buffer (nullable)
      * @param vertexCount  The number of vertices
@@ -41,23 +41,23 @@ public class IndexedMesh implements Disposable {
      * @deprecated Use {@link #IndexedMesh(VertexBuffer, IndexBuffer, int, int)} instead
      */
     @Deprecated
-    public IndexedMesh(CommandBuffer graphics, VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int vertexCount, int indexCount) {
+    public IndexedMesh(CommandBuffer commandBuffer, VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int vertexCount, int indexCount) {
         this(vertexBuffer, indexBuffer, vertexCount, indexCount);
     }
 
     /**
      * Draws this mesh.
      *
-     * @param graphics      The graphics API
+     * @param commandBuffer      The commandBuffer API
      * @param primitiveType The primitive type to draw (e.g., triangles, lines)
      */
-    public void draw(CommandBuffer graphics, PrimitiveType primitiveType) {
+    public void draw(CommandBuffer commandBuffer, PrimitiveType primitiveType) {
         int elementCount = indexBuffer != null ? indexCount : vertexCount;
-        graphics.draw(primitiveType, vertexBuffer, indexBuffer, 0, elementCount);
+        commandBuffer.draw(primitiveType, vertexBuffer, indexBuffer, 0, elementCount);
     }
 
-    public void draw(CommandBuffer graphics) {
-        draw(graphics, PrimitiveType.TRIANGLES);
+    public void draw(CommandBuffer commandBuffer) {
+        draw(commandBuffer, PrimitiveType.TRIANGLES);
     }
 
     /**

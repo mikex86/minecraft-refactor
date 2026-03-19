@@ -60,18 +60,18 @@ public class ParticleEngine {
     /**
      * Renders all particles managed by the particle engine
      *
-     * @param graphics    The graphics API
+     * @param commandBuffer    The commandBuffer API
      * @param player      The player (for camera-relative positioning)
      * @param partialTick Partial tick time
      */
-    public void render(CommandBuffer graphics, EntityPlayer player, float partialTick) {
+    public void render(CommandBuffer commandBuffer, EntityPlayer player, float partialTick) {
         if (this.particles.isEmpty()) {
             return;
         }
 
         // Setup texture
         Texture texture = this.textureManager.terrainTexture;
-        graphics.setTexture(texture);
+        commandBuffer.bindTexture(0, texture);
 
         // Calculate view vectors based on player rotation
         float xa = -((float) Math.cos(player.yaw * DEG_TO_RAD));
@@ -91,7 +91,7 @@ public class ParticleEngine {
         }
 
         // Finish rendering
-        tesselator.flush(graphics);
+        tesselator.flush(commandBuffer);
 
     }
 }

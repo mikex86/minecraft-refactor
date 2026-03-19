@@ -8,12 +8,13 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums.CullMode;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.FillMode;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.graphics.PipelineLayout;
+import com.mojang.minecraft.renderer.graphics.Uniform;
+import com.mojang.minecraft.renderer.graphics.UniformCollection;
 import com.mojang.minecraft.renderer.shader.impl.*;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class PipelineRegistry implements Disposable {
@@ -32,6 +33,7 @@ public class PipelineRegistry implements Disposable {
     private OutlineShader outlineShader;
 
     private PipelineLayout sharedPipelineLayout;
+    private UniformCollection sharedUniforms;
 
     // Core pipelines
     private Pipeline worldPipeline;
@@ -96,6 +98,12 @@ public class PipelineRegistry implements Disposable {
                         )
                 )
         );
+        Uniform modelViewMatrixUniform = createMatrixUniform(PipelineLayout.BindingSemantic.MODEL_VIEW_MATRIX);
+        Uniform projectionMatrixUniform = createMatrixUniform(PipelineLayout.BindingSemantic.PROJECTION_MATRIX);
+        sharedUniforms = new UniformCollection(
+                sharedPipelineLayout,
+                Arrays.asList(modelViewMatrixUniform, projectionMatrixUniform)
+        );
 
         Pipeline.BlendState blendDisabled = new Pipeline.BlendState(false, BlendFactor.ONE, BlendFactor.ZERO);
         Pipeline.BlendState blendAlpha = new Pipeline.BlendState(true, BlendFactor.SRC_ALPHA, BlendFactor.ONE_MINUS_SRC_ALPHA);
@@ -121,6 +129,14 @@ public class PipelineRegistry implements Disposable {
         hudNoTexPipeline = createPipeline("hud-notex-pipeline", hudNoTexShader, blendDisabled, depthDisabled, cullBack);
 
         outlinePipeline = createPipeline("outline-pipeline", outlineShader, blendAlpha, depthReadWrite, cullNone);
+    }
+
+    private Uniform createMatrixUniform(PipelineLayout.BindingSemantic semantic) {
+        int binding = sharedPipelineLayout.findBinding(semantic);
+        if (binding < 0) {
+            throw new IllegalStateException("Missing required matrix binding " + semantic + " in layout " + sharedPipelineLayout.getDebugName());
+        }
+        return GraphicsFactory.getGraphicsAPI().createUniform(binding, Uniform.ValueType.MAT4);
     }
 
     private Pipeline createPipeline(String name,
@@ -165,6 +181,10 @@ public class PipelineRegistry implements Disposable {
 
     public PipelineLayout getSharedPipelineLayout() {
         return sharedPipelineLayout;
+    }
+
+    public UniformCollection getSharedUniforms() {
+        return sharedUniforms;
     }
 
     public Pipeline getWorldPipeline() {
@@ -270,6 +290,10 @@ public class PipelineRegistry implements Disposable {
         if (sharedPipelineLayout != null) {
             sharedPipelineLayout.dispose();
             sharedPipelineLayout = null;
+        }
+        if (sharedUniforms != null) {
+            sharedUniforms.dispose();
+            sharedUniforms = null;
         }
         
         if (worldShader != null) {

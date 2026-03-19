@@ -485,8 +485,8 @@ public class EntityPlayer extends EntityLiving {
      * @param partialTicks Partial tick time for smooth animation
      */
     @Override
-    public void render(CommandBuffer graphics, MatrixStack matrixStack, TextureManager textureManager, float partialTicks) {
-        graphics.setTexture(textureManager.charTexture);
+    public void render(CommandBuffer commandBuffer, MatrixStack matrixStack, TextureManager textureManager, float partialTicks) {
+        commandBuffer.bindTexture(0, textureManager.charTexture);
 
         matrixStack.pushMatrix();
 
@@ -502,7 +502,7 @@ public class EntityPlayer extends EntityLiving {
         matrixStack.translate(0.0F, MODEL_Y_OFFSET, 0.0F);
 
         // Render the model
-        PLAYER_MODEL.render(graphics, matrixStack, this, partialTicks);
+        PLAYER_MODEL.render(commandBuffer, matrixStack, this, partialTicks);
 
         matrixStack.popMatrix();
     }

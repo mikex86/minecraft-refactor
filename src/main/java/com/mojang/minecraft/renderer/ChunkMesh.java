@@ -43,11 +43,11 @@ public class ChunkMesh implements Disposable {
     /**
      * Draws this chunk mesh
      *
-     * @param graphics the graphics API
+     * @param commandBuffer the commandBuffer API
      */
-    public int draw(CommandBuffer graphics) {
+    public int draw(CommandBuffer commandBuffer) {
         if (mesh != null) {
-            mesh.draw(graphics);
+            mesh.draw(commandBuffer);
             return 1;
         }
         return 0;

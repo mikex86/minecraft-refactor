@@ -22,6 +22,7 @@ import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
+import com.mojang.minecraft.renderer.graphics.MatrixUniformBinder;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
@@ -40,8 +41,9 @@ public class GameRenderer implements Disposable {
 
     // Graphics context
     private final GraphicsAPI device;
-    private CommandBuffer graphics;
+    private CommandBuffer commandBuffer;
     private final MatrixStack matrixStack = new MatrixStack();
+    private final PipelineRegistry pipelineRegistry;
 
     // Texture manager
     private final TextureManager textureManager;
@@ -94,7 +96,7 @@ public class GameRenderer implements Disposable {
     private final String[] debugStrings = new String[5];
 
     /**
-     * Creates a new graphics renderer.
+     * Creates a new commandBuffer renderer.
      *
      * @param textureManager The texture manager
      * @param pipelineRegistry The shader registry
@@ -108,8 +110,9 @@ public class GameRenderer implements Disposable {
     public GameRenderer(TextureManager textureManager, PipelineRegistry pipelineRegistry,
                         Level level, LevelRenderer levelRenderer,
                         ParticleEngine particleEngine, EntityPlayer player, int width, int height) {
-        // Get graphics API instance
+        // Get commandBuffer API instance
         this.device = GraphicsFactory.getGraphicsAPI();
+        this.pipelineRegistry = pipelineRegistry;
 
         this.textureManager = textureManager;
         this.level = level;
@@ -200,7 +203,7 @@ public class GameRenderer implements Disposable {
         float aspectRatio = (float) (this.width) / this.height;
 
         // Set viewport
-        graphics.setViewport(0, 0, this.width, this.height);
+        commandBuffer.setViewport(0, 0, this.width, this.height);
 
         // Set up projection matrix
         setPerspectiveProjection(70.0F * player.getInterpolatedFOV(partialTick), aspectRatio, 0.05F, 4096.0F);
@@ -257,11 +260,11 @@ public class GameRenderer implements Disposable {
      * @param hitResult    The current hit result (block selection)
      */
     public void render(float partialTicks, HitResult hitResult) {
-        graphics = device.beginFrame();
+        commandBuffer = device.beginFrame();
         try {
             // Set viewport and clear buffers
-            graphics.setViewport(0, 0, this.width, this.height);
-            graphics.clear(true, true, 0.5F, 0.8F, 1.0F, 0.0F);
+            commandBuffer.setViewport(0, 0, this.width, this.height);
+            commandBuffer.clear(true, true, 0.5F, 0.8F, 1.0F, 0.0F);
 
             resetMatricesForFrame();
 
@@ -269,7 +272,7 @@ public class GameRenderer implements Disposable {
             this.setupCamera(partialTicks);
 
             // Update chunks that have changed
-            this.levelRenderer.updateDirtyChunks(graphics, matrixStack, this.player);
+            this.levelRenderer.updateDirtyChunks(commandBuffer, matrixStack, this.player);
 
             render(partialTicks);
 
@@ -284,10 +287,10 @@ public class GameRenderer implements Disposable {
             renderHeldItem(partialTicks);
 
             // Render HUD elements
-            drawUI(graphics, debugStrings, partialTicks);
+            drawUI(commandBuffer, debugStrings, partialTicks);
         } finally {
             device.endFrame();
-            graphics = null;
+            commandBuffer = null;
         }
     }
 
@@ -306,7 +309,7 @@ public class GameRenderer implements Disposable {
         }
 
         // Calculate aspect ratio
-        graphics.setPipeline(worldPipeline);
+        commandBuffer.setPipeline(worldPipeline);
 
         float handFov = 70.0F * player.getInterpolatedFOV(partialTicks);
         setPerspectiveProjection(handFov, aspectRatio, 0.05F, 4096.0F);
@@ -316,7 +319,7 @@ public class GameRenderer implements Disposable {
             matrixStack.loadIdentity();
 
             // clear depth test because items shouldn't intersect with world geometry such as blocks
-            graphics.clear(false, true, 0.0F, 0.0F, 0.0F, 0.0F);
+            commandBuffer.clear(false, true, 0.0F, 0.0F, 0.0F, 0.0F);
 
             // In vanilla the hurt tilt is applied before bobbing. The clone currently has no hurt tilt data.
             bobView(player, partialTicks);
@@ -349,19 +352,18 @@ public class GameRenderer implements Disposable {
             try {
                 Item item = itemStack.getItem();
                 if (item instanceof BlockItem) {
-                    graphics.setPipeline(worldPipeline);
-                    graphics.setTexture(textureManager.terrainTexture);
+                    commandBuffer.setPipeline(worldPipeline);
+                    commandBuffer.bindTexture(0, textureManager.terrainTexture);
                     applyBlockFirstPersonTransform(handSign);
-                    device.bindCurrentMatrices(matrixStack);
+                    MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
                     BlockItem blockItem = (BlockItem) item;
                     Block block = blockItem.getBlock();
-                    BlockRenderer.getBlockMesh(block).draw(graphics);
+                    BlockRenderer.getBlockMesh(block).draw(commandBuffer);
                 } else if (item instanceof HeldItem) {
-                    graphics.setPipeline(hudItemPipeline);
-                    graphics.setTexture(textureManager.itemsTexture);
+                    commandBuffer.setPipeline(hudItemPipeline);
+                    commandBuffer.bindTexture(0, textureManager.itemsTexture);
                     applyHeldItemFirstPersonTransform(handSign);
-                    device.bindCurrentMatrices(matrixStack);
-                    heldItemRenderer.renderHeldItemModel(graphics, matrixStack, (HeldItem) item, 1);
+                    heldItemRenderer.renderHeldItemModel(commandBuffer, matrixStack, (HeldItem) item, 1);
                 }
             } finally {
                 matrixStack.popMatrix();
@@ -426,27 +428,27 @@ public class GameRenderer implements Disposable {
 
         // render level
         {
-            graphics.setPipeline(worldPipeline);
-            device.bindCurrentMatrices(matrixStack);
+            commandBuffer.setPipeline(worldPipeline);
+            MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
             setupFog(worldShader);
 
-            this.levelRenderer.render(graphics, matrixStack, partialTicks);
+            this.levelRenderer.render(commandBuffer, matrixStack, partialTicks);
         }
 
         // render entities
         {
-            graphics.setPipeline(entityPipeline);
+            commandBuffer.setPipeline(entityPipeline);
             // cannot set matrices "globally" because entities transform themselves
             setupFog(entityShader);
 
-            this.levelRenderer.renderEntities(graphics, matrixStack, partialTicks);
+            this.levelRenderer.renderEntities(commandBuffer, matrixStack, partialTicks);
         }
 
         // render particles
         {
-            graphics.setPipeline(particlePipeline);
-            device.bindCurrentMatrices(matrixStack);
-            this.particleEngine.render(this.graphics, this.player, partialTicks);
+            commandBuffer.setPipeline(particlePipeline);
+            MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
+            this.particleEngine.render(this.commandBuffer, this.player, partialTicks);
         }
     }
 
@@ -545,10 +547,10 @@ public class GameRenderer implements Disposable {
         matrixStack.pushMatrix();
         matrixStack.translate(hitResult.x, hitResult.y, hitResult.z);
 
-        graphics.setPipeline(outlinePipeline);
-        device.bindCurrentMatrices(matrixStack);
+        commandBuffer.setPipeline(outlinePipeline);
+        MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
 
-        blockOutlineMesh.draw(graphics, GraphicsEnums.PrimitiveType.TRIANGLES);
+        blockOutlineMesh.draw(commandBuffer, GraphicsEnums.PrimitiveType.TRIANGLES);
 
         matrixStack.popMatrix();
     }
@@ -574,12 +576,12 @@ public class GameRenderer implements Disposable {
         matrixStack.pushMatrix();
         matrixStack.translate(player.breakingBlockX, player.breakingBlockY, player.breakingBlockZ);
 
-        graphics.setPipeline(worldOverlayPipeline);
+        commandBuffer.setPipeline(worldOverlayPipeline);
         setupFog(worldShader);
-        graphics.setTexture(textureManager.terrainTexture);
-        device.bindCurrentMatrices(matrixStack);
+        commandBuffer.bindTexture(0, textureManager.terrainTexture);
+        MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
 
-        breakingMesh.draw(graphics);
+        breakingMesh.draw(commandBuffer);
 
         matrixStack.popMatrix();
     }
@@ -653,40 +655,40 @@ public class GameRenderer implements Disposable {
     /**
      * Draws all UI elements, including the hotbar and crosshair.
      *
-     * @param graphics     The graphics api
+     * @param commandBuffer     The commandBuffer api
      * @param debugStrings the debug strings to display
      * @param partialTicks The partial ticks for animation
      */
-    private void drawUI(CommandBuffer graphics, String[] debugStrings, float partialTicks) {
-        graphics.setPipeline(hudNoCullPipeline);
+    private void drawUI(CommandBuffer commandBuffer, String[] debugStrings, float partialTicks) {
+        commandBuffer.setPipeline(hudNoCullPipeline);
 
         float scaledWidth = ScaledResolution.getScaledWidth(this.width, this.height);
         float scaledHeight = ScaledResolution.getScaledHeight(this.height);
 
-        graphics.clear(false, true, 0.0F, 0.0F, 0.0F, 0.0F);
+        commandBuffer.clear(false, true, 0.0F, 0.0F, 0.0F, 0.0F);
 
         setOrthographicProjection(0.0F, scaledWidth, scaledHeight, 0.0F, 100.0F, 300.0F);
         matrixStack.setMatrixMode(MatrixStack.MatrixMode.MODELVIEW);
         matrixStack.loadIdentity();
         matrixStack.translate(0.0F, 0.0F, -200.0F);
 
-        drawDebugText(graphics, debugStrings);
+        drawDebugText(commandBuffer, debugStrings);
 
         // Draw hotbar
-        drawHotbar(graphics, scaledWidth, scaledHeight, player.hotbarSlotIndex);
+        drawHotbar(commandBuffer, scaledWidth, scaledHeight, player.hotbarSlotIndex);
 
-        graphics.setPipeline(hudNoTexPipeline);
-        device.bindCurrentMatrices(matrixStack);
+        commandBuffer.setPipeline(hudNoTexPipeline);
+        MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
 
         // Draw cross-hair
-        drawCrosshair(graphics, scaledWidth, scaledHeight);
+        drawCrosshair(commandBuffer, scaledWidth, scaledHeight);
 
-        graphics.setPipeline(hudPipeline);
-        device.bindCurrentMatrices(matrixStack);
+        commandBuffer.setPipeline(hudPipeline);
+        MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
 
         // Draw current screen if it exists
         if (currentScreen != null) {
-            currentScreen.drawScreen(graphics, matrixStack, scaledWidth, scaledHeight, partialTicks);
+            currentScreen.drawScreen(commandBuffer, matrixStack, scaledWidth, scaledHeight, partialTicks);
         }
     }
 
@@ -716,7 +718,7 @@ public class GameRenderer implements Disposable {
 
     private TextLabel[] stackSizeHotbarLabels;
 
-    private void drawHotbar(CommandBuffer graphics, float screenWidth, float screenHeight, int hotbarSlotIndex) {
+    private void drawHotbar(CommandBuffer commandBuffer, float screenWidth, float screenHeight, int hotbarSlotIndex) {
         float centerX = screenWidth / 2f;
 
         if (hotbarMesh == null) {
@@ -748,13 +750,13 @@ public class GameRenderer implements Disposable {
         }
 
         // draw hot-bar background
-        graphics.setTexture(textureManager.guiTexture);
-        device.bindCurrentMatrices(matrixStack);
-        hotbarMesh.draw(graphics);
+        commandBuffer.bindTexture(0, textureManager.guiTexture);
+        MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
+        hotbarMesh.draw(commandBuffer);
 
         // draw hot-bar blocks
-        graphics.setTexture(textureManager.terrainTexture);
-        graphics.setPipeline(worldPipeline);
+        commandBuffer.bindTexture(0, textureManager.terrainTexture);
+        commandBuffer.setPipeline(worldPipeline);
         worldShader.setFogUniforms(0.0F, 0.0F, 10.0F,
                 0.5F, 0.8F, 1.0F, 1.0F);
 
@@ -773,14 +775,14 @@ public class GameRenderer implements Disposable {
                 // render item pickup animation
                 renderPickupAnimation(itemStack);
 
-                BlockRenderer.renderBlockPreview(graphics, matrixStack, blockItem.getBlock(), BLOCK_ITEM_SIZE);
+                BlockRenderer.renderBlockPreview(commandBuffer, matrixStack, blockItem.getBlock(), BLOCK_ITEM_SIZE);
                 matrixStack.popMatrix();
             }
         }
 
         // draw hot-bar items
-        graphics.setTexture(textureManager.itemsTexture);
-        graphics.setPipeline(hudPipeline);
+        commandBuffer.bindTexture(0, textureManager.itemsTexture);
+        commandBuffer.setPipeline(hudPipeline);
 
         for (int i = 0; i < hotBarSize; i++) {
             ItemStack itemStack = player.getInventory().getHotbarItem(i);
@@ -796,19 +798,19 @@ public class GameRenderer implements Disposable {
                 // render item pickup animation
                 renderPickupAnimation(itemStack);
 
-                heldItemRenderer.renderHeldItemPreview(graphics, matrixStack, heldItem, HELD_ITEM_SIZE);
+                heldItemRenderer.renderHeldItemPreview(commandBuffer, matrixStack, heldItem, HELD_ITEM_SIZE);
                 matrixStack.popMatrix();
             }
         }
 
         // draw selector (selector is drawn before stack sizes)
-        graphics.setPipeline(hudPipeline);
+        commandBuffer.setPipeline(hudPipeline);
         {
             matrixStack.pushMatrix();
             matrixStack.translate(centerX - HOTBAR_WIDTH / 2f + hotbarSlotIndex * HOTBAR_SLOT_WIDTH - 1, screenHeight - HOTBAR_SELECTOR_SIZE + 1, 0.0F);
-            device.bindCurrentMatrices(matrixStack);
-            graphics.setTexture(textureManager.guiTexture);
-            hotbarSelectorMesh.draw(graphics);
+            MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
+            commandBuffer.bindTexture(0, textureManager.guiTexture);
+            hotbarSelectorMesh.draw(commandBuffer);
             matrixStack.popMatrix();
         }
 
@@ -828,7 +830,7 @@ public class GameRenderer implements Disposable {
                 int count = itemStack.getCount();
                 if (count > 1) {
                     stackSizeHotbarLabels[i].setText(StackCountStringPool.valueOf(count));
-                    stackSizeHotbarLabels[i].render(graphics, matrixStack, centerX - HOTBAR_WIDTH / 2f + HOTBAR_SLOT_WIDTH + HOTBAR_SLOT_WIDTH * i - stackSizeHotbarLabels[i].getWidth(), screenHeight - font.getFontHeight() - 2);
+                    stackSizeHotbarLabels[i].render(commandBuffer, matrixStack, centerX - HOTBAR_WIDTH / 2f + HOTBAR_SLOT_WIDTH + HOTBAR_SLOT_WIDTH * i - stackSizeHotbarLabels[i].getWidth(), screenHeight - font.getFontHeight() - 2);
                 }
             }
         }
@@ -848,27 +850,25 @@ public class GameRenderer implements Disposable {
 
     }
 
-    private void drawDebugText(CommandBuffer graphics, String[] debugStrings) {
+    private void drawDebugText(CommandBuffer commandBuffer, String[] debugStrings) {
         String fpsString = debugStrings[0];
         String positionString = debugStrings[1];
         String memoryString1 = debugStrings[2];
         String memoryString2 = debugStrings[3];
         String memoryString3 = debugStrings[4];
 
-        device.bindCurrentMatrices(matrixStack);
-
         this.versionStringLabel.setText(Minecraft.MINECRAFT_VERSION_STRING);
-        this.versionStringLabel.render(graphics, matrixStack, 2, 2);
+        this.versionStringLabel.render(commandBuffer, matrixStack, 2, 2);
         this.fpsStringLabel.setText(fpsString);
-        this.fpsStringLabel.render(graphics, matrixStack, 2, 12);
+        this.fpsStringLabel.render(commandBuffer, matrixStack, 2, 12);
         this.positionStringLabel.setText(positionString);
-        this.positionStringLabel.render(graphics, matrixStack, 2, 22);
+        this.positionStringLabel.render(commandBuffer, matrixStack, 2, 22);
         this.memoryStringLabel1.setText(memoryString1);
-        this.memoryStringLabel1.render(graphics, matrixStack, 2, 32);
+        this.memoryStringLabel1.render(commandBuffer, matrixStack, 2, 32);
         this.memoryStringLabel2.setText(memoryString2);
-        this.memoryStringLabel2.render(graphics, matrixStack, 2, 42);
+        this.memoryStringLabel2.render(commandBuffer, matrixStack, 2, 42);
         this.memoryStringLabel3.setText(memoryString3);
-        this.memoryStringLabel3.render(graphics, matrixStack, 2, 52);
+        this.memoryStringLabel3.render(commandBuffer, matrixStack, 2, 52);
     }
 
     private void resetMatricesForFrame() {
@@ -892,11 +892,11 @@ public class GameRenderer implements Disposable {
 
     private IndexedMesh crosshairMesh;
 
-    private void drawCrosshair(CommandBuffer graphics, float screenWidth, float screenHeight) {
+    private void drawCrosshair(CommandBuffer commandBuffer, float screenWidth, float screenHeight) {
         float centerX = screenWidth / 2f;
         float centerY = screenHeight / 2f;
 
-        device.bindCurrentMatrices(matrixStack);
+        MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
 
         if (crosshairMesh == null) {
             Tesselator t = Tesselator.instance;
@@ -918,7 +918,7 @@ public class GameRenderer implements Disposable {
             crosshairMesh = t.createIndexedMesh(GraphicsEnums.BufferUsage.STATIC);
         }
 
-        crosshairMesh.draw(graphics);
+        crosshairMesh.draw(commandBuffer);
     }
 
     @Override

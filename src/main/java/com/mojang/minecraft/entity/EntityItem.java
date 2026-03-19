@@ -7,8 +7,8 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.block.BlockRenderer;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
-import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
+import com.mojang.minecraft.renderer.graphics.MatrixUniformBinder;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
@@ -82,17 +82,17 @@ public class EntityItem extends Entity {
     }
 
     @Override
-    public void render(CommandBuffer graphics, MatrixStack matrixStack, TextureManager textureManager, float partialTick) {
+    public void render(CommandBuffer commandBuffer, MatrixStack matrixStack, TextureManager textureManager, float partialTick) {
         Item item = itemStack.getItem(); // TODO: RENDER > STACK SIZE AS ITEM BUNDLE
         if (item instanceof BlockItem) {
-            renderBlockItem((BlockItem) item, graphics, matrixStack, textureManager, partialTick);
+            renderBlockItem((BlockItem) item, commandBuffer, matrixStack, textureManager, partialTick);
         }
     }
 
-    private void renderBlockItem(BlockItem blockItem, CommandBuffer graphics, MatrixStack matrixStack, TextureManager textureManager, float partialTicks) {
+    private void renderBlockItem(BlockItem blockItem, CommandBuffer commandBuffer, MatrixStack matrixStack, TextureManager textureManager, float partialTicks) {
         IndexedMesh mesh = BlockRenderer.getBlockMesh(blockItem.getBlock());
-        graphics.setTexture(textureManager.terrainTexture);
-        graphics.setPipeline(WORLD_PIPELINE);
+        commandBuffer.bindTexture(0, textureManager.terrainTexture);
+        commandBuffer.setPipeline(WORLD_PIPELINE);
 
         matrixStack.pushMatrix();
 
@@ -115,9 +115,9 @@ public class EntityItem extends Entity {
         matrixStack.rotateY(rot);
         matrixStack.translate(-0.5f, -0.0f, -0.5f);
 
-        GraphicsFactory.getGraphicsAPI().bindCurrentMatrices(matrixStack);
+        MatrixUniformBinder.bindStandardMatrices(commandBuffer, PipelineRegistry.getInstance().getSharedUniforms(), matrixStack);
 
-        mesh.draw(graphics);
+        mesh.draw(commandBuffer);
 
         matrixStack.popMatrix();
     }

@@ -5,10 +5,10 @@ import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BufferUsage;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.TextureFormat;
 import com.mojang.minecraft.renderer.graphics.IndexBuffer;
-import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.graphics.PipelineLayout;
 import com.mojang.minecraft.renderer.graphics.Texture;
+import com.mojang.minecraft.renderer.graphics.Uniform;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 import com.mojang.minecraft.renderer.graphics.allocator.BufferAllocation;
 import com.mojang.minecraft.renderer.graphics.allocator.BufferAllocator;
@@ -180,8 +180,8 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     }
 
     @Override
-    public void bindCurrentMatrices(MatrixStack matrixStack) {
-        frameCommandBuffer.bindCurrentMatrices(matrixStack);
+    public Uniform createUniform(int binding, Uniform.ValueType type) {
+        return new OpenGLUniform(binding, type);
     }
 
     private static int bufferTypeFor(BufferBinding binding) {

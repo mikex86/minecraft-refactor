@@ -8,16 +8,17 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums.CullMode;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.FillMode;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.PrimitiveType;
 import com.mojang.minecraft.renderer.graphics.IndexBuffer;
-import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
-import com.mojang.minecraft.renderer.graphics.PipelineLayout;
 import com.mojang.minecraft.renderer.graphics.Texture;
+import com.mojang.minecraft.renderer.graphics.Uniform;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 import com.mojang.minecraft.renderer.shader.IShader;
 
 import java.util.Objects;
 
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
+import static org.lwjgl.opengl.GL13.glActiveTexture;
 import static org.lwjgl.opengl.GL15.glBindBuffer;
 import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL30.GL_HALF_FLOAT;
@@ -34,7 +35,7 @@ final class OpenGLCommandBuffer implements CommandBuffer {
 
     void reset() {
         bindShader(null);
-        setTexture(null);
+        bindTexture(0, null);
         currentPipeline = null;
     }
 
@@ -101,7 +102,11 @@ final class OpenGLCommandBuffer implements CommandBuffer {
     }
 
     @Override
-    public void setTexture(Texture texture) {
+    public void bindTexture(int binding, Texture texture) {
+        if (binding < 0) {
+            throw new IllegalArgumentException("Texture binding must be >= 0");
+        }
+        glActiveTexture(GL_TEXTURE0 + binding);
         if (texture == null) {
             glBindTexture(GL_TEXTURE_2D, 0);
         } else if (texture instanceof OpenGLTexture) {
@@ -111,19 +116,54 @@ final class OpenGLCommandBuffer implements CommandBuffer {
         }
     }
 
-    void bindCurrentMatrices(MatrixStack matrixStack) {
-        Objects.requireNonNull(matrixStack, "Matrix stack cannot be null");
+    @Override
+    public void bindUniform(Uniform uniform) {
+        Objects.requireNonNull(uniform, "uniform cannot be null");
         Objects.requireNonNull(currentShader, "No shader set");
         Objects.requireNonNull(currentPipeline, "No pipeline set");
 
-        PipelineLayout layout = currentPipeline.getLayout();
-        int modelViewBinding = layout.findBinding(PipelineLayout.BindingSemantic.MODEL_VIEW_MATRIX);
-        if (modelViewBinding >= 0) {
-            glUniformMatrix4fv(modelViewBinding, false, matrixStack.getModelViewBuffer());
+        if (!(uniform instanceof OpenGLUniform)) {
+            throw new IllegalArgumentException("Uniform must be an OpenGL uniform");
         }
-        int projectionBinding = layout.findBinding(PipelineLayout.BindingSemantic.PROJECTION_MATRIX);
-        if (projectionBinding >= 0) {
-            glUniformMatrix4fv(projectionBinding, false, matrixStack.getProjectionBuffer());
+
+        OpenGLUniform glUniform = (OpenGLUniform) uniform;
+        int binding = glUniform.getBinding();
+        if (!currentPipeline.getLayout().hasBinding(binding)) {
+            throw new IllegalStateException("Uniform binding " + binding + " is not declared by pipeline layout " + currentPipeline.getDebugName());
+        }
+
+        switch (glUniform.getType()) {
+            case INT1:
+                glUniform1i(binding, glUniform.intValue());
+                break;
+            case FLOAT1: {
+                float[] values = glUniform.floatValues();
+                glUniform1f(binding, values[0]);
+                break;
+            }
+            case FLOAT2: {
+                float[] values = glUniform.floatValues();
+                glUniform2f(binding, values[0], values[1]);
+                break;
+            }
+            case FLOAT3: {
+                float[] values = glUniform.floatValues();
+                glUniform3f(binding, values[0], values[1], values[2]);
+                break;
+            }
+            case FLOAT4: {
+                float[] values = glUniform.floatValues();
+                glUniform4f(binding, values[0], values[1], values[2], values[3]);
+                break;
+            }
+            case MAT3:
+                glUniformMatrix3fv(binding, false, glUniform.floatValues());
+                break;
+            case MAT4:
+                glUniformMatrix4fv(binding, false, glUniform.floatValues());
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported uniform type: " + glUniform.getType());
         }
     }
 

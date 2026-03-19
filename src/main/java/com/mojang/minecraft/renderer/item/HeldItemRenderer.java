@@ -4,18 +4,18 @@ import com.mojang.minecraft.item.HeldItem;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
-import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
+import com.mojang.minecraft.renderer.graphics.MatrixUniformBinder;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Texture;
+import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
 public class HeldItemRenderer {
-
     private final Map<HeldItem, IndexedMesh> itemQuadMeshes = new HashMap<>();
 
     private static final int ITEM_TEXTURE_SIZE = 16;
@@ -33,13 +33,13 @@ public class HeldItemRenderer {
         this.itemsTextureData = hostData;
     }
 
-    public void renderHeldItemPreview(CommandBuffer graphics, MatrixStack matrixStack, HeldItem heldItem, int itemSize) {
+    public void renderHeldItemPreview(CommandBuffer commandBuffer, MatrixStack matrixStack, HeldItem heldItem, int itemSize) {
         matrixStack.pushMatrix();
         try {
             // GUI space has Y going down; flip to keep item upright.
             matrixStack.translate(0.0F, itemSize, 0.0F);
             matrixStack.scale(1.0F, -1.0F, 1.0F);
-            renderHeldItemModel(graphics, matrixStack, heldItem, itemSize);
+            renderHeldItemModel(commandBuffer, matrixStack, heldItem, itemSize);
         } finally {
             matrixStack.popMatrix();
         }
@@ -62,12 +62,12 @@ public class HeldItemRenderer {
         return (itemsTextureData.get(alphaIndex) & 0xFF) == 0;
     }
 
-    public void renderHeldItemModel(CommandBuffer graphics, MatrixStack matrixStack, HeldItem heldItem, int itemSize) {
+    public void renderHeldItemModel(CommandBuffer commandBuffer, MatrixStack matrixStack, HeldItem heldItem, int itemSize) {
         IndexedMesh itemQuadMesh = getItemQuadMesh(heldItem);
 
         matrixStack.scale(itemSize, itemSize, itemSize);
-        GraphicsFactory.getGraphicsAPI().bindCurrentMatrices(matrixStack);
-        itemQuadMesh.draw(graphics);
+        MatrixUniformBinder.bindStandardMatrices(commandBuffer, PipelineRegistry.getInstance().getSharedUniforms(), matrixStack);
+        itemQuadMesh.draw(commandBuffer);
     }
 
     private IndexedMesh getItemQuadMesh(HeldItem heldItem) {

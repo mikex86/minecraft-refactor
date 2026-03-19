@@ -29,14 +29,14 @@ public class InventoryItemRenderer {
     private static final Pipeline HUD_PIPELINE = PipelineRegistry.getInstance().getHudPipeline();
     private static final Pipeline HUD_NO_CULL_PIPELINE = PipelineRegistry.getInstance().getHudNoCullPipeline();
 
-    public static void renderInventoryItems(CommandBuffer graphics, MatrixStack matrixStack, TextureManager textureManager, HeldItemRenderer heldItemRenderer, AbstractInventoryScreen inventoryScreen, float centerX, float centerY) {
+    public static void renderInventoryItems(CommandBuffer commandBuffer, MatrixStack matrixStack, TextureManager textureManager, HeldItemRenderer heldItemRenderer, AbstractInventoryScreen inventoryScreen, float centerX, float centerY) {
 
         // set world shader
-        graphics.setPipeline(WORLD_PIPELINE);
+        commandBuffer.setPipeline(WORLD_PIPELINE);
         WORLD_SHADER.setFogUniforms(0f, 0f, 0f, 0f, 0f, 0f, 0f);
 
         // set terrain texture
-        graphics.setTexture(textureManager.terrainTexture);
+        commandBuffer.bindTexture(0, textureManager.terrainTexture);
 
         for (InventoryScreen.Slot slot : inventoryScreen.slots) {
             ItemStack itemStack = slot.getItemStack();
@@ -48,15 +48,14 @@ public class InventoryItemRenderer {
             matrixStack.translate(slot.getItemRenderX(centerX), slot.getItemRenderY(centerY), 0);
             if (item instanceof BlockItem) {
                 BlockItem blockItem = (BlockItem) item;
-                BlockRenderer.renderBlockPreview(graphics, matrixStack, blockItem.getBlock(), BLOCK_ITEM_SCALE_FACTOR
-                );
+                BlockRenderer.renderBlockPreview(commandBuffer, matrixStack, blockItem.getBlock(), BLOCK_ITEM_SCALE_FACTOR);
             }
             matrixStack.popMatrix();
         }
 
         // set items texture
-        graphics.setTexture(textureManager.itemsTexture);
-        graphics.setPipeline(HUD_NO_CULL_PIPELINE);
+        commandBuffer.bindTexture(0, textureManager.itemsTexture);
+        commandBuffer.setPipeline(HUD_NO_CULL_PIPELINE);
 
         for (InventoryScreen.Slot slot : inventoryScreen.slots) {
             ItemStack itemStack = slot.getItemStack();
@@ -68,14 +67,14 @@ public class InventoryItemRenderer {
             matrixStack.translate(slot.getItemRenderX(centerX) - HELD_ITEM_SCALE_FACTOR / 2f, slot.getItemRenderY(centerY) - HELD_ITEM_SCALE_FACTOR, 0);
             if (item instanceof HeldItem) {
                 HeldItem blockItem = (HeldItem) item;
-                heldItemRenderer.renderHeldItemPreview(graphics, matrixStack, blockItem, HELD_ITEM_SCALE_FACTOR);
+                heldItemRenderer.renderHeldItemPreview(commandBuffer, matrixStack, blockItem, HELD_ITEM_SCALE_FACTOR);
             }
             matrixStack.popMatrix();
         }
 
         // draw stack size labels
         {
-            graphics.setPipeline(HUD_PIPELINE);
+            commandBuffer.setPipeline(HUD_PIPELINE);
 
             for (InventoryScreen.Slot slot : inventoryScreen.slots) {
                 ItemStack itemStack = slot.getItemStack();
@@ -84,13 +83,13 @@ public class InventoryItemRenderer {
                 }
                 int count = itemStack.getCount();
                 if (count > 1) {
-                    slot.renderStackSize(graphics, matrixStack, centerX, centerY, count);
+                    slot.renderStackSize(commandBuffer, matrixStack, centerX, centerY, count);
                 }
             }
         }
     }
 
-    public static void drawSelectedItem(CommandBuffer graphics, MatrixStack matrixStack, TextureManager textureManager, HeldItemRenderer heldItemRenderer, Inventory inventory, float mouseX, float mouseY, TextLabel stackSizeSelectedItemLabel) {
+    public static void drawSelectedItem(CommandBuffer commandBuffer, MatrixStack matrixStack, TextureManager textureManager, HeldItemRenderer heldItemRenderer, Inventory inventory, float mouseX, float mouseY, TextLabel stackSizeSelectedItemLabel) {
         // draw selected item at cursor position
         {
             // set terrain texture again after drawing labels and the player
@@ -99,31 +98,31 @@ public class InventoryItemRenderer {
             if (selectedItem != null) {
                 Item item = selectedItem.getItem();
                 if (item instanceof BlockItem) {
-                    graphics.setPipeline(WORLD_PIPELINE);
-                    graphics.setTexture(textureManager.terrainTexture);
+                    commandBuffer.setPipeline(WORLD_PIPELINE);
+                    commandBuffer.bindTexture(0, textureManager.terrainTexture);
                     BlockItem blockItem = (BlockItem) item;
                     matrixStack.pushMatrix();
                     matrixStack.translate(mouseX, mouseY + ITEM_SLOT_SIZE / 2f, 0);
-                    BlockRenderer.renderBlockPreview(graphics, matrixStack, blockItem.getBlock(), BLOCK_ITEM_SCALE_FACTOR);
+                    BlockRenderer.renderBlockPreview(commandBuffer, matrixStack, blockItem.getBlock(), BLOCK_ITEM_SCALE_FACTOR);
                     matrixStack.popMatrix();
                 } else if (item instanceof HeldItem) {
-                    graphics.setPipeline(HUD_NO_CULL_PIPELINE);
-                    graphics.setTexture(textureManager.itemsTexture);
+                    commandBuffer.setPipeline(HUD_NO_CULL_PIPELINE);
+                    commandBuffer.bindTexture(0, textureManager.itemsTexture);
                     HeldItem heldItem = (HeldItem) item;
                     matrixStack.pushMatrix();
                     matrixStack.translate(mouseX - HELD_ITEM_SCALE_FACTOR / 2f, mouseY - HELD_ITEM_SCALE_FACTOR / 2f, 0);
-                    heldItemRenderer.renderHeldItemPreview(graphics, matrixStack, heldItem, HELD_ITEM_SCALE_FACTOR);
+                    heldItemRenderer.renderHeldItemPreview(commandBuffer, matrixStack, heldItem, HELD_ITEM_SCALE_FACTOR);
                     matrixStack.popMatrix();
                 }
             }
 
             // draw selected item stack size label
             if (selectedItem != null) {
-                graphics.setPipeline(HUD_PIPELINE);
+                commandBuffer.setPipeline(HUD_PIPELINE);
                 int count = selectedItem.getCount();
                 if (count > 1) {
                     stackSizeSelectedItemLabel.setText(StackCountStringPool.valueOf(count));
-                    stackSizeSelectedItemLabel.render(graphics, matrixStack, mouseX + 9 - stackSizeSelectedItemLabel.getWidth(), mouseY + 2);
+                    stackSizeSelectedItemLabel.render(commandBuffer, matrixStack, mouseX + 9 - stackSizeSelectedItemLabel.getWidth(), mouseY + 2);
                 }
             }
         }

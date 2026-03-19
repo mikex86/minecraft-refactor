@@ -13,9 +13,9 @@ public interface Model<T> extends Disposable {
     /**
      * Renders the model with the given animation time.
      *
-     * @param graphics     The graphics API to use for rendering
+     * @param commandBuffer     The commandBuffer API to use for rendering
      * @param drawable     The drawable object to render
      * @param partialTicks The partial ticks for animation smoothing
      */
-    void render(CommandBuffer graphics, MatrixStack matrixStack, T drawable, float partialTicks);
+    void render(CommandBuffer commandBuffer, MatrixStack matrixStack, T drawable, float partialTicks);
 }

@@ -232,43 +232,35 @@ public class Shader implements IShader {
         return location;
     }
 
-    @Override
-    public void setUniform(String name, boolean value) {
+    void setUniform(String name, boolean value) {
         glUniform1i(getUniformLocation(name), value ? 1 : 0);
     }
 
-    @Override
-    public void setUniform(String name, int value) {
+    void setUniform(String name, int value) {
         glUniform1i(getUniformLocation(name), value);
     }
 
-    @Override
-    public void setUniform(String name, float value) {
+    void setUniform(String name, float value) {
         glUniform1f(getUniformLocation(name), value);
     }
 
-    @Override
-    public void setUniform(String name, float x, float y) {
+    void setUniform(String name, float x, float y) {
         glUniform2f(getUniformLocation(name), x, y);
     }
 
-    @Override
-    public void setUniform(String name, float x, float y, float z) {
+    void setUniform(String name, float x, float y, float z) {
         glUniform3f(getUniformLocation(name), x, y, z);
     }
 
-    @Override
-    public void setUniform(String name, float x, float y, float z, float w) {
+    void setUniform(String name, float x, float y, float z, float w) {
         glUniform4f(getUniformLocation(name), x, y, z, w);
     }
 
-    @Override
-    public void setUniform4fv(String name, FloatBuffer buffer) {
+    void setUniform4fv(String name, FloatBuffer buffer) {
         glUniform4fv(getUniformLocation(name), buffer);
     }
 
-    @Override
-    public void setUniformMatrix4fv(String name, FloatBuffer matrix) {
+    void setUniformMatrix4fv(String name, FloatBuffer matrix) {
         glUniformMatrix4fv(getUniformLocation(name), false, matrix);
     }
 

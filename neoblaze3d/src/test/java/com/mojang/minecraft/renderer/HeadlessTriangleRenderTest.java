@@ -13,6 +13,7 @@ import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.graphics.PipelineLayout;
+import com.mojang.minecraft.renderer.graphics.Uniform;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 import com.mojang.minecraft.renderer.shader.Shader;
 import org.junit.jupiter.api.AfterAll;
@@ -48,6 +49,8 @@ class HeadlessTriangleRenderTest {
     private static final float BACKGROUND_TOLERANCE = 0.08f;
     private static GameWindow window;
     private static GraphicsAPI graphics;
+    private static Uniform modelViewUniform;
+    private static Uniform projectionUniform;
 
     @BeforeAll
     static void initializeGraphicsContext() {
@@ -57,6 +60,8 @@ class HeadlessTriangleRenderTest {
             GLCapabilities capabilities = GL.getCapabilities();
             boolean supportsSpirv = capabilities != null && (capabilities.OpenGL46 || capabilities.GL_ARB_gl_spirv);
             Assumptions.assumeTrue(supportsSpirv, "Skipping OpenGL tests. ARB_gl_spirv/OpenGL 4.6 is not available.");
+            modelViewUniform = graphics.createUniform(0, Uniform.ValueType.MAT4);
+            projectionUniform = graphics.createUniform(4, Uniform.ValueType.MAT4);
         } catch (Throwable t) {
             Assumptions.assumeTrue(false, "Skipping OpenGL tests. Could not initialize hidden context: " + t.getMessage());
         }
@@ -67,6 +72,14 @@ class HeadlessTriangleRenderTest {
         if (window != null) {
             window.dispose();
             window = null;
+        }
+        if (modelViewUniform != null) {
+            modelViewUniform.dispose();
+            modelViewUniform = null;
+        }
+        if (projectionUniform != null) {
+            projectionUniform.dispose();
+            projectionUniform = null;
         }
         graphics = null;
     }
@@ -176,7 +189,7 @@ class HeadlessTriangleRenderTest {
             matrixStack.loadIdentity();
             matrixStack.translate(translateX, translateY, 0.0f);
             matrixStack.rotateZ(rotateDegrees);
-            graphics.bindCurrentMatrices(matrixStack);
+            bindMatrixUniforms(commandBuffer, matrixStack);
 
             VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
                     DataType.FLOAT,
@@ -280,7 +293,7 @@ class HeadlessTriangleRenderTest {
             matrixStack.rotateZ(poppedRotateDegrees);
             matrixStack.popMatrix();
 
-            graphics.bindCurrentMatrices(matrixStack);
+            bindMatrixUniforms(commandBuffer, matrixStack);
 
             VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
                     DataType.FLOAT,
@@ -378,6 +391,13 @@ class HeadlessTriangleRenderTest {
     private static void putVertex(ByteBuffer buffer, float r, float g, float b, float x, float y, float z) {
         buffer.putFloat(r).putFloat(g).putFloat(b);
         buffer.putFloat(x).putFloat(y).putFloat(z);
+    }
+
+    private static void bindMatrixUniforms(CommandBuffer commandBuffer, MatrixStack matrixStack) {
+        modelViewUniform.setFloatBuffer(matrixStack.getModelViewBuffer());
+        projectionUniform.setFloatBuffer(matrixStack.getProjectionBuffer());
+        commandBuffer.bindUniform(modelViewUniform);
+        commandBuffer.bindUniform(projectionUniform);
     }
 
     private static Pipeline createTestPipeline(String debugName, PipelineLayout layout, Shader shader) {

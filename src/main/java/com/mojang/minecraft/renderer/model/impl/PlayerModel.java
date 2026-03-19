@@ -59,7 +59,7 @@ public class PlayerModel implements Model<EntityPlayer> {
      * Renders the player model
      */
     @Override
-    public void render(CommandBuffer graphics, MatrixStack matrixStack, EntityPlayer player, float partialTicks) {
+    public void render(CommandBuffer commandBuffer, MatrixStack matrixStack, EntityPlayer player, float partialTicks) {
         float limbSwingAmount = player.prevLimbSwingAmount + (player.limbSwingAmount - player.prevLimbSwingAmount) * partialTicks;
         float limbSwing = player.limbSwing + (player.limbSwing - player.prevLimbSwing) * partialTicks;
 
@@ -73,14 +73,14 @@ public class PlayerModel implements Model<EntityPlayer> {
         setRotationAngles(limbSwing, limbSwingAmount, headYaw, headPitch);
 
         // Render all body parts
-        this.head.render(graphics, matrixStack);
+        this.head.render(commandBuffer, matrixStack);
 
         matrixStack.rotateY(bodyYaw);
-        this.body.render(graphics, matrixStack);
-        this.rightArm.render(graphics, matrixStack);
-        this.leftArm.render(graphics, matrixStack);
-        this.rightLeg.render(graphics, matrixStack);
-        this.leftLeg.render(graphics, matrixStack);
+        this.body.render(commandBuffer, matrixStack);
+        this.rightArm.render(commandBuffer, matrixStack);
+        this.leftArm.render(commandBuffer, matrixStack);
+        this.rightLeg.render(commandBuffer, matrixStack);
+        this.leftLeg.render(commandBuffer, matrixStack);
     }
 
     protected void setRotationAngles(float limbSwing, float limbSwingAmount, float netHeadYaw, float headPitch) {

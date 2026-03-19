@@ -252,11 +252,11 @@ public final class Chunk implements Disposable {
     /**
      * Renders the given chunk
      */
-    public int render(CommandBuffer graphics, Frustum frustum) {
+    public int render(CommandBuffer commandBuffer, Frustum frustum) {
         int numSectionDrawCalls = 0;
         for (ChunkSection section : sections) {
             if (section.hasMesh() && frustum.isVisible(section.getAABB())) {
-                numSectionDrawCalls += section.render(graphics);
+                numSectionDrawCalls += section.render(commandBuffer);
             }
         }
         return numSectionDrawCalls;
@@ -631,11 +631,11 @@ public final class Chunk implements Disposable {
         /**
          * Renders this section
          *
-         * @param graphics the graphics API
+         * @param commandBuffer the commandBuffer API
          */
-        public int render(CommandBuffer graphics) {
+        public int render(CommandBuffer commandBuffer) {
             if (!empty) {
-                return chunkMesh.draw(graphics);
+                return chunkMesh.draw(commandBuffer);
             }
             return 0;
         }
