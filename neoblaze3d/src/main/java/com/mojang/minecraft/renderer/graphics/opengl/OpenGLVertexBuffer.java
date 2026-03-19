@@ -1,6 +1,7 @@
 package com.mojang.minecraft.renderer.graphics.opengl;
 
 import com.mojang.minecraft.profiler.GpuMemoryTracker;
+import com.mojang.minecraft.renderer.graphics.ResourceState;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 
 import java.nio.ByteBuffer;
@@ -11,7 +12,7 @@ import static org.lwjgl.opengl.GL15.*;
  * OpenGL implementation of the VertexBuffer interface.
  * Represents a VBO (Vertex Buffer Object) in OpenGL.
  */
-public class OpenGLVertexBuffer implements VertexBuffer {
+public class OpenGLVertexBuffer implements VertexBuffer, OpenGLBufferStateTracked {
     // OpenGL VBO ID
     private int vboId;
 
@@ -20,6 +21,7 @@ public class OpenGLVertexBuffer implements VertexBuffer {
 
     // State tracking
     private boolean disposed = false;
+    private ResourceState.BufferAccess bufferAccess = ResourceState.BufferAccess.UNDEFINED;
 
     /**
      * Creates a new OpenGL vertex buffer.
@@ -35,6 +37,11 @@ public class OpenGLVertexBuffer implements VertexBuffer {
     public void setData(ByteBuffer data, int sizeInBytes) {
         if (isDisposed()) {
             throw new IllegalStateException("Cannot use a disposed vertex buffer");
+        }
+        if (bufferAccess != ResourceState.BufferAccess.TRANSFER_DST) {
+            throw new IllegalStateException(
+                    "VertexBuffer setData requires state TRANSFER_DST but was " + bufferAccess
+            );
         }
 
         // subtract previous size from allocated memory
@@ -59,6 +66,11 @@ public class OpenGLVertexBuffer implements VertexBuffer {
     public void updateData(ByteBuffer data, int offsetInBytes, int sizeInBytes) {
         if (isDisposed()) {
             throw new IllegalStateException("Cannot use a disposed vertex buffer");
+        }
+        if (bufferAccess != ResourceState.BufferAccess.TRANSFER_DST) {
+            throw new IllegalStateException(
+                    "VertexBuffer updateData requires state TRANSFER_DST but was " + bufferAccess
+            );
         }
 
         if (offsetInBytes + sizeInBytes > this.sizeInBytes) {
@@ -123,4 +135,17 @@ public class OpenGLVertexBuffer implements VertexBuffer {
     int getBufferId() {
         return vboId;
     }
-} 
+
+    @Override
+    public ResourceState.BufferAccess getBufferAccess() {
+        return bufferAccess;
+    }
+
+    @Override
+    public void setBufferAccess(ResourceState.BufferAccess access) {
+        if (access == null) {
+            throw new IllegalArgumentException("access cannot be null");
+        }
+        this.bufferAccess = access;
+    }
+}

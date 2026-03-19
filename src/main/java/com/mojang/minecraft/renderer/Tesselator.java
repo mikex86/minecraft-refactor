@@ -53,6 +53,8 @@ public final class Tesselator implements Disposable {
     private final GraphicsAPI graphics;
     private VertexBuffer vertexBuffer;
     private IndexBuffer indexBuffer;
+    private ResourceState.BufferAccess transientVertexBufferAccess = ResourceState.BufferAccess.UNDEFINED;
+    private ResourceState.BufferAccess transientIndexBufferAccess = ResourceState.BufferAccess.UNDEFINED;
 
     // Shared pooled allocators must outlive transient tesselator instances.
     private static BufferAllocator<? extends BufferAllocation> sharedPooledVertexAllocator = null;
@@ -93,6 +95,8 @@ public final class Tesselator implements Disposable {
         }
         this.vertexBuffer = graphics.createVertexBuffer(BufferUsage.DYNAMIC);
         this.indexBuffer = graphics.createIndexBuffer(BufferUsage.DYNAMIC);
+        this.transientVertexBufferAccess = ResourceState.BufferAccess.UNDEFINED;
+        this.transientIndexBufferAccess = ResourceState.BufferAccess.UNDEFINED;
     }
 
     /**
@@ -160,9 +164,19 @@ public final class Tesselator implements Disposable {
 
             int elementCount = useIndexBuffer ? indexCount : vertexCount;
 
+            graphics.transitionVertexBuffer(vertexBuffer, transientVertexBufferAccess, ResourceState.BufferAccess.TRANSFER_DST);
+            transientVertexBufferAccess = ResourceState.BufferAccess.TRANSFER_DST;
+            graphics.transitionIndexBuffer(indexBuffer, transientIndexBufferAccess, ResourceState.BufferAccess.TRANSFER_DST);
+            transientIndexBufferAccess = ResourceState.BufferAccess.TRANSFER_DST;
+
             // Upload data to GPU
             vertexBuffer.setData(getBuffer(), dataIndex);
             indexBuffer.setData(getIndexBuffer(), elementCount * Integer.BYTES); // 4 bytes per int
+
+            graphics.transitionVertexBuffer(vertexBuffer, transientVertexBufferAccess, ResourceState.BufferAccess.VERTEX_READ);
+            transientVertexBufferAccess = ResourceState.BufferAccess.VERTEX_READ;
+            graphics.transitionIndexBuffer(indexBuffer, transientIndexBufferAccess, ResourceState.BufferAccess.INDEX_READ);
+            transientIndexBufferAccess = ResourceState.BufferAccess.INDEX_READ;
 
             // Draw the vertices
             commandBuffer.draw(PrimitiveType.TRIANGLES, vertexBuffer, indexBuffer, 0, elementCount);
@@ -238,9 +252,13 @@ public final class Tesselator implements Disposable {
         }
 
         // Upload data
+        graphics.transitionVertexBuffer(vertexBuffer, ResourceState.BufferAccess.UNDEFINED, ResourceState.BufferAccess.TRANSFER_DST);
         vertexBuffer.setData(getBuffer(), vertexDataSizeInBytes);
+        graphics.transitionVertexBuffer(vertexBuffer, ResourceState.BufferAccess.TRANSFER_DST, ResourceState.BufferAccess.VERTEX_READ);
         if (indexBuffer != null) {
+            graphics.transitionIndexBuffer(indexBuffer, ResourceState.BufferAccess.UNDEFINED, ResourceState.BufferAccess.TRANSFER_DST);
             indexBuffer.setData(getIndexBuffer(), indexDataSizeInBytes);
+            graphics.transitionIndexBuffer(indexBuffer, ResourceState.BufferAccess.TRANSFER_DST, ResourceState.BufferAccess.INDEX_READ);
         }
 
         // Create mesh with explicit vertex/index buffers

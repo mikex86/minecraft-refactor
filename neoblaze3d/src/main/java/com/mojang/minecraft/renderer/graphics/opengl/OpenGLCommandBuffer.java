@@ -12,6 +12,7 @@ import com.mojang.minecraft.renderer.graphics.IndexBuffer;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.graphics.PipelineLayout;
 import com.mojang.minecraft.renderer.graphics.RenderPassAttachments;
+import com.mojang.minecraft.renderer.graphics.ResourceState;
 import com.mojang.minecraft.renderer.graphics.ShaderProgram;
 import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.Uniform;
@@ -296,6 +297,18 @@ final class OpenGLCommandBuffer implements CommandBuffer {
         if (!insideRenderPass) {
             throw new IllegalStateException("draw called without an active render pass");
         }
+        OpenGLResourceTransitions.requireVertexBufferState(
+                vertexBuffer,
+                ResourceState.BufferAccess.VERTEX_READ,
+                "draw"
+        );
+        if (indexBuffer != null) {
+            OpenGLResourceTransitions.requireIndexBufferState(
+                    indexBuffer,
+                    ResourceState.BufferAccess.INDEX_READ,
+                    "draw"
+            );
+        }
 
         int snapshotStart = snapshotEntryCount;
         int snapshotCount = captureCurrentDescriptorSnapshotForDraw();
@@ -329,6 +342,27 @@ final class OpenGLCommandBuffer implements CommandBuffer {
         currentDescriptorSet = descriptorSet;
     }
 
+    @Override
+    public void transitionTexture(Texture texture,
+                                  ResourceState.TextureAccess expectedOldAccess,
+                                  ResourceState.TextureAccess newAccess) {
+        OpenGLResourceTransitions.transitionTexture(texture, expectedOldAccess, newAccess);
+    }
+
+    @Override
+    public void transitionVertexBuffer(VertexBuffer vertexBuffer,
+                                       ResourceState.BufferAccess expectedOldAccess,
+                                       ResourceState.BufferAccess newAccess) {
+        OpenGLResourceTransitions.transitionVertexBuffer(vertexBuffer, expectedOldAccess, newAccess);
+    }
+
+    @Override
+    public void transitionIndexBuffer(IndexBuffer indexBuffer,
+                                      ResourceState.BufferAccess expectedOldAccess,
+                                      ResourceState.BufferAccess newAccess) {
+        OpenGLResourceTransitions.transitionIndexBuffer(indexBuffer, expectedOldAccess, newAccess);
+    }
+
     private int captureCurrentDescriptorSnapshotForDraw() {
         List<PipelineLayout.Binding> bindings = currentPipeline.getLayout().getBindings();
         if (bindings.isEmpty()) {
@@ -354,10 +388,18 @@ final class OpenGLCommandBuffer implements CommandBuffer {
             int binding = declaredBinding.getBinding();
             PipelineLayout.ResourceType resourceType = declaredBinding.getResourceType();
             if (isTextureResourceType(resourceType)) {
+                Texture texture = currentDescriptorSet.getTexture(binding);
+                if (texture != null) {
+                    OpenGLResourceTransitions.requireTextureState(
+                            texture,
+                            ResourceState.TextureAccess.SHADER_READ,
+                            "Descriptor binding " + binding
+                    );
+                }
                 ensureSnapshotCapacity(1);
                 snapshotKinds[snapshotEntryCount] = SNAPSHOT_KIND_TEXTURE;
                 snapshotBindings[snapshotEntryCount] = binding;
-                snapshotTextures[snapshotEntryCount] = currentDescriptorSet.getTexture(binding);
+                snapshotTextures[snapshotEntryCount] = texture;
                 snapshotUniformSizes[snapshotEntryCount] = 0;
                 snapshotUniformOffsets[snapshotEntryCount] = 0;
                 snapshotEntryCount++;

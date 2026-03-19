@@ -2,6 +2,7 @@ package com.mojang.minecraft.renderer.graphics.opengl;
 
 import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.TextureFormat;
+import com.mojang.minecraft.renderer.graphics.ResourceState;
 
 import java.nio.ByteBuffer;
 
@@ -14,7 +15,7 @@ import static org.lwjgl.opengl.GL30.*;
  * OpenGL implementation of the Texture interface.
  * Represents a texture in OpenGL.
  */
-public class OpenGLTexture implements Texture {
+public class OpenGLTexture implements Texture, OpenGLTextureStateTracked {
     // OpenGL texture ID
     private int textureId;
     
@@ -25,6 +26,7 @@ public class OpenGLTexture implements Texture {
     
     // State tracking
     private boolean disposed = false;
+    private ResourceState.TextureAccess textureAccess = ResourceState.TextureAccess.UNDEFINED;
     
     /**
      * Creates a new OpenGL texture.
@@ -82,6 +84,11 @@ public class OpenGLTexture implements Texture {
     public void update(int x, int y, int width, int height, ByteBuffer data) {
         if (isDisposed()) {
             throw new IllegalStateException("Cannot update a disposed texture");
+        }
+        if (textureAccess != ResourceState.TextureAccess.TRANSFER_DST) {
+            throw new IllegalStateException(
+                    "Texture update requires state TRANSFER_DST but was " + textureAccess
+            );
         }
         
         // Validate parameters
@@ -156,6 +163,19 @@ public class OpenGLTexture implements Texture {
      */
     int getTextureId() {
         return textureId;
+    }
+
+    @Override
+    public ResourceState.TextureAccess getTextureAccess() {
+        return textureAccess;
+    }
+
+    @Override
+    public void setTextureAccess(ResourceState.TextureAccess access) {
+        if (access == null) {
+            throw new IllegalArgumentException("access cannot be null");
+        }
+        this.textureAccess = access;
     }
     
     //--------------------------------------------------

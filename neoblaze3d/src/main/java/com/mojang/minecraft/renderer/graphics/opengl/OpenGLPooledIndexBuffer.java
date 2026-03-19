@@ -1,6 +1,7 @@
 package com.mojang.minecraft.renderer.graphics.opengl;
 
 import com.mojang.minecraft.renderer.graphics.IndexBuffer;
+import com.mojang.minecraft.renderer.graphics.ResourceState;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.jemalloc.JEmalloc;
 
@@ -13,7 +14,7 @@ import static org.lwjgl.opengl.GL15.*;
  * OpenGL implementation of the IndexBuffer interface that uses a region
  * from a buffer pool instead of creating its own buffer.
  */
-public class OpenGLPooledIndexBuffer implements IndexBuffer {
+public class OpenGLPooledIndexBuffer implements IndexBuffer, OpenGLBufferStateTracked {
     private static final int STACK_UPLOAD_THRESHOLD_BYTES = 16 * 1024;
 
     // Buffer region from the pool
@@ -24,6 +25,7 @@ public class OpenGLPooledIndexBuffer implements IndexBuffer {
     
     // State tracking
     private boolean disposed = false;
+    private ResourceState.BufferAccess bufferAccess = ResourceState.BufferAccess.UNDEFINED;
     
     /**
      * Creates a new pooled OpenGL index buffer.
@@ -56,6 +58,11 @@ public class OpenGLPooledIndexBuffer implements IndexBuffer {
     public void setData(IntBuffer data, int sizeInBytes) {
         if (isDisposed()) {
             throw new IllegalStateException("Cannot use a disposed index buffer");
+        }
+        if (bufferAccess != ResourceState.BufferAccess.TRANSFER_DST) {
+            throw new IllegalStateException(
+                    "IndexBuffer setData requires state TRANSFER_DST but was " + bufferAccess
+            );
         }
         
         if (sizeInBytes > region.getSizeInBytes()) {
@@ -97,6 +104,11 @@ public class OpenGLPooledIndexBuffer implements IndexBuffer {
     public void updateData(IntBuffer data, int offsetInBytes, int sizeInBytes) {
         if (isDisposed()) {
             throw new IllegalStateException("Cannot use a disposed index buffer");
+        }
+        if (bufferAccess != ResourceState.BufferAccess.TRANSFER_DST) {
+            throw new IllegalStateException(
+                    "IndexBuffer updateData requires state TRANSFER_DST but was " + bufferAccess
+            );
         }
         
         if (offsetInBytes + sizeInBytes > region.getSizeInBytes()) {
@@ -195,5 +207,18 @@ public class OpenGLPooledIndexBuffer implements IndexBuffer {
      */
     long getOffset() {
         return region.getOffset();
+    }
+
+    @Override
+    public ResourceState.BufferAccess getBufferAccess() {
+        return bufferAccess;
+    }
+
+    @Override
+    public void setBufferAccess(ResourceState.BufferAccess access) {
+        if (access == null) {
+            throw new IllegalArgumentException("access cannot be null");
+        }
+        this.bufferAccess = access;
     }
 } 

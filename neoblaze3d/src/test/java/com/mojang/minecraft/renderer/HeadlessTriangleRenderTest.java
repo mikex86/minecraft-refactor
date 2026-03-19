@@ -14,6 +14,7 @@ import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.graphics.PipelineLayout;
 import com.mojang.minecraft.renderer.graphics.RenderPassAttachments;
+import com.mojang.minecraft.renderer.graphics.ResourceState;
 import com.mojang.minecraft.renderer.graphics.ShaderProgram;
 import com.mojang.minecraft.renderer.graphics.Uniform;
 import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
@@ -124,6 +125,11 @@ class HeadlessTriangleRenderTest {
             commandBuffer.setPipeline(pipeline);
 
             vertexBuffer = graphics.createVertexBuffer(BufferUsage.STATIC);
+            graphics.transitionVertexBuffer(
+                    vertexBuffer,
+                    ResourceState.BufferAccess.UNDEFINED,
+                    ResourceState.BufferAccess.TRANSFER_DST
+            );
 
             try (MemoryStack stack = MemoryStack.stackPush()) {
                 ByteBuffer vertexData = stack.malloc(3 * 6 * Float.BYTES);
@@ -134,6 +140,11 @@ class HeadlessTriangleRenderTest {
                 vertexData.flip();
                 vertexBuffer.setData(vertexData, vertexData.remaining());
             }
+            graphics.transitionVertexBuffer(
+                    vertexBuffer,
+                    ResourceState.BufferAccess.TRANSFER_DST,
+                    ResourceState.BufferAccess.VERTEX_READ
+            );
 
             commandBuffer.draw(PrimitiveType.TRIANGLES, vertexBuffer, null, 0, 3);
             commandBuffer.endRenderPass();
@@ -226,6 +237,11 @@ class HeadlessTriangleRenderTest {
             bindMatrixUniforms(commandBuffer, matrixStack, descriptorSet);
 
             vertexBuffer = graphics.createVertexBuffer(BufferUsage.STATIC);
+            graphics.transitionVertexBuffer(
+                    vertexBuffer,
+                    ResourceState.BufferAccess.UNDEFINED,
+                    ResourceState.BufferAccess.TRANSFER_DST
+            );
 
             try (MemoryStack stack = MemoryStack.stackPush()) {
                 ByteBuffer vertexData = stack.malloc(3 * 6 * Float.BYTES);
@@ -235,6 +251,11 @@ class HeadlessTriangleRenderTest {
                 vertexData.flip();
                 vertexBuffer.setData(vertexData, vertexData.remaining());
             }
+            graphics.transitionVertexBuffer(
+                    vertexBuffer,
+                    ResourceState.BufferAccess.TRANSFER_DST,
+                    ResourceState.BufferAccess.VERTEX_READ
+            );
 
             commandBuffer.draw(PrimitiveType.TRIANGLES, vertexBuffer, null, 0, 3);
             commandBuffer.endRenderPass();
@@ -348,6 +369,11 @@ class HeadlessTriangleRenderTest {
             bindMatrixUniforms(commandBuffer, matrixStack, descriptorSet);
 
             vertexBuffer = graphics.createVertexBuffer(BufferUsage.STATIC);
+            graphics.transitionVertexBuffer(
+                    vertexBuffer,
+                    ResourceState.BufferAccess.UNDEFINED,
+                    ResourceState.BufferAccess.TRANSFER_DST
+            );
 
             try (MemoryStack stack = MemoryStack.stackPush()) {
                 ByteBuffer vertexData = stack.malloc(3 * 6 * Float.BYTES);
@@ -357,6 +383,11 @@ class HeadlessTriangleRenderTest {
                 vertexData.flip();
                 vertexBuffer.setData(vertexData, vertexData.remaining());
             }
+            graphics.transitionVertexBuffer(
+                    vertexBuffer,
+                    ResourceState.BufferAccess.TRANSFER_DST,
+                    ResourceState.BufferAccess.VERTEX_READ
+            );
 
             commandBuffer.draw(PrimitiveType.TRIANGLES, vertexBuffer, null, 0, 3);
             commandBuffer.endRenderPass();

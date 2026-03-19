@@ -2,6 +2,7 @@ package com.mojang.minecraft.renderer.graphics.opengl;
 
 import com.mojang.minecraft.profiler.GpuMemoryTracker;
 import com.mojang.minecraft.renderer.graphics.IndexBuffer;
+import com.mojang.minecraft.renderer.graphics.ResourceState;
 
 import java.nio.IntBuffer;
 
@@ -11,7 +12,7 @@ import static org.lwjgl.opengl.GL15.*;
  * OpenGL implementation of the IndexBuffer interface.
  * Represents an IBO (Index Buffer Object) in OpenGL.
  */
-public class OpenGLIndexBuffer implements IndexBuffer {
+public class OpenGLIndexBuffer implements IndexBuffer, OpenGLBufferStateTracked {
     // OpenGL IBO ID
     private final int iboId;
     
@@ -22,6 +23,7 @@ public class OpenGLIndexBuffer implements IndexBuffer {
     
     // State tracking
     private boolean disposed = false;
+    private ResourceState.BufferAccess bufferAccess = ResourceState.BufferAccess.UNDEFINED;
     
     /**
      * Creates a new OpenGL index buffer.
@@ -56,6 +58,11 @@ public class OpenGLIndexBuffer implements IndexBuffer {
         if (isDisposed()) {
             throw new IllegalStateException("Cannot use a disposed index buffer");
         }
+        if (bufferAccess != ResourceState.BufferAccess.TRANSFER_DST) {
+            throw new IllegalStateException(
+                    "IndexBuffer setData requires state TRANSFER_DST but was " + bufferAccess
+            );
+        }
 
         if (this.sizeInBytes != 0) {
             // track de-allocation of previous size
@@ -82,6 +89,11 @@ public class OpenGLIndexBuffer implements IndexBuffer {
     public void updateData(IntBuffer data, int offsetInBytes, int sizeInBytes) {
         if (isDisposed()) {
             throw new IllegalStateException("Cannot use a disposed index buffer");
+        }
+        if (bufferAccess != ResourceState.BufferAccess.TRANSFER_DST) {
+            throw new IllegalStateException(
+                    "IndexBuffer updateData requires state TRANSFER_DST but was " + bufferAccess
+            );
         }
         
         // Upload data to IBO
@@ -116,5 +128,18 @@ public class OpenGLIndexBuffer implements IndexBuffer {
             glDeleteBuffers(iboId);
             disposed = true;
         }
+    }
+
+    @Override
+    public ResourceState.BufferAccess getBufferAccess() {
+        return bufferAccess;
+    }
+
+    @Override
+    public void setBufferAccess(ResourceState.BufferAccess access) {
+        if (access == null) {
+            throw new IllegalArgumentException("access cannot be null");
+        }
+        this.bufferAccess = access;
     }
 } 

@@ -103,6 +103,21 @@ public interface GraphicsAPI {
     Texture createTexture(int width, int height, TextureFormat format, ByteBuffer data);
 
     /**
+     * Transitions texture access state with strict old-state validation.
+     */
+    void transitionTexture(Texture texture, ResourceState.TextureAccess expectedOldAccess, ResourceState.TextureAccess newAccess);
+
+    /**
+     * Transitions vertex-buffer access state with strict old-state validation.
+     */
+    void transitionVertexBuffer(VertexBuffer vertexBuffer, ResourceState.BufferAccess expectedOldAccess, ResourceState.BufferAccess newAccess);
+
+    /**
+     * Transitions index-buffer access state with strict old-state validation.
+     */
+    void transitionIndexBuffer(IndexBuffer indexBuffer, ResourceState.BufferAccess expectedOldAccess, ResourceState.BufferAccess newAccess);
+
+    /**
      * Creates a pipeline layout.
      *
      * @param descriptor Layout descriptor

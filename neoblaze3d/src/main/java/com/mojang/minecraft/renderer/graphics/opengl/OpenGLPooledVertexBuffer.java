@@ -1,6 +1,7 @@
 package com.mojang.minecraft.renderer.graphics.opengl;
 
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
+import com.mojang.minecraft.renderer.graphics.ResourceState;
 
 import java.nio.ByteBuffer;
 
@@ -10,12 +11,13 @@ import static org.lwjgl.opengl.GL15.*;
  * OpenGL implementation of the VertexBuffer interface that uses a region
  * from a buffer pool instead of creating its own buffer.
  */
-public class OpenGLPooledVertexBuffer implements VertexBuffer {
+public class OpenGLPooledVertexBuffer implements VertexBuffer, OpenGLBufferStateTracked {
     // Buffer region from the pool
     private final OpenGLBufferAllocation region;
 
     // State tracking
     private boolean disposed = false;
+    private ResourceState.BufferAccess bufferAccess = ResourceState.BufferAccess.UNDEFINED;
 
     /**
      * Creates a new pooled OpenGL vertex buffer.
@@ -30,6 +32,11 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
     public void setData(ByteBuffer data, int sizeInBytes) {
         if (isDisposed()) {
             throw new IllegalStateException("Cannot use a disposed vertex buffer");
+        }
+        if (bufferAccess != ResourceState.BufferAccess.TRANSFER_DST) {
+            throw new IllegalStateException(
+                    "VertexBuffer setData requires state TRANSFER_DST but was " + bufferAccess
+            );
         }
 
         if (sizeInBytes > region.getSizeInBytes()) {
@@ -46,6 +53,11 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
     public void updateData(ByteBuffer data, int offsetInBytes, int sizeInBytes) {
         if (isDisposed()) {
             throw new IllegalStateException("Cannot use a disposed vertex buffer");
+        }
+        if (bufferAccess != ResourceState.BufferAccess.TRANSFER_DST) {
+            throw new IllegalStateException(
+                    "VertexBuffer updateData requires state TRANSFER_DST but was " + bufferAccess
+            );
         }
 
         if (offsetInBytes + sizeInBytes > region.getSizeInBytes()) {
@@ -113,5 +125,18 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
      */
     long getOffset() {
         return region.getOffset();
+    }
+
+    @Override
+    public ResourceState.BufferAccess getBufferAccess() {
+        return bufferAccess;
+    }
+
+    @Override
+    public void setBufferAccess(ResourceState.BufferAccess access) {
+        if (access == null) {
+            throw new IllegalArgumentException("access cannot be null");
+        }
+        this.bufferAccess = access;
     }
 } 

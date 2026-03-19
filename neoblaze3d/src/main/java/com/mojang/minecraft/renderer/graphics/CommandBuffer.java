@@ -42,4 +42,19 @@ public interface CommandBuffer {
      */
     void bindDescriptorSet(DescriptorSet descriptorSet);
 
+    /**
+     * Transitions texture access state with strict old-state validation.
+     */
+    void transitionTexture(Texture texture, ResourceState.TextureAccess expectedOldAccess, ResourceState.TextureAccess newAccess);
+
+    /**
+     * Transitions vertex-buffer access state with strict old-state validation.
+     */
+    void transitionVertexBuffer(VertexBuffer vertexBuffer, ResourceState.BufferAccess expectedOldAccess, ResourceState.BufferAccess newAccess);
+
+    /**
+     * Transitions index-buffer access state with strict old-state validation.
+     */
+    void transitionIndexBuffer(IndexBuffer indexBuffer, ResourceState.BufferAccess expectedOldAccess, ResourceState.BufferAccess newAccess);
+
 }

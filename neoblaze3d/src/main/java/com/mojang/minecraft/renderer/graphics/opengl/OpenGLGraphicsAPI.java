@@ -7,6 +7,7 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums.TextureFormat;
 import com.mojang.minecraft.renderer.graphics.IndexBuffer;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.graphics.PipelineLayout;
+import com.mojang.minecraft.renderer.graphics.ResourceState;
 import com.mojang.minecraft.renderer.graphics.ShaderProgram;
 import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.Uniform;
@@ -158,8 +159,39 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     @Override
     public Texture createTexture(int width, int height, TextureFormat format, ByteBuffer data) {
         OpenGLTexture texture = new OpenGLTexture(width, height, format);
+        OpenGLResourceTransitions.transitionTexture(
+                texture,
+                ResourceState.TextureAccess.UNDEFINED,
+                ResourceState.TextureAccess.TRANSFER_DST
+        );
         texture.update(0, 0, width, height, data);
+        OpenGLResourceTransitions.transitionTexture(
+                texture,
+                ResourceState.TextureAccess.TRANSFER_DST,
+                ResourceState.TextureAccess.SHADER_READ
+        );
         return texture;
+    }
+
+    @Override
+    public void transitionTexture(Texture texture,
+                                  ResourceState.TextureAccess expectedOldAccess,
+                                  ResourceState.TextureAccess newAccess) {
+        OpenGLResourceTransitions.transitionTexture(texture, expectedOldAccess, newAccess);
+    }
+
+    @Override
+    public void transitionVertexBuffer(VertexBuffer vertexBuffer,
+                                       ResourceState.BufferAccess expectedOldAccess,
+                                       ResourceState.BufferAccess newAccess) {
+        OpenGLResourceTransitions.transitionVertexBuffer(vertexBuffer, expectedOldAccess, newAccess);
+    }
+
+    @Override
+    public void transitionIndexBuffer(IndexBuffer indexBuffer,
+                                      ResourceState.BufferAccess expectedOldAccess,
+                                      ResourceState.BufferAccess newAccess) {
+        OpenGLResourceTransitions.transitionIndexBuffer(indexBuffer, expectedOldAccess, newAccess);
     }
 
     @Override
