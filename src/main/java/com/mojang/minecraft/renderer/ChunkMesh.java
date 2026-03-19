@@ -1,6 +1,7 @@
 package com.mojang.minecraft.renderer;
 
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.DrawBatch;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 import com.mojang.minecraft.renderer.graphics.annotation.RenderThreadOnly;
@@ -50,6 +51,14 @@ public class ChunkMesh implements Disposable {
     public int draw(CommandBuffer commandBuffer) {
         if (mesh != null) {
             mesh.draw(commandBuffer);
+            return 1;
+        }
+        return 0;
+    }
+
+    public int appendDraw(DrawBatch drawBatch) {
+        if (mesh != null) {
+            mesh.appendDraw(drawBatch, GraphicsEnums.PrimitiveType.TRIANGLES);
             return 1;
         }
         return 0;

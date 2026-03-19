@@ -13,6 +13,7 @@ import com.mojang.minecraft.renderer.Frustum;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.graphics.DataType;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.DrawBatch;
 import com.mojang.minecraft.renderer.graphics.annotation.RenderThreadOnly;
 import com.mojang.minecraft.util.math.MathUtils;
 import com.mojang.minecraft.util.nio.NativeByteArray;
@@ -258,6 +259,16 @@ public final class Chunk implements Disposable {
         for (ChunkSection section : sections) {
             if (section.hasMesh() && frustum.isVisible(section.getAABB())) {
                 numSectionDrawCalls += section.render(commandBuffer);
+            }
+        }
+        return numSectionDrawCalls;
+    }
+
+    public int appendDraws(DrawBatch drawBatch, Frustum frustum) {
+        int numSectionDrawCalls = 0;
+        for (ChunkSection section : sections) {
+            if (section.hasMesh() && frustum.isVisible(section.getAABB())) {
+                numSectionDrawCalls += section.appendDraw(drawBatch);
             }
         }
         return numSectionDrawCalls;
@@ -639,6 +650,13 @@ public final class Chunk implements Disposable {
         public int render(CommandBuffer commandBuffer) {
             if (!empty) {
                 return chunkMesh.draw(commandBuffer);
+            }
+            return 0;
+        }
+
+        public int appendDraw(DrawBatch drawBatch) {
+            if (!empty) {
+                return chunkMesh.appendDraw(drawBatch);
             }
             return 0;
         }

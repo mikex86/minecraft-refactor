@@ -8,6 +8,7 @@ import com.mojang.minecraft.renderer.Disposable;
 import com.mojang.minecraft.renderer.Frustum;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.DrawBatch;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.graphics.annotation.RenderThreadOnly;
@@ -31,6 +32,7 @@ public class LevelRenderer implements Disposable {
 
     // Number of chunk sections draw calls issued this frame
     public static int numSectionDrawCalls = 0;
+    private final DrawBatch chunkDrawBatch = new DrawBatch(2048);
 
     /**
      * Creates a new GraphicsLevelRenderer for the specified level.
@@ -71,12 +73,14 @@ public class LevelRenderer implements Disposable {
         Frustum frustum = Frustum.getFrustum(matrixStack);
 
         // Render all visible chunks
+        chunkDrawBatch.clear();
         numSectionDrawCalls = 0;
         for (Chunk chunk : this.level.getLoadedChunks()) {
             if (frustum.isVisible(chunk.aabb)) {
-                numSectionDrawCalls += chunk.render(commandBuffer, frustum);
+                numSectionDrawCalls += chunk.appendDraws(chunkDrawBatch, frustum);
             }
         }
+        commandBuffer.drawBatch(chunkDrawBatch);
     }
 
     public void renderEntities(CommandBuffer commandBuffer, MatrixStack matrixStack, float partialTicks) {

@@ -3,6 +3,7 @@ package com.mojang.minecraft.renderer.graphics.opengl;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.DataType;
 import com.mojang.minecraft.renderer.graphics.DescriptorSet;
+import com.mojang.minecraft.renderer.graphics.DrawBatch;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BlendFactor;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.CompareFunc;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.CullMode;
@@ -17,6 +18,8 @@ import com.mojang.minecraft.renderer.graphics.ShaderProgram;
 import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.Uniform;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
+import org.lwjgl.PointerBuffer;
+import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -27,6 +30,7 @@ import java.util.Objects;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL13.glActiveTexture;
+import static org.lwjgl.opengl.GL14.glMultiDrawArrays;
 import static org.lwjgl.opengl.GL15.GL_DYNAMIC_DRAW;
 import static org.lwjgl.opengl.GL15.glBindBuffer;
 import static org.lwjgl.opengl.GL15.glBufferData;
@@ -41,6 +45,7 @@ import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
 import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT;
 import static org.lwjgl.opengl.GL30.glBindBufferRange;
 import static org.lwjgl.opengl.GL11.glGetInteger;
+import static org.lwjgl.opengl.GL32.glMultiDrawElementsBaseVertex;
 
 /**
  * OpenGL command buffer implementation.
@@ -54,6 +59,7 @@ final class OpenGLCommandBuffer implements CommandBuffer {
     private static final int COMMAND_END_RENDER_PASS = 2;
     private static final int COMMAND_DRAW = 3;
     private static final int COMMAND_SET_VIEWPORT = 4;
+    private static final int COMMAND_MULTI_DRAW = 5;
 
     private static final int SNAPSHOT_KIND_TEXTURE = 1;
     private static final int SNAPSHOT_KIND_UNIFORM = 2;
@@ -61,6 +67,7 @@ final class OpenGLCommandBuffer implements CommandBuffer {
     private static final int INITIAL_COMMAND_CAPACITY = 2048;
     private static final int INITIAL_SNAPSHOT_CAPACITY = 8192;
     private static final int INITIAL_UNIFORM_RING_CAPACITY = 1 << 20; // 1 MiB
+    private static final int INITIAL_MULTI_DRAW_ENTRY_CAPACITY = 4096;
 
     private Pipeline currentPipeline;
     private DescriptorSet currentDescriptorSet;
@@ -82,6 +89,17 @@ final class OpenGLCommandBuffer implements CommandBuffer {
     private int[] drawCounts;
     private int[] drawSnapshotStarts;
     private int[] drawSnapshotCounts;
+    private int[] multiDrawEntryStartsByCommand;
+    private int[] multiDrawEntryCountsByCommand;
+    private int[] multiDrawSnapshotStartsByCommand;
+    private int[] multiDrawSnapshotCountsByCommand;
+
+    private int multiDrawEntryCount;
+    private PrimitiveType[] multiDrawEntryPrimitiveTypes;
+    private VertexBuffer[] multiDrawEntryVertexBuffers;
+    private IndexBuffer[] multiDrawEntryIndexBuffers;
+    private int[] multiDrawEntryStarts;
+    private int[] multiDrawEntryCounts;
 
     private int snapshotEntryCount;
     private int[] snapshotKinds;
@@ -117,6 +135,16 @@ final class OpenGLCommandBuffer implements CommandBuffer {
         this.drawCounts = new int[INITIAL_COMMAND_CAPACITY];
         this.drawSnapshotStarts = new int[INITIAL_COMMAND_CAPACITY];
         this.drawSnapshotCounts = new int[INITIAL_COMMAND_CAPACITY];
+        this.multiDrawEntryStartsByCommand = new int[INITIAL_COMMAND_CAPACITY];
+        this.multiDrawEntryCountsByCommand = new int[INITIAL_COMMAND_CAPACITY];
+        this.multiDrawSnapshotStartsByCommand = new int[INITIAL_COMMAND_CAPACITY];
+        this.multiDrawSnapshotCountsByCommand = new int[INITIAL_COMMAND_CAPACITY];
+
+        this.multiDrawEntryPrimitiveTypes = new PrimitiveType[INITIAL_MULTI_DRAW_ENTRY_CAPACITY];
+        this.multiDrawEntryVertexBuffers = new VertexBuffer[INITIAL_MULTI_DRAW_ENTRY_CAPACITY];
+        this.multiDrawEntryIndexBuffers = new IndexBuffer[INITIAL_MULTI_DRAW_ENTRY_CAPACITY];
+        this.multiDrawEntryStarts = new int[INITIAL_MULTI_DRAW_ENTRY_CAPACITY];
+        this.multiDrawEntryCounts = new int[INITIAL_MULTI_DRAW_ENTRY_CAPACITY];
 
         this.snapshotKinds = new int[INITIAL_SNAPSHOT_CAPACITY];
         this.snapshotBindings = new int[INITIAL_SNAPSHOT_CAPACITY];
@@ -154,6 +182,11 @@ final class OpenGLCommandBuffer implements CommandBuffer {
             drawVertexBuffers[i] = null;
             drawIndexBuffers[i] = null;
         }
+        for (int i = 0; i < multiDrawEntryCount; i++) {
+            multiDrawEntryPrimitiveTypes[i] = null;
+            multiDrawEntryVertexBuffers[i] = null;
+            multiDrawEntryIndexBuffers[i] = null;
+        }
         for (int i = 0; i < snapshotEntryCount; i++) {
             snapshotTextures[i] = null;
             snapshotUniformSizes[i] = 0;
@@ -164,6 +197,7 @@ final class OpenGLCommandBuffer implements CommandBuffer {
         insideRenderPass = false;
 
         commandCount = 0;
+        multiDrawEntryCount = 0;
         snapshotEntryCount = 0;
         uniformRingWriteOffset = 0;
         uniformRingUploadDirty = false;
@@ -230,6 +264,29 @@ final class OpenGLCommandBuffer implements CommandBuffer {
                             drawStarts[i],
                             drawCounts[i],
                             drawPipeline.getVertexFormat()
+                    );
+                    break;
+                case COMMAND_MULTI_DRAW:
+                    if (!replayInsideRenderPass) {
+                        throw new IllegalStateException("Recorded drawBatch outside render pass");
+                    }
+                    Pipeline multiDrawPipeline = drawPipelines[i];
+                    if (multiDrawPipeline == null) {
+                        throw new IllegalStateException("Recorded drawBatch has no pipeline");
+                    }
+                    if (multiDrawPipeline != activePipeline) {
+                        applyPipelineState(multiDrawPipeline);
+                        activePipeline = multiDrawPipeline;
+                    }
+                    bindDescriptorSnapshot(
+                            multiDrawPipeline.getLayout(),
+                            multiDrawSnapshotStartsByCommand[i],
+                            multiDrawSnapshotCountsByCommand[i]
+                    );
+                    executeMultiDraw(
+                            multiDrawEntryStartsByCommand[i],
+                            multiDrawEntryCountsByCommand[i],
+                            multiDrawPipeline.getVertexFormat()
                     );
                     break;
                 default:
@@ -322,6 +379,60 @@ final class OpenGLCommandBuffer implements CommandBuffer {
         drawCounts[commandIndex] = count;
         drawSnapshotStarts[commandIndex] = snapshotStart;
         drawSnapshotCounts[commandIndex] = snapshotCount;
+    }
+
+    @Override
+    public void drawBatch(DrawBatch drawBatch) {
+        Objects.requireNonNull(drawBatch, "drawBatch cannot be null");
+        Objects.requireNonNull(currentPipeline, "No pipeline set");
+        if (!insideRenderPass) {
+            throw new IllegalStateException("drawBatch called without an active render pass");
+        }
+
+        int entryCount = drawBatch.size();
+        if (entryCount == 0) {
+            return;
+        }
+
+        int snapshotStart = snapshotEntryCount;
+        int snapshotCount = captureCurrentDescriptorSnapshotForDraw();
+        int entryStart = multiDrawEntryCount;
+        ensureMultiDrawEntryCapacity(entryCount);
+
+        for (int i = 0; i < entryCount; i++) {
+            PrimitiveType type = drawBatch.getPrimitiveType(i);
+            VertexBuffer vertexBuffer = drawBatch.getVertexBuffer(i);
+            IndexBuffer indexBuffer = drawBatch.getIndexBuffer(i);
+            int start = drawBatch.getStart(i);
+            int count = drawBatch.getCount(i);
+
+            OpenGLResourceTransitions.requireVertexBufferState(
+                    vertexBuffer,
+                    ResourceState.BufferAccess.VERTEX_READ,
+                    "drawBatch"
+            );
+            if (indexBuffer != null) {
+                OpenGLResourceTransitions.requireIndexBufferState(
+                        indexBuffer,
+                        ResourceState.BufferAccess.INDEX_READ,
+                        "drawBatch"
+                );
+            }
+
+            int writeIndex = multiDrawEntryCount++;
+            multiDrawEntryPrimitiveTypes[writeIndex] = type;
+            multiDrawEntryVertexBuffers[writeIndex] = vertexBuffer;
+            multiDrawEntryIndexBuffers[writeIndex] = indexBuffer;
+            multiDrawEntryStarts[writeIndex] = start;
+            multiDrawEntryCounts[writeIndex] = count;
+        }
+
+        int commandIndex = appendCommand(COMMAND_MULTI_DRAW);
+        drawPipelines[commandIndex] = currentPipeline;
+        multiDrawEntryStartsByCommand[commandIndex] = entryStart;
+        multiDrawEntryCountsByCommand[commandIndex] = entryCount;
+        multiDrawSnapshotStartsByCommand[commandIndex] = snapshotStart;
+        multiDrawSnapshotCountsByCommand[commandIndex] = snapshotCount;
     }
 
     @Override
@@ -537,17 +648,119 @@ final class OpenGLCommandBuffer implements CommandBuffer {
         setupVertexAttributes(vertexBuffer, vertexFormat);
 
         if (indexBuffer != null) {
-            long indexOffset = start * 4L;
+            long indexOffset = resolveIndexOffsetBytes(indexBuffer) + start * 4L;
             bindIndexBuffer(indexBuffer);
-            if (indexBuffer instanceof OpenGLPooledIndexBuffer) {
-                indexOffset += ((OpenGLPooledIndexBuffer) indexBuffer).getOffset();
-            }
             glDrawElements(translatePrimitiveType(type), count, GL_UNSIGNED_INT, indexOffset);
         } else {
             glDrawArrays(translatePrimitiveType(type), start, count);
         }
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+
+    private void executeMultiDraw(int entryStart, int entryCount, VertexBuffer.VertexFormat vertexFormat) {
+        if (entryCount <= 0) {
+            return;
+        }
+        int runStart = entryStart;
+        int end = entryStart + entryCount;
+        while (runStart < end) {
+            int runEnd = runStart + 1;
+            while (runEnd < end && canShareMultiDrawRun(runStart, runEnd)) {
+                runEnd++;
+            }
+            executeMultiDrawRun(runStart, runEnd - runStart, vertexFormat);
+            runStart = runEnd;
+        }
+    }
+
+    private boolean canShareMultiDrawRun(int runAnchorEntry, int candidateEntry) {
+        if (multiDrawEntryPrimitiveTypes[runAnchorEntry] != multiDrawEntryPrimitiveTypes[candidateEntry]) {
+            return false;
+        }
+        IndexBuffer anchorIndexBuffer = multiDrawEntryIndexBuffers[runAnchorEntry];
+        IndexBuffer candidateIndexBuffer = multiDrawEntryIndexBuffers[candidateEntry];
+        boolean indexed = anchorIndexBuffer != null;
+        if (indexed != (candidateIndexBuffer != null)) {
+            return false;
+        }
+        if (resolveVertexBufferId(multiDrawEntryVertexBuffers[runAnchorEntry])
+                != resolveVertexBufferId(multiDrawEntryVertexBuffers[candidateEntry])) {
+            return false;
+        }
+        if (indexed && resolveIndexBufferId(anchorIndexBuffer) != resolveIndexBufferId(candidateIndexBuffer)) {
+            return false;
+        }
+        return true;
+    }
+
+    private void executeMultiDrawRun(int runStart, int runCount, VertexBuffer.VertexFormat vertexFormat) {
+        if (runCount <= 0) {
+            return;
+        }
+        if (multiDrawEntryIndexBuffers[runStart] != null) {
+            executeIndexedMultiDrawRun(runStart, runCount, vertexFormat);
+            return;
+        }
+        executeArrayMultiDrawRun(runStart, runCount, vertexFormat);
+    }
+
+    private void executeIndexedMultiDrawRun(int runStart, int runCount, VertexBuffer.VertexFormat vertexFormat) {
+        PrimitiveType primitiveType = multiDrawEntryPrimitiveTypes[runStart];
+        int mode = translatePrimitiveType(primitiveType);
+        int vertexBufferId = resolveVertexBufferId(multiDrawEntryVertexBuffers[runStart]);
+        int indexBufferId = resolveIndexBufferId(multiDrawEntryIndexBuffers[runStart]);
+
+        setupVertexAttributes(vertexBufferId, 0L, vertexFormat);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferId);
+
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            java.nio.IntBuffer counts = stack.mallocInt(runCount);
+            PointerBuffer indices = stack.mallocPointer(runCount);
+            java.nio.IntBuffer baseVertices = stack.mallocInt(runCount);
+
+            for (int i = 0; i < runCount; i++) {
+                int entry = runStart + i;
+                VertexBuffer vertexBuffer = multiDrawEntryVertexBuffers[entry];
+                IndexBuffer indexBuffer = multiDrawEntryIndexBuffers[entry];
+                if (resolveVertexBufferId(vertexBuffer) != vertexBufferId
+                        || resolveIndexBufferId(indexBuffer) != indexBufferId) {
+                    throw new IllegalStateException("drawBatch compatibility run changed unexpectedly");
+                }
+
+                counts.put(i, multiDrawEntryCounts[entry]);
+                indices.put(i, resolveIndexOffsetBytes(indexBuffer) + ((long) multiDrawEntryStarts[entry] * 4L));
+                baseVertices.put(i, resolveVertexBaseVertex(vertexBuffer, vertexFormat));
+            }
+
+            glMultiDrawElementsBaseVertex(mode, counts, GL_UNSIGNED_INT, indices, baseVertices);
+        }
+    }
+
+    private void executeArrayMultiDrawRun(int runStart, int runCount, VertexBuffer.VertexFormat vertexFormat) {
+        PrimitiveType primitiveType = multiDrawEntryPrimitiveTypes[runStart];
+        int mode = translatePrimitiveType(primitiveType);
+        int vertexBufferId = resolveVertexBufferId(multiDrawEntryVertexBuffers[runStart]);
+
+        setupVertexAttributes(vertexBufferId, 0L, vertexFormat);
+
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            java.nio.IntBuffer first = stack.mallocInt(runCount);
+            java.nio.IntBuffer count = stack.mallocInt(runCount);
+
+            for (int i = 0; i < runCount; i++) {
+                int entry = runStart + i;
+                VertexBuffer vertexBuffer = multiDrawEntryVertexBuffers[entry];
+                if (resolveVertexBufferId(vertexBuffer) != vertexBufferId) {
+                    throw new IllegalStateException("drawBatch compatibility run changed unexpectedly");
+                }
+
+                first.put(i, multiDrawEntryStarts[entry] + resolveVertexBaseVertex(vertexBuffer, vertexFormat));
+                count.put(i, multiDrawEntryCounts[entry]);
+            }
+
+            glMultiDrawArrays(mode, first, count);
+        }
     }
 
     private void applyPipelineState(Pipeline pipeline) {
@@ -596,6 +809,10 @@ final class OpenGLCommandBuffer implements CommandBuffer {
         drawCounts = Arrays.copyOf(drawCounts, newCapacity);
         drawSnapshotStarts = Arrays.copyOf(drawSnapshotStarts, newCapacity);
         drawSnapshotCounts = Arrays.copyOf(drawSnapshotCounts, newCapacity);
+        multiDrawEntryStartsByCommand = Arrays.copyOf(multiDrawEntryStartsByCommand, newCapacity);
+        multiDrawEntryCountsByCommand = Arrays.copyOf(multiDrawEntryCountsByCommand, newCapacity);
+        multiDrawSnapshotStartsByCommand = Arrays.copyOf(multiDrawSnapshotStartsByCommand, newCapacity);
+        multiDrawSnapshotCountsByCommand = Arrays.copyOf(multiDrawSnapshotCountsByCommand, newCapacity);
     }
 
     private void ensureSnapshotCapacity(int additional) {
@@ -609,6 +826,19 @@ final class OpenGLCommandBuffer implements CommandBuffer {
         snapshotTextures = Arrays.copyOf(snapshotTextures, newCapacity);
         snapshotUniformSizes = Arrays.copyOf(snapshotUniformSizes, newCapacity);
         snapshotUniformOffsets = Arrays.copyOf(snapshotUniformOffsets, newCapacity);
+    }
+
+    private void ensureMultiDrawEntryCapacity(int additional) {
+        int required = multiDrawEntryCount + additional;
+        if (required <= multiDrawEntryPrimitiveTypes.length) {
+            return;
+        }
+        int newCapacity = Math.max(multiDrawEntryPrimitiveTypes.length * 2, required);
+        multiDrawEntryPrimitiveTypes = Arrays.copyOf(multiDrawEntryPrimitiveTypes, newCapacity);
+        multiDrawEntryVertexBuffers = Arrays.copyOf(multiDrawEntryVertexBuffers, newCapacity);
+        multiDrawEntryIndexBuffers = Arrays.copyOf(multiDrawEntryIndexBuffers, newCapacity);
+        multiDrawEntryStarts = Arrays.copyOf(multiDrawEntryStarts, newCapacity);
+        multiDrawEntryCounts = Arrays.copyOf(multiDrawEntryCounts, newCapacity);
     }
 
     private void ensureUniformRingCapacity(int requiredBytes) {
@@ -730,24 +960,17 @@ final class OpenGLCommandBuffer implements CommandBuffer {
     }
 
     private void setupVertexAttributes(VertexBuffer vertexBuffer, VertexBuffer.VertexFormat format) {
-        if (!(vertexBuffer instanceof OpenGLVertexBuffer) && !(vertexBuffer instanceof OpenGLPooledVertexBuffer)) {
-            throw new IllegalArgumentException("VertexBuffer must be an OpenGL buffer");
-        }
-        Objects.requireNonNull(format, "Current pipeline vertex format must be set before drawing");
+        setupVertexAttributes(resolveVertexBufferId(vertexBuffer), resolveVertexOffsetBytes(vertexBuffer), format);
+    }
 
-        long bufferOffset = 0L;
-        if (vertexBuffer instanceof OpenGLVertexBuffer) {
-            ((OpenGLVertexBuffer) vertexBuffer).bind();
-        } else {
-            OpenGLPooledVertexBuffer pooledVertexBuffer = (OpenGLPooledVertexBuffer) vertexBuffer;
-            pooledVertexBuffer.bind();
-            bufferOffset = pooledVertexBuffer.getOffset();
-        }
+    private void setupVertexAttributes(int arrayBufferId, long baseOffset, VertexBuffer.VertexFormat format) {
+        Objects.requireNonNull(format, "Current pipeline vertex format must be set before drawing");
+        glBindBuffer(GL_ARRAY_BUFFER, arrayBufferId);
 
         disableVertexAttributes();
 
         int stride = format.getStrideInBytes();
-        long offset = bufferOffset;
+        long offset = baseOffset;
 
         if (format.hasTexCoords()) {
             glEnableVertexAttribArray(2);
@@ -778,15 +1001,61 @@ final class OpenGLCommandBuffer implements CommandBuffer {
     }
 
     private void bindIndexBuffer(IndexBuffer indexBuffer) {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, resolveIndexBufferId(indexBuffer));
+    }
+
+    private static int resolveVertexBufferId(VertexBuffer vertexBuffer) {
+        if (vertexBuffer instanceof OpenGLVertexBuffer) {
+            return ((OpenGLVertexBuffer) vertexBuffer).getBufferId();
+        }
+        if (vertexBuffer instanceof OpenGLPooledVertexBuffer) {
+            return ((OpenGLPooledVertexBuffer) vertexBuffer).getBufferId();
+        }
+        throw new IllegalArgumentException("VertexBuffer must be an OpenGL buffer");
+    }
+
+    private static long resolveVertexOffsetBytes(VertexBuffer vertexBuffer) {
+        if (vertexBuffer instanceof OpenGLVertexBuffer) {
+            return 0L;
+        }
+        if (vertexBuffer instanceof OpenGLPooledVertexBuffer) {
+            return ((OpenGLPooledVertexBuffer) vertexBuffer).getOffset();
+        }
+        throw new IllegalArgumentException("VertexBuffer must be an OpenGL buffer");
+    }
+
+    private static int resolveIndexBufferId(IndexBuffer indexBuffer) {
         if (indexBuffer instanceof OpenGLIndexBuffer) {
-            ((OpenGLIndexBuffer) indexBuffer).bind();
-            return;
+            return ((OpenGLIndexBuffer) indexBuffer).getBufferId();
         }
         if (indexBuffer instanceof OpenGLPooledIndexBuffer) {
-            ((OpenGLPooledIndexBuffer) indexBuffer).bind();
-            return;
+            return ((OpenGLPooledIndexBuffer) indexBuffer).getBufferId();
         }
         throw new IllegalArgumentException("IndexBuffer must be an OpenGL buffer");
+    }
+
+    private static long resolveIndexOffsetBytes(IndexBuffer indexBuffer) {
+        if (indexBuffer instanceof OpenGLIndexBuffer) {
+            return 0L;
+        }
+        if (indexBuffer instanceof OpenGLPooledIndexBuffer) {
+            return ((OpenGLPooledIndexBuffer) indexBuffer).getOffset();
+        }
+        throw new IllegalArgumentException("IndexBuffer must be an OpenGL buffer");
+    }
+
+    private static int resolveVertexBaseVertex(VertexBuffer vertexBuffer, VertexBuffer.VertexFormat vertexFormat) {
+        long offsetBytes = resolveVertexOffsetBytes(vertexBuffer);
+        int stride = vertexFormat.getStrideInBytes();
+        if (stride <= 0) {
+            throw new IllegalStateException("Vertex stride must be > 0");
+        }
+        if (offsetBytes % stride != 0L) {
+            throw new IllegalStateException(
+                    "Vertex buffer offset " + offsetBytes + " is not aligned to stride " + stride
+            );
+        }
+        return (int) (offsetBytes / stride);
     }
 
     private void disableVertexAttributes() {

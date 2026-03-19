@@ -56,6 +56,11 @@ public class IndexedMesh implements Disposable {
         commandBuffer.draw(primitiveType, vertexBuffer, indexBuffer, 0, elementCount);
     }
 
+    public void appendDraw(DrawBatch drawBatch, PrimitiveType primitiveType) {
+        int elementCount = indexBuffer != null ? indexCount : vertexCount;
+        drawBatch.add(primitiveType, vertexBuffer, indexBuffer, 0, elementCount);
+    }
+
     public void draw(CommandBuffer commandBuffer) {
         draw(commandBuffer, PrimitiveType.TRIANGLES);
     }

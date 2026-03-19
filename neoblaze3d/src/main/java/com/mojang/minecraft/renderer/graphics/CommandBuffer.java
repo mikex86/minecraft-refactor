@@ -38,6 +38,11 @@ public interface CommandBuffer {
     void draw(PrimitiveType type, VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int start, int count);
 
     /**
+     * Draws a reusable batch of draw commands.
+     */
+    void drawBatch(DrawBatch drawBatch);
+
+    /**
      * Binds a descriptor set compatible with the currently bound pipeline.
      */
     void bindDescriptorSet(DescriptorSet descriptorSet);

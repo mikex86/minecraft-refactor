@@ -130,6 +130,10 @@ public class OpenGLIndexBuffer implements IndexBuffer, OpenGLBufferStateTracked 
         }
     }
 
+    int getBufferId() {
+        return iboId;
+    }
+
     @Override
     public ResourceState.BufferAccess getBufferAccess() {
         return bufferAccess;
