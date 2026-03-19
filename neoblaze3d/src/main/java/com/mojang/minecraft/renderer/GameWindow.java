@@ -42,6 +42,7 @@ public class GameWindow implements Disposable {
     private final GraphicsAPI graphics;
     private final Swapchain swapchain;
     private int currentSwapchainImageIndex = -1;
+    private int currentFrameInFlightIndex = -1;
 
     // Flag to check if window was created or is embedded
     private final boolean isStandalone;
@@ -171,8 +172,10 @@ public class GameWindow implements Disposable {
 
         // Create swapchain abstraction for presentation.
         this.swapchain = new OpenGLSwapchain(window, this.width, this.height);
-        Swapchain.AcquireResult acquireResult = this.swapchain.acquireNextImage();
+        this.swapchain.initialize();
+        Swapchain.AcquireResult acquireResult = this.swapchain.beginFrame();
         this.currentSwapchainImageIndex = acquireResult.getImageIndex();
+        this.currentFrameInFlightIndex = acquireResult.getFrameInFlightIndex();
     }
 
     public void show() {
@@ -206,10 +209,12 @@ public class GameWindow implements Disposable {
     public boolean update() {
         // Present the previously rendered frame when a valid image is available.
         if (currentSwapchainImageIndex >= 0) {
-            Swapchain.PresentStatus presentStatus = swapchain.present();
+            Swapchain.PresentStatus presentStatus = swapchain.endFrame();
             if (presentStatus == Swapchain.PresentStatus.OUT_OF_DATE) {
                 swapchain.markOutOfDate();
             }
+            currentSwapchainImageIndex = -1;
+            currentFrameInFlightIndex = -1;
         }
 
         // Poll for events
@@ -247,6 +252,7 @@ public class GameWindow implements Disposable {
         // Minimized/hidden framebuffer: skip acquire until we have a valid extent again.
         if (width <= 0 || height <= 0) {
             currentSwapchainImageIndex = -1;
+            currentFrameInFlightIndex = -1;
             return !glfwWindowShouldClose(window);
         }
 
@@ -255,15 +261,17 @@ public class GameWindow implements Disposable {
         }
 
         // Acquire next frame image for upcoming rendering work.
-        Swapchain.AcquireResult acquireResult = swapchain.acquireNextImage();
+        Swapchain.AcquireResult acquireResult = swapchain.beginFrame();
         if (acquireResult.getStatus() == Swapchain.AcquireStatus.OUT_OF_DATE) {
             swapchain.recreate(width, height);
-            acquireResult = swapchain.acquireNextImage();
+            acquireResult = swapchain.beginFrame();
         }
         if (acquireResult.getStatus() != Swapchain.AcquireStatus.OUT_OF_DATE) {
             currentSwapchainImageIndex = acquireResult.getImageIndex();
+            currentFrameInFlightIndex = acquireResult.getFrameInFlightIndex();
         } else {
             currentSwapchainImageIndex = -1;
+            currentFrameInFlightIndex = -1;
         }
 
         // Check if window should close
@@ -412,6 +420,14 @@ public class GameWindow implements Disposable {
      */
     public int getCurrentSwapchainImageIndex() {
         return currentSwapchainImageIndex;
+    }
+
+    /**
+     * Gets the currently acquired in-flight frame slot index.
+     * This is stable across frame resource rings and maps to per-frame synchronization slots.
+     */
+    public int getCurrentFrameInFlightIndex() {
+        return currentFrameInFlightIndex;
     }
 
     /**

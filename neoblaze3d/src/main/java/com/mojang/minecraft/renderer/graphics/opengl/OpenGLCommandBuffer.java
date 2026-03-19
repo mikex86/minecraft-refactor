@@ -11,6 +11,7 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums.PrimitiveType;
 import com.mojang.minecraft.renderer.graphics.IndexBuffer;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.graphics.PipelineLayout;
+import com.mojang.minecraft.renderer.graphics.RenderPassAttachments;
 import com.mojang.minecraft.renderer.graphics.ShaderProgram;
 import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.Uniform;
@@ -35,10 +36,12 @@ import static org.lwjgl.opengl.GL20.*;
 final class OpenGLCommandBuffer implements CommandBuffer {
 
     private Pipeline currentPipeline;
+    private boolean insideRenderPass;
 
     void reset() {
         glUseProgram(0);
         currentPipeline = null;
+        insideRenderPass = false;
     }
 
     @Override
@@ -68,25 +71,53 @@ final class OpenGLCommandBuffer implements CommandBuffer {
     }
 
     @Override
-    public void clear(boolean clearColor, boolean clearDepth, float r, float g, float b, float a) {
-        int bits = 0;
-
-        if (clearColor) {
-            bits |= GL_COLOR_BUFFER_BIT;
-            glClearColor(r, g, b, a);
+    public void beginRenderPass(RenderPassAttachments attachments, int x, int y, int width, int height) {
+        Objects.requireNonNull(attachments, "attachments cannot be null");
+        if (insideRenderPass) {
+            throw new IllegalStateException("beginRenderPass called while another render pass is active");
         }
 
-        if (clearDepth) {
-            bits |= GL_DEPTH_BUFFER_BIT;
+        setViewport(x, y, width, height);
+
+        int clearBits = 0;
+        RenderPassAttachments.ColorAttachment colorAttachment = attachments.getColorAttachment();
+        if (colorAttachment != null && colorAttachment.getLoadOp() == RenderPassAttachments.LoadOp.CLEAR) {
+            glClearColor(
+                    colorAttachment.getClearR(),
+                    colorAttachment.getClearG(),
+                    colorAttachment.getClearB(),
+                    colorAttachment.getClearA()
+            );
+            clearBits |= GL_COLOR_BUFFER_BIT;
         }
 
-        glClear(bits);
+        RenderPassAttachments.DepthAttachment depthAttachment = attachments.getDepthAttachment();
+        if (depthAttachment != null && depthAttachment.getLoadOp() == RenderPassAttachments.LoadOp.CLEAR) {
+            glClearDepth(depthAttachment.getClearDepth());
+            clearBits |= GL_DEPTH_BUFFER_BIT;
+        }
+
+        if (clearBits != 0) {
+            glClear(clearBits);
+        }
+        insideRenderPass = true;
+    }
+
+    @Override
+    public void endRenderPass() {
+        if (!insideRenderPass) {
+            throw new IllegalStateException("endRenderPass called without an active render pass");
+        }
+        insideRenderPass = false;
     }
 
     @Override
     public void draw(PrimitiveType type, VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int start, int count) {
         Objects.requireNonNull(vertexBuffer, "Vertex buffer cannot be null");
         Objects.requireNonNull(currentPipeline, "No pipeline set");
+        if (!insideRenderPass) {
+            throw new IllegalStateException("draw called without an active render pass");
+        }
 
         setupVertexAttributes(vertexBuffer, currentPipeline.getVertexFormat());
 

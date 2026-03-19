@@ -27,6 +27,7 @@ import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.graphics.DataType;
 import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.RenderPassAttachments;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 import com.mojang.minecraft.world.HitResult;
@@ -36,6 +37,32 @@ import com.mojang.minecraft.world.HitResult;
  * Extracted from the main Minecraft class to separate rendering concerns.
  */
 public class GameRenderer implements Disposable {
+    private static final RenderPassAttachments WORLD_RENDER_PASS = new RenderPassAttachments(
+            new RenderPassAttachments.ColorAttachment(
+                    RenderPassAttachments.LoadOp.CLEAR,
+                    RenderPassAttachments.StoreOp.STORE,
+                    0.5F, 0.8F, 1.0F, 0.0F
+            ),
+            new RenderPassAttachments.DepthAttachment(
+                    RenderPassAttachments.LoadOp.CLEAR,
+                    RenderPassAttachments.StoreOp.STORE,
+                    1.0F
+            )
+    );
+
+    private static final RenderPassAttachments COLOR_LOAD_DEPTH_CLEAR_PASS = new RenderPassAttachments(
+            new RenderPassAttachments.ColorAttachment(
+                    RenderPassAttachments.LoadOp.LOAD,
+                    RenderPassAttachments.StoreOp.STORE,
+                    0.0F, 0.0F, 0.0F, 0.0F
+            ),
+            new RenderPassAttachments.DepthAttachment(
+                    RenderPassAttachments.LoadOp.CLEAR,
+                    RenderPassAttachments.StoreOp.STORE,
+                    1.0F
+            )
+    );
+
 
     // Graphics context
     private final GraphicsAPI device;
@@ -237,32 +264,46 @@ public class GameRenderer implements Disposable {
     public void render(float partialTicks, HitResult hitResult) {
         commandBuffer = device.beginFrame();
         try {
-            // Set viewport and clear buffers
-            commandBuffer.setViewport(0, 0, this.width, this.height);
-            commandBuffer.clear(true, true, 0.5F, 0.8F, 1.0F, 0.0F);
+            commandBuffer.beginRenderPass(WORLD_RENDER_PASS, 0, 0, this.width, this.height);
+            try {
+                resetMatricesForFrame();
 
-            resetMatricesForFrame();
+                // Set up the 3D camera
+                this.setupCamera(partialTicks);
 
-            // Set up the 3D camera
-            this.setupCamera(partialTicks);
+                // Update chunks that have changed
+                this.levelRenderer.updateDirtyChunks(commandBuffer, matrixStack, this.player);
 
-            // Update chunks that have changed
-            this.levelRenderer.updateDirtyChunks(commandBuffer, matrixStack, this.player);
+                render(partialTicks);
 
-            render(partialTicks);
+                renderBlockBreakingOverlay();
 
-            renderBlockBreakingOverlay();
-
-            // Render block selection highlight
-            if (hitResult != null) {
-                renderBlockOutline(hitResult);
+                // Render block selection highlight
+                if (hitResult != null) {
+                    renderBlockOutline(hitResult);
+                }
+            } finally {
+                commandBuffer.endRenderPass();
             }
 
             // Render held block in 3D with view bobbing
-            renderHeldItem(partialTicks);
+            ItemStack hotbarItem = player.getInventory().getHotbarItem(player.hotbarSlotIndex);
+            if (hotbarItem != null) {
+                commandBuffer.beginRenderPass(COLOR_LOAD_DEPTH_CLEAR_PASS, 0, 0, this.width, this.height);
+                try {
+                    renderHeldItem(partialTicks);
+                } finally {
+                    commandBuffer.endRenderPass();
+                }
+            }
 
             // Render HUD elements
-            drawUI(commandBuffer, debugStrings, partialTicks);
+            commandBuffer.beginRenderPass(COLOR_LOAD_DEPTH_CLEAR_PASS, 0, 0, this.width, this.height);
+            try {
+                drawUI(commandBuffer, debugStrings, partialTicks);
+            } finally {
+                commandBuffer.endRenderPass();
+            }
         } finally {
             device.endFrame();
             commandBuffer = null;
@@ -292,9 +333,6 @@ public class GameRenderer implements Disposable {
         matrixStack.pushMatrix();
         try {
             matrixStack.loadIdentity();
-
-            // clear depth test because items shouldn't intersect with world geometry such as blocks
-            commandBuffer.clear(false, true, 0.0F, 0.0F, 0.0F, 0.0F);
 
             // In vanilla the hurt tilt is applied before bobbing. The clone currently has no hurt tilt data.
             bobView(player, partialTicks);
@@ -636,8 +674,6 @@ public class GameRenderer implements Disposable {
 
         float scaledWidth = ScaledResolution.getScaledWidth(this.width, this.height);
         float scaledHeight = ScaledResolution.getScaledHeight(this.height);
-
-        commandBuffer.clear(false, true, 0.0F, 0.0F, 0.0F, 0.0F);
 
         setOrthographicProjection(0.0F, scaledWidth, scaledHeight, 0.0F, 100.0F, 300.0F);
         matrixStack.setMatrixMode(MatrixStack.MatrixMode.MODELVIEW);

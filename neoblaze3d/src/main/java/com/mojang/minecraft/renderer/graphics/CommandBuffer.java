@@ -22,9 +22,15 @@ public interface CommandBuffer {
     void setViewport(int x, int y, int width, int height);
 
     /**
-     * Clears the color and/or depth buffer.
+     * Begins a render pass for the specified framebuffer region.
+     * Draw calls must happen between beginRenderPass/endRenderPass.
      */
-    void clear(boolean clearColor, boolean clearDepth, float r, float g, float b, float a);
+    void beginRenderPass(RenderPassAttachments attachments, int x, int y, int width, int height);
+
+    /**
+     * Ends the active render pass.
+     */
+    void endRenderPass();
 
     /**
      * Draws primitives using explicit vertex/index buffers.

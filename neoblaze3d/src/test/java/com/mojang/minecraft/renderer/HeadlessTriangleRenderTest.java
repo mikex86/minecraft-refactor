@@ -13,6 +13,7 @@ import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.graphics.PipelineLayout;
+import com.mojang.minecraft.renderer.graphics.RenderPassAttachments;
 import com.mojang.minecraft.renderer.graphics.ShaderProgram;
 import com.mojang.minecraft.renderer.graphics.Uniform;
 import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
@@ -48,6 +49,18 @@ class HeadlessTriangleRenderTest {
     private static final float[] V2 = {0.0f, 0.8f};
     private static final float COLOR_TOLERANCE = 0.16f;
     private static final float BACKGROUND_TOLERANCE = 0.08f;
+    private static final RenderPassAttachments TEST_RENDER_PASS = new RenderPassAttachments(
+            new RenderPassAttachments.ColorAttachment(
+                    RenderPassAttachments.LoadOp.CLEAR,
+                    RenderPassAttachments.StoreOp.STORE,
+                    0.0f, 0.0f, 0.0f, 1.0f
+            ),
+            new RenderPassAttachments.DepthAttachment(
+                    RenderPassAttachments.LoadOp.CLEAR,
+                    RenderPassAttachments.StoreOp.STORE,
+                    1.0f
+            )
+    );
     private static GameWindow window;
     private static GraphicsAPI graphics;
 
@@ -83,11 +96,12 @@ class HeadlessTriangleRenderTest {
         Uniform modelViewUniform = null;
         Uniform projectionUniform = null;
         CommandBuffer commandBuffer = graphics.beginFrame();
+        boolean renderPassActive = false;
         MatrixStack matrixStack = new MatrixStack();
 
         try {
-            commandBuffer.setViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-            commandBuffer.clear(true, true, 0.0f, 0.0f, 0.0f, 1.0f);
+            commandBuffer.beginRenderPass(TEST_RENDER_PASS, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+            renderPassActive = true;
 
             shaderProgram = graphics.createShaderProgramFromPrecompiled("/shaders/test_triangle.vert.spv", "/shaders/test_triangle.frag.spv");
             pipelineLayout = graphics.createPipelineLayout(
@@ -121,6 +135,8 @@ class HeadlessTriangleRenderTest {
             }
 
             commandBuffer.draw(PrimitiveType.TRIANGLES, vertexBuffer, null, 0, 3);
+            commandBuffer.endRenderPass();
+            renderPassActive = false;
             glFinish();
 
             verifyGradientAtNdcPoint(SCREEN_WIDTH, SCREEN_HEIGHT, -0.3f, -0.3f, V0, V1, V2, COLOR_TOLERANCE);
@@ -140,6 +156,9 @@ class HeadlessTriangleRenderTest {
             }
             if (shaderProgram != null) {
                 shaderProgram.dispose();
+            }
+            if (renderPassActive) {
+                commandBuffer.endRenderPass();
             }
             graphics.endFrame();
         }
@@ -163,11 +182,12 @@ class HeadlessTriangleRenderTest {
         Uniform modelViewUniform = null;
         Uniform projectionUniform = null;
         CommandBuffer commandBuffer = graphics.beginFrame();
+        boolean renderPassActive = false;
         MatrixStack matrixStack = new MatrixStack();
 
         try {
-            commandBuffer.setViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-            commandBuffer.clear(true, true, 0.0f, 0.0f, 0.0f, 1.0f);
+            commandBuffer.beginRenderPass(TEST_RENDER_PASS, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+            renderPassActive = true;
 
             shaderProgram = graphics.createShaderProgramFromPrecompiled("/shaders/test_triangle_matrix.vert.spv", "/shaders/test_triangle.frag.spv");
             pipelineLayout = graphics.createPipelineLayout(
@@ -211,6 +231,8 @@ class HeadlessTriangleRenderTest {
             }
 
             commandBuffer.draw(PrimitiveType.TRIANGLES, vertexBuffer, null, 0, 3);
+            commandBuffer.endRenderPass();
+            renderPassActive = false;
             glFinish();
 
             verifyGradientAtNdcPoint(SCREEN_WIDTH, SCREEN_HEIGHT, 0.5f, 0.4f, transformedV0, transformedV1, transformedV2, COLOR_TOLERANCE);
@@ -234,6 +256,9 @@ class HeadlessTriangleRenderTest {
             }
             if (shaderProgram != null) {
                 shaderProgram.dispose();
+            }
+            if (renderPassActive) {
+                commandBuffer.endRenderPass();
             }
             graphics.endFrame();
         }
@@ -266,11 +291,12 @@ class HeadlessTriangleRenderTest {
         Uniform modelViewUniform = null;
         Uniform projectionUniform = null;
         CommandBuffer commandBuffer = graphics.beginFrame();
+        boolean renderPassActive = false;
         MatrixStack matrixStack = new MatrixStack();
 
         try {
-            commandBuffer.setViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-            commandBuffer.clear(true, true, 0.0f, 0.0f, 0.0f, 1.0f);
+            commandBuffer.beginRenderPass(TEST_RENDER_PASS, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+            renderPassActive = true;
 
             shaderProgram = graphics.createShaderProgramFromPrecompiled("/shaders/test_triangle_matrix.vert.spv", "/shaders/test_triangle.frag.spv");
             pipelineLayout = graphics.createPipelineLayout(
@@ -322,6 +348,8 @@ class HeadlessTriangleRenderTest {
             }
 
             commandBuffer.draw(PrimitiveType.TRIANGLES, vertexBuffer, null, 0, 3);
+            commandBuffer.endRenderPass();
+            renderPassActive = false;
             glFinish();
 
             verifyGradientAtNdcPoint(SCREEN_WIDTH, SCREEN_HEIGHT, -0.2f, -0.4f, expectedV0, expectedV1, expectedV2, COLOR_TOLERANCE);
@@ -349,6 +377,9 @@ class HeadlessTriangleRenderTest {
             }
             if (shaderProgram != null) {
                 shaderProgram.dispose();
+            }
+            if (renderPassActive) {
+                commandBuffer.endRenderPass();
             }
             graphics.endFrame();
         }

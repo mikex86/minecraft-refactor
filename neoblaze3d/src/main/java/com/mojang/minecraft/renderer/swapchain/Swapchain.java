@@ -8,18 +8,29 @@ import com.mojang.minecraft.renderer.Disposable;
  */
 public interface Swapchain extends Disposable {
     /**
-     * Acquires the next presentable image for rendering.
+     * Initializes backend swapchain state.
+     * Must be called exactly once before beginFrame/endFrame usage.
+     */
+    void initialize();
+
+    /**
+     * Begins a frame by synchronizing with prior work and acquiring a presentable image.
      *
      * @return acquisition result
      */
-    AcquireResult acquireNextImage();
+    AcquireResult beginFrame();
 
     /**
-     * Presents the currently rendered image.
+     * Ends the current frame by presenting the acquired image.
      *
      * @return present result
      */
-    PresentStatus present();
+    PresentStatus endFrame();
+
+    /**
+     * Waits for all in-flight swapchain work to finish.
+     */
+    void waitForIdle();
 
     /**
      * Recreates swapchain resources for the provided framebuffer dimensions.
@@ -56,10 +67,12 @@ public interface Swapchain extends Disposable {
     final class AcquireResult {
         private final AcquireStatus status;
         private final int imageIndex;
+        private final int frameInFlightIndex;
 
-        public AcquireResult(AcquireStatus status, int imageIndex) {
+        public AcquireResult(AcquireStatus status, int imageIndex, int frameInFlightIndex) {
             this.status = status;
             this.imageIndex = imageIndex;
+            this.frameInFlightIndex = frameInFlightIndex;
         }
 
         public AcquireStatus getStatus() {
@@ -68,6 +81,10 @@ public interface Swapchain extends Disposable {
 
         public int getImageIndex() {
             return imageIndex;
+        }
+
+        public int getFrameInFlightIndex() {
+            return frameInFlightIndex;
         }
     }
 
