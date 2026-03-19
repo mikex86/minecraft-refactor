@@ -2,7 +2,6 @@ package com.mojang.minecraft.renderer.graphics.opengl;
 
 import com.mojang.minecraft.renderer.graphics.DataType;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
-import com.mojang.minecraft.renderer.graphics.opengl.OpenGLBufferPool.BufferRegion;
 
 import java.nio.ByteBuffer;
 
@@ -14,7 +13,7 @@ import static org.lwjgl.opengl.GL15.*;
  */
 public class OpenGLPooledVertexBuffer implements VertexBuffer {
     // Buffer region from the pool
-    private final BufferRegion region;
+    private final OpenGLBufferAllocation region;
 
     // Buffer state
     private VertexFormat format;
@@ -28,7 +27,7 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
      *
      * @param region The buffer region from the pool
      */
-    public OpenGLPooledVertexBuffer(BufferRegion region) {
+    public OpenGLPooledVertexBuffer(OpenGLBufferAllocation region) {
         this.region = region;
         this.format = new VertexFormat(
                 DataType.BYTE, null, null, null, null,
@@ -41,7 +40,7 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
             throw new IllegalStateException("Cannot use a disposed vertex buffer");
         }
 
-        if (sizeInBytes > region.getSize()) {
+        if (sizeInBytes > region.getSizeInBytes()) {
             throw new IllegalArgumentException("Data size exceeds buffer region size");
         }
 
@@ -60,7 +59,7 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
             throw new IllegalStateException("Cannot use a disposed vertex buffer");
         }
 
-        if (offsetInBytes + sizeInBytes > region.getSize()) {
+        if (offsetInBytes + sizeInBytes > region.getSizeInBytes()) {
             throw new IllegalArgumentException("Update range exceeds buffer region size");
         }
 
@@ -80,14 +79,14 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
         this.format = format;
 
         // Recalculate vertex count if the buffer has data
-        if (region.getSize() > 0) {
-            this.vertexCount = region.getSize() / format.getStrideInBytes();
+        if (region.getSizeInBytes() > 0) {
+            this.vertexCount = region.getSizeInBytes() / format.getStrideInBytes();
         }
     }
 
     @Override
     public long getSizeInBytes() {
-        return region.getSize();
+        return region.getSizeInBytes();
     }
 
     @Override

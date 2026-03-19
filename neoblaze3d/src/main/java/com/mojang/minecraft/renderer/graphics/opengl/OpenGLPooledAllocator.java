@@ -1,6 +1,8 @@
 package com.mojang.minecraft.renderer.graphics.opengl;
 
 import com.mojang.minecraft.profiler.GpuMemoryTracker;
+import com.mojang.minecraft.renderer.graphics.allocator.BufferAllocator;
+import com.mojang.minecraft.renderer.graphics.annotation.RenderThreadOnly;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -11,7 +13,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import org.lwjgl.BufferUtils;
+import org.lwjgl.system.jemalloc.JEmalloc;
 
 import static org.lwjgl.opengl.GL15.*;
 
@@ -19,8 +21,8 @@ import static org.lwjgl.opengl.GL15.*;
  * A pool for OpenGL buffer objects that manages a single large buffer
  * and allocates regions from it to avoid creating many small buffer objects.
  */
-public class OpenGLBufferPool {
-    private static final Logger LOGGER = Logger.getLogger(OpenGLBufferPool.class.getName());
+public class OpenGLPooledAllocator implements BufferAllocator<OpenGLBufferAllocation> {
+    private static final Logger LOGGER = Logger.getLogger(OpenGLPooledAllocator.class.getName());
     
     // Growth settings
     private static final float GROWTH_THRESHOLD = 0.85f; // Start growing at 85% capacity
@@ -64,7 +66,7 @@ public class OpenGLBufferPool {
      * @param bufferType The OpenGL buffer type (GL_ARRAY_BUFFER or GL_ELEMENT_ARRAY_BUFFER)
      * @param sizeInBytes The total size of the buffer in bytes
      */
-    public OpenGLBufferPool(int bufferType, long sizeInBytes) {
+    public OpenGLPooledAllocator(int bufferType, long sizeInBytes) {
         this.bufferType = bufferType;
         this.totalSize = sizeInBytes;
 
@@ -90,9 +92,14 @@ public class OpenGLBufferPool {
      * @param sizeInBytes The size of the region to allocate
      * @return A BufferRegion representing the allocated region, or null if no suitable region is available
      */
+    @RenderThreadOnly
+    @Override
     public BufferRegion allocate(int sizeInBytes) {
         if (disposed) {
             throw new IllegalStateException("Cannot allocate from a disposed buffer pool");
+        }
+        if (sizeInBytes <= 0) {
+            throw new IllegalArgumentException("Allocation size must be greater than zero");
         }
 
         // Check total free space first
@@ -129,29 +136,35 @@ public class OpenGLBufferPool {
             return null;
         }
 
-        // Find the best fit region (smallest region that fits)
+        // Find the best fit region (smallest region that fits), with at most one
+        // defragmentation attempt and one growth attempt to avoid unbounded recursion.
         Region bestFit = null;
         int bestFitIndex = -1;
+        boolean attemptedDefrag = false;
 
-        for (int i = 0; i < freeRegions.size(); i++) {
-            Region region = freeRegions.get(i);
-
-            if (region.size >= sizeInBytes && (bestFit == null || region.size < bestFit.size)) {
-                bestFit = region;
-                bestFitIndex = i;
+        while (bestFit == null) {
+            for (int i = 0; i < freeRegions.size(); i++) {
+                Region region = freeRegions.get(i);
+                if (region.size >= sizeInBytes && (bestFit == null || region.size < bestFit.size)) {
+                    bestFit = region;
+                    bestFitIndex = i;
+                }
             }
-        }
 
-        // If no suitable region was found, try defragmentation if not already done
-        if (bestFit == null && !defragmenting) {
-            defragmentMemory();
+            if (bestFit != null) {
+                break;
+            }
 
-            // Try allocation again after defragmentation
-            return allocate(sizeInBytes);
-        }
+            if (!attemptedDefrag && !defragmenting) {
+                attemptedDefrag = true;
+                defragmentMemory();
+                continue;
+            }
 
-        // If still no suitable region after defragmentation, return null
-        if (bestFit == null) {
+            if (!growing && totalSize < MAX_SIZE && growBuffer()) {
+                return allocate(sizeInBytes);
+            }
+
             failedAllocations++;
             return null;
         }
@@ -166,6 +179,13 @@ public class OpenGLBufferPool {
 
             // Sort the free list by offset to facilitate merging adjacent regions
             freeRegions.sort(Comparator.comparingLong(r -> r.offset));
+        }
+
+        if (activeRegions.containsKey(bestFit.offset)) {
+            LOGGER.severe("Buffer pool corruption detected: active region collision at offset " + bestFit.offset + ". Repairing free list.");
+            rebuildFreeRegionsFromActiveRegions();
+            failedAllocations++;
+            return null;
         }
 
         // Create and return a buffer region
@@ -185,16 +205,24 @@ public class OpenGLBufferPool {
      * @param offset The offset of the region
      * @param size The size of the region
      */
+    @RenderThreadOnly
     public void free(long offset, long size) {
         if (disposed) {
             return;
         }
 
         // Remove from active regions
-        activeRegions.remove(offset);
+        BufferRegion removedRegion = activeRegions.remove(offset);
+        if (removedRegion == null) {
+            LOGGER.warning("Attempted to free unknown buffer region at offset " + offset + " (size " + size + "). Skipping free region insertion to avoid overlap corruption.");
+            rebuildFreeRegionsFromActiveRegions();
+            return;
+        }
+        long removedSize = removedRegion.getSize();
+        totalAllocated = Math.max(0, totalAllocated - removedSize);
 
         // Create a new free region
-        Region newRegion = new Region(offset, size);
+        Region newRegion = new Region(offset, removedSize);
 
         // Find where to insert the new region (keeping the list sorted by offset)
         int insertIndex = 0;
@@ -214,6 +242,7 @@ public class OpenGLBufferPool {
      * 
      * @return True if growth was successful, false otherwise
      */
+    @RenderThreadOnly
     private boolean growBuffer() {
         if (growing || disposed || totalSize >= MAX_SIZE) {
             return false;
@@ -247,39 +276,46 @@ public class OpenGLBufferPool {
             
             // Copy data from active regions to new buffer
             if (!activeRegions.isEmpty()) {
-                // Buffer for copying data
-                ByteBuffer tempBuffer = BufferUtils.createByteBuffer(Math.min(Integer.MAX_VALUE, 64 * 1024 * 1024)); // 64MB temp buffer or max int
-                
-                // Copy each active region
-                for (BufferRegion region : activeRegions.values()) {
-                    long offset = region.getOffset();
-                    long remaining = region.getSize();
-                    long srcOffset = offset;
-                    long dstOffset = offset;
-                    
-                    while (remaining > 0) {
-                        // Determine copy size for this iteration
-                        int copySize = (int)Math.min(remaining, tempBuffer.capacity());
-                        tempBuffer.clear();
-                        tempBuffer.limit(copySize);
+                // Buffer for copying data (64MB temp buffer or max int).
+                ByteBuffer tempBuffer = allocateJemallocBuffer(
+                        Math.min(Integer.MAX_VALUE, 64 * 1024 * 1024),
+                        "grow-buffer copy staging"
+                );
+                try {
+                    // Copy each active region
+                    for (BufferRegion region : activeRegions.values()) {
+                        long offset = region.getOffset();
+                        long remaining = region.getSize();
+                        long srcOffset = offset;
+                        long dstOffset = offset;
                         
-                        // Read from old buffer
-                        glBindBuffer(bufferType, bufferId);
-                        glGetBufferSubData(bufferType, srcOffset, tempBuffer);
-                        tempBuffer.flip();
+                        while (remaining > 0) {
+                            // Determine copy size for this iteration
+                            int copySize = (int)Math.min(remaining, tempBuffer.capacity());
+                            tempBuffer.clear();
+                            tempBuffer.limit(copySize);
+                            
+                            // Read from old buffer
+                            glBindBuffer(bufferType, bufferId);
+                            glGetBufferSubData(bufferType, srcOffset, tempBuffer);
+                            tempBuffer.position(0);
+                            tempBuffer.limit(copySize);
+                            
+                            // Write to new buffer
+                            glBindBuffer(bufferType, newBufferId);
+                            glBufferSubData(bufferType, dstOffset, tempBuffer);
+                            
+                            // Update offsets and remaining
+                            srcOffset += copySize;
+                            dstOffset += copySize;
+                            remaining -= copySize;
+                        }
                         
-                        // Write to new buffer
-                        glBindBuffer(bufferType, newBufferId);
-                        glBufferSubData(bufferType, dstOffset, tempBuffer);
-                        
-                        // Update offsets and remaining
-                        srcOffset += copySize;
-                        dstOffset += copySize;
-                        remaining -= copySize;
+                        // Update the region's buffer ID
+                        region.setBufferId(newBufferId);
                     }
-                    
-                    // Update the region's buffer ID
-                    region.setBufferId(newBufferId);
+                } finally {
+                    JEmalloc.je_free(tempBuffer);
                 }
             }
             
@@ -290,26 +326,9 @@ public class OpenGLBufferPool {
             // Update pool state
             bufferId = newBufferId;
             
-            // Update free regions list
-            // First, find any existing free region at the end of the buffer
-            Region lastRegion = null;
-            for (Region region : freeRegions) {
-                if (region.offset + region.size == totalSize) {
-                    lastRegion = region;
-                    break;
-                }
-            }
-            
-            // If found, extend it; otherwise add a new free region
-            if (lastRegion != null) {
-                lastRegion.size += (newSize - totalSize);
-            } else {
-                freeRegions.add(new Region(totalSize, newSize - totalSize));
-                freeRegions.sort(Comparator.comparingLong(r -> r.offset));
-            }
-            
             // Update total size
             totalSize = newSize;
+            rebuildFreeRegionsFromActiveRegions();
             
             // Update stats
             growthCount++;
@@ -336,9 +355,12 @@ public class OpenGLBufferPool {
             Region current = freeRegions.get(i);
             Region next = freeRegions.get(i + 1);
 
-            // If the regions are adjacent, merge them
-            if (current.offset + current.size == next.offset) {
-                current.size += next.size;
+            long currentEnd = current.offset + current.size;
+            long nextEnd = next.offset + next.size;
+
+            // Merge adjacent or overlapping regions to keep free space canonical.
+            if (currentEnd >= next.offset) {
+                current.size = Math.max(currentEnd, nextEnd) - current.offset;
                 freeRegions.remove(i + 1);
             } else {
                 i++;
@@ -349,11 +371,13 @@ public class OpenGLBufferPool {
     /**
      * Defragments the memory by moving allocated regions to eliminate fragmentation.
      */
+    @RenderThreadOnly
     private void defragmentMemory() {
         if (defragmenting || disposed || activeRegions.isEmpty()) {
             return;
         }
 
+        Map<BufferRegion, ByteBuffer> regionData = new HashMap<>();
         try {
             defragmenting = true;
             defragmentationCount++;
@@ -382,27 +406,19 @@ public class OpenGLBufferPool {
             LOGGER.info(String.format("Defragmenting buffer with %.2f MB fragmentation", 
                     totalFragmentation / (1024.0 * 1024.0)));
 
-            // Create temporary buffer for each region's data
-            Map<BufferRegion, ByteBuffer> regionData = new HashMap<>();
-
             // Read all region data into temporary buffers
             glBindBuffer(bufferType, bufferId);
             for (BufferRegion region : sortedRegions) {
                 int size = (int) Math.min(Integer.MAX_VALUE, region.getSize());
-                ByteBuffer data = BufferUtils.createByteBuffer(size);
+                ByteBuffer data = allocateJemallocBuffer(size, "defragment-region staging");
 
                 // Copy data from GPU to CPU
                 glGetBufferSubData(bufferType, region.getOffset(), data);
-                data.flip();
+                data.position(0);
+                data.limit(size);
 
                 regionData.put(region, data);
             }
-
-            // Clear free regions list
-            freeRegions.clear();
-
-            // Start with all memory free
-            freeRegions.add(new Region(0, totalSize));
 
             // Re-allocate and copy data back, compacted
             long newOffset = 0;
@@ -415,13 +431,6 @@ public class OpenGLBufferPool {
                 // Upload data back to GPU at new location
                 ByteBuffer data = regionData.get(region);
                 glBufferSubData(bufferType, newOffset, data);
-
-                // Update free regions list
-                // First, remove the entire space
-                freeRegions.clear();
-
-                // Then add the remaining free space after all allocated regions
-                freeRegions.add(new Region(newOffset + size, totalSize - (newOffset + size)));
 
                 // Move to next position
                 newOffset += size;
@@ -436,12 +445,26 @@ public class OpenGLBufferPool {
             }
             activeRegions.clear();
             activeRegions.putAll(newActiveRegions);
+            rebuildFreeRegionsFromActiveRegions();
             
             LOGGER.info("Buffer defragmentation complete");
 
         } finally {
+            for (ByteBuffer data : regionData.values()) {
+                if (data != null) {
+                    JEmalloc.je_free(data);
+                }
+            }
             defragmenting = false;
         }
+    }
+
+    private static ByteBuffer allocateJemallocBuffer(int sizeInBytes, String context) {
+        ByteBuffer buffer = JEmalloc.je_malloc((long) sizeInBytes);
+        if (buffer == null) {
+            throw new OutOfMemoryError("jemalloc failed to allocate " + sizeInBytes + " bytes for " + context);
+        }
+        return buffer;
     }
 
     /**
@@ -449,6 +472,7 @@ public class OpenGLBufferPool {
      *
      * @return A string with buffer statistics
      */
+    @Override
     public String getStats() {
         long allocatedBytes = totalAllocated;
         long freeBytes = freeRegions.stream().mapToLong(r -> r.size).sum();
@@ -494,6 +518,7 @@ public class OpenGLBufferPool {
     /**
      * Disposes of the buffer pool.
      */
+    @Override
     public synchronized void dispose() {
         if (!disposed) {
             glBindBuffer(bufferType, bufferId);
@@ -512,6 +537,11 @@ public class OpenGLBufferPool {
         }
     }
 
+    @Override
+    public boolean isDisposed() {
+        return disposed;
+    }
+
     /**
      * Updates a region of the buffer with data.
      *
@@ -527,6 +557,32 @@ public class OpenGLBufferPool {
         glBindBuffer(bufferType, bufferId);
         glBufferSubData(bufferType, offset, data);
         glBindBuffer(bufferType, 0);
+    }
+
+    private void rebuildFreeRegionsFromActiveRegions() {
+        freeRegions.clear();
+        if (activeRegions.isEmpty()) {
+            freeRegions.add(new Region(0, totalSize));
+            return;
+        }
+
+        List<BufferRegion> sortedRegions = new ArrayList<>(activeRegions.values());
+        Collections.sort(sortedRegions, Comparator.comparingLong(BufferRegion::getOffset));
+
+        long cursor = 0;
+        for (BufferRegion region : sortedRegions) {
+            long offset = region.getOffset();
+            long end = offset + region.getSize();
+
+            if (offset > cursor) {
+                freeRegions.add(new Region(cursor, offset - cursor));
+            }
+            cursor = Math.max(cursor, end);
+        }
+
+        if (cursor < totalSize) {
+            freeRegions.add(new Region(cursor, totalSize - cursor));
+        }
     }
 
     /**
@@ -553,15 +609,15 @@ public class OpenGLBufferPool {
     /**
      * A region allocated from the buffer pool.
      */
-    public static class BufferRegion implements MutableBufferRegion {
-        private final OpenGLBufferPool pool;
+    public static class BufferRegion implements MutableBufferRegion, OpenGLBufferAllocation {
+        private final OpenGLPooledAllocator pool;
         private int bufferId;
         private final int bufferType;
         private long offset;
         private final long size;
         private boolean freed = false;
         
-        BufferRegion(OpenGLBufferPool pool, int bufferId, int bufferType, long offset, long size) {
+        BufferRegion(OpenGLPooledAllocator pool, int bufferId, int bufferType, long offset, long size) {
             this.pool = pool;
             this.bufferId = bufferId;
             this.bufferType = bufferType;
@@ -577,6 +633,7 @@ public class OpenGLBufferPool {
          * 
          * @return The OpenGL buffer ID
          */
+        @Override
         public int getBufferId() {
             return bufferId;
         }
@@ -586,6 +643,7 @@ public class OpenGLBufferPool {
          * 
          * @return The OpenGL buffer type
          */
+        @Override
         public int getBufferType() {
             return bufferType;
         }
@@ -595,6 +653,7 @@ public class OpenGLBufferPool {
          * 
          * @return The offset in bytes
          */
+        @Override
         public long getOffset() {
             return offset;
         }
@@ -627,10 +686,16 @@ public class OpenGLBufferPool {
         public long getSize() {
             return size;
         }
+
+        @Override
+        public long getSizeInBytes() {
+            return size;
+        }
         
         /**
          * Frees the region back to the pool.
          */
+        @Override
         public void free() {
             if (!freed) {
                 // Track memory deallocation first
@@ -646,6 +711,7 @@ public class OpenGLBufferPool {
          * 
          * @return true if the region has been freed, false otherwise
          */
+        @Override
         public boolean isFreed() {
             return freed;
         }

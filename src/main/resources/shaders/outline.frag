@@ -1,10 +1,10 @@
-#version 330 core
+#version 450 core
 
 // Input from vertex shader
-in vec4 vertexColor;
+layout (location = 0) in vec4 vertexColor;
 
 // Output color
-out vec4 fragColor;
+layout (location = 0) out vec4 fragColor;
 
 void main() {
     // Apply vertex color

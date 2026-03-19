@@ -45,6 +45,17 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
 }
 
+val shaderTools by sourceSets.creating
+
+dependencies {
+    add(shaderTools.implementationConfigurationName, platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
+    add(shaderTools.implementationConfigurationName, "org.lwjgl:lwjgl")
+    add(shaderTools.implementationConfigurationName, "org.lwjgl:lwjgl-shaderc")
+
+    add(shaderTools.runtimeOnlyConfigurationName, "org.lwjgl:lwjgl::$lwjglNatives")
+    add(shaderTools.runtimeOnlyConfigurationName, "org.lwjgl:lwjgl-shaderc::$lwjglNatives")
+}
+
 // Main class configuration
 application {
     mainClass.set("com.mojang.minecraft.Minecraft")
@@ -60,6 +71,28 @@ tasks.named<JavaExec>("run") {
     // Add macOS-specific JVM args
     if (System.getProperty("os.name").contains("Mac")) {
         jvmArgs = jvmArgs!! + listOf("-XstartOnFirstThread")
+    }
+}
+
+val generatedShaderOutputDir = layout.buildDirectory.dir("generated/resources/main/shaders")
+
+val compileShaders by tasks.registering(JavaExec::class) {
+    group = "build"
+    description = "Compiles GLSL shaders to SPIR-V binaries with Shaderc."
+    classpath = shaderTools.runtimeClasspath
+    mainClass.set("com.mojang.minecraft.tools.ShaderBinaryCompiler")
+    args(
+        file("src/main/resources/shaders").absolutePath,
+        generatedShaderOutputDir.get().asFile.absolutePath
+    )
+    inputs.dir(file("src/main/resources/shaders"))
+    outputs.dir(generatedShaderOutputDir)
+}
+
+tasks.processResources {
+    dependsOn(compileShaders)
+    from(generatedShaderOutputDir) {
+        into("shaders")
     }
 }
 

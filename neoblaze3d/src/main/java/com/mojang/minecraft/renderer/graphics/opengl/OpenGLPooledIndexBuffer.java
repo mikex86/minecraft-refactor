@@ -1,11 +1,11 @@
 package com.mojang.minecraft.renderer.graphics.opengl;
 
 import com.mojang.minecraft.renderer.graphics.IndexBuffer;
-import com.mojang.minecraft.renderer.graphics.opengl.OpenGLBufferPool.BufferRegion;
+import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.jemalloc.JEmalloc;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
-import org.lwjgl.BufferUtils;
 
 import static org.lwjgl.opengl.GL15.*;
 
@@ -14,8 +14,10 @@ import static org.lwjgl.opengl.GL15.*;
  * from a buffer pool instead of creating its own buffer.
  */
 public class OpenGLPooledIndexBuffer implements IndexBuffer {
+    private static final int STACK_UPLOAD_THRESHOLD_BYTES = 16 * 1024;
+
     // Buffer region from the pool
-    private final BufferRegion region;
+    private final OpenGLBufferAllocation region;
     
     // Buffer state
     private int indexCount;
@@ -28,7 +30,7 @@ public class OpenGLPooledIndexBuffer implements IndexBuffer {
      * 
      * @param region The buffer region from the pool
      */
-    public OpenGLPooledIndexBuffer(BufferRegion region) {
+    public OpenGLPooledIndexBuffer(OpenGLBufferAllocation region) {
         this.region = region;
     }
     
@@ -56,41 +58,39 @@ public class OpenGLPooledIndexBuffer implements IndexBuffer {
             throw new IllegalStateException("Cannot use a disposed index buffer");
         }
         
-        if (sizeInBytes > region.getSize()) {
+        if (sizeInBytes > region.getSizeInBytes()) {
             throw new IllegalArgumentException("Data size exceeds buffer region size");
         }
         
         // Calculate index count
         this.indexCount = sizeInBytes / 4; // 4 bytes per int
         
-        // Create a ByteBuffer using LWJGL's BufferUtils to ensure direct allocation
-        ByteBuffer byteBuffer = BufferUtils.createByteBuffer(sizeInBytes);
-        
-        // Save the buffer's position and limit
-        int originalPosition = data.position();
-        int originalLimit = data.limit();
-        
-        // Only read up to the size needed in ints
-        int intCount = sizeInBytes / 4; // 4 bytes per int
-        
-        // Make sure we don't read past the end of the buffer
-        int limit = Math.min(originalPosition + intCount, originalLimit);
-        data.limit(limit);
-        
-        // Copy the int data to the byte buffer
-        while (data.hasRemaining()) {
-            byteBuffer.putInt(data.get());
+        if (sizeInBytes <= STACK_UPLOAD_THRESHOLD_BYTES) {
+            try (MemoryStack stack = MemoryStack.stackPush()) {
+                ByteBuffer byteBuffer = stack.malloc(sizeInBytes);
+                writeIntsAsBytes(data, sizeInBytes, byteBuffer);
+
+                // Upload data to the buffer region
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, region.getBufferId());
+                glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, region.getOffset(), byteBuffer);
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+            }
+        } else {
+            ByteBuffer byteBuffer = JEmalloc.je_malloc((long) sizeInBytes);
+            if (byteBuffer == null) {
+                throw new OutOfMemoryError("jemalloc failed to allocate " + sizeInBytes + " bytes");
+            }
+            try {
+                writeIntsAsBytes(data, sizeInBytes, byteBuffer);
+
+                // Upload data to the buffer region
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, region.getBufferId());
+                glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, region.getOffset(), byteBuffer);
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+            } finally {
+                JEmalloc.je_free(byteBuffer);
+            }
         }
-        
-        // Reset buffer positions
-        data.position(originalPosition);
-        data.limit(originalLimit);
-        byteBuffer.flip();
-        
-        // Upload data to the buffer region
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, region.getBufferId());
-        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, region.getOffset(), byteBuffer);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
     
     @Override
@@ -99,43 +99,65 @@ public class OpenGLPooledIndexBuffer implements IndexBuffer {
             throw new IllegalStateException("Cannot use a disposed index buffer");
         }
         
-        if (offsetInBytes + sizeInBytes > region.getSize()) {
+        if (offsetInBytes + sizeInBytes > region.getSizeInBytes()) {
             throw new IllegalArgumentException("Update range exceeds buffer region size");
         }
         
-        // Create a ByteBuffer using LWJGL's BufferUtils to ensure direct allocation
-        ByteBuffer byteBuffer = BufferUtils.createByteBuffer(sizeInBytes);
-        
-        // Save the buffer's position and limit
+        if (sizeInBytes <= STACK_UPLOAD_THRESHOLD_BYTES) {
+            try (MemoryStack stack = MemoryStack.stackPush()) {
+                ByteBuffer byteBuffer = stack.malloc(sizeInBytes);
+                writeIntsAsBytes(data, sizeInBytes, byteBuffer);
+
+                // Upload data to the buffer region
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, region.getBufferId());
+                glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, region.getOffset() + offsetInBytes, byteBuffer);
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+            }
+        } else {
+            ByteBuffer byteBuffer = JEmalloc.je_malloc((long) sizeInBytes);
+            if (byteBuffer == null) {
+                throw new OutOfMemoryError("jemalloc failed to allocate " + sizeInBytes + " bytes");
+            }
+            try {
+                writeIntsAsBytes(data, sizeInBytes, byteBuffer);
+
+                // Upload data to the buffer region
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, region.getBufferId());
+                glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, region.getOffset() + offsetInBytes, byteBuffer);
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+            } finally {
+                JEmalloc.je_free(byteBuffer);
+            }
+        }
+    }
+
+    private static void writeIntsAsBytes(IntBuffer data, int sizeInBytes, ByteBuffer byteBuffer) {
+        // Save the buffer's position and limit.
         int originalPosition = data.position();
         int originalLimit = data.limit();
-        
-        // Only read up to the size needed in ints
-        int intCount = sizeInBytes / 4; // 4 bytes per int
-        
-        // Make sure we don't read past the end of the buffer
-        int limit = Math.min(originalPosition + intCount, originalLimit);
-        data.limit(limit);
-        
-        // Copy the int data to the byte buffer
-        while (data.hasRemaining()) {
-            byteBuffer.putInt(data.get());
+        try {
+            // Only read up to the size needed in ints.
+            int intCount = sizeInBytes / 4; // 4 bytes per int
+
+            // Make sure we don't read past the end of the buffer.
+            int limit = Math.min(originalPosition + intCount, originalLimit);
+            data.limit(limit);
+
+            // Copy the int data to the byte buffer.
+            while (data.hasRemaining()) {
+                byteBuffer.putInt(data.get());
+            }
+            byteBuffer.flip();
+        } finally {
+            // Always restore caller-owned buffer state.
+            data.position(originalPosition);
+            data.limit(originalLimit);
         }
-        
-        // Reset buffer positions
-        data.position(originalPosition);
-        data.limit(originalLimit);
-        byteBuffer.flip();
-        
-        // Upload data to the buffer region
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, region.getBufferId());
-        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, region.getOffset() + offsetInBytes, byteBuffer);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
     
     @Override
     public long getSizeInBytes() {
-        return region.getSize();
+        return region.getSizeInBytes();
     }
     
     @Override

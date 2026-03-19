@@ -1,14 +1,14 @@
-#version 330 core
+#version 450 core
 
 // Texture sampler
 uniform sampler2D textureSampler;
 
 // Input from vertex shader
-in vec4 vertexColor;
-in vec2 texCoord;
+layout (location = 0) in vec4 vertexColor;
+layout (location = 1) in vec2 texCoord;
 
 // Output color
-out vec4 fragColor;
+layout (location = 0) out vec4 fragColor;
 
 void main() {
     // Sample the texture

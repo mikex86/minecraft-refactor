@@ -17,7 +17,6 @@ import java.nio.IntBuffer;
  * uses the abstracted graphics API instead of direct OpenGL calls.
  * <p>
  * This version uses indexed triangles instead of direct quads for modern GPU compatibility.
- * It also uses Vertex Array Objects (VAOs) for improved rendering performance.
  */
 public final class Tesselator implements Disposable {
     private static final int MAX_BYTES = 1048576;
@@ -58,7 +57,6 @@ public final class Tesselator implements Disposable {
     private final GraphicsAPI graphics;
     private VertexBuffer vertexBuffer;
     private IndexBuffer indexBuffer;
-    private VertexArrayObject vao;
     private VertexBuffer.VertexFormat format;
 
     /**
@@ -78,13 +76,12 @@ public final class Tesselator implements Disposable {
         clear();
     }
 
-    private void ensureVAOInitialized() {
+    private void ensureGpuBuffersInitialized() {
         if (this.vertexBuffer != null) {
             return;
         }
         this.vertexBuffer = graphics.createVertexBuffer(BufferUsage.DYNAMIC);
         this.indexBuffer = graphics.createIndexBuffer(BufferUsage.DYNAMIC);
-        this.vao = graphics.createVertexArrayObject();
     }
 
     /**
@@ -148,7 +145,7 @@ public final class Tesselator implements Disposable {
      */
     public void flush() {
         if (this.vertexCount > 0) {
-            ensureVAOInitialized();
+            ensureGpuBuffersInitialized();
 
             // Update format
             format = new VertexBuffer.VertexFormat(
@@ -173,12 +170,8 @@ public final class Tesselator implements Disposable {
             vertexBuffer.setData(getBuffer(), dataIndex);
             indexBuffer.setData(getIndexBuffer(), elementCount * Integer.BYTES); // 4 bytes per int
 
-            // Set up VAO
-            vao.setVertexBuffer(vertexBuffer);
-            vao.setIndexBuffer(indexBuffer);
-
             // Draw the vertices
-            graphics.drawPrimitives(vao, PrimitiveType.TRIANGLES, 0, elementCount);
+            graphics.draw(PrimitiveType.TRIANGLES, vertexBuffer, indexBuffer, 0, elementCount);
         }
 
         // Reset state
@@ -203,7 +196,7 @@ public final class Tesselator implements Disposable {
      * @return The created indexed mesh
      */
     public IndexedMesh createIndexedMesh(BufferUsage bufferUsage, boolean pooled) {
-        ensureVAOInitialized();
+        ensureGpuBuffersInitialized();
 
         // Set up vertex format based on tesselator state
         VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
@@ -257,8 +250,8 @@ public final class Tesselator implements Disposable {
             indexBuffer.setData(getIndexBuffer(), indexDataSizeInBytes);
         }
 
-        // Create mesh with VAO
-        return new IndexedMesh(graphics, vertexBuffer, indexBuffer, vertexCount, indexCount);
+        // Create mesh with explicit vertex/index buffers
+        return new IndexedMesh(vertexBuffer, indexBuffer, vertexCount, indexCount);
     }
 
     /**
@@ -492,9 +485,5 @@ public final class Tesselator implements Disposable {
             indexBuffer = null;
         }
 
-        if (vao != null) {
-            vao.dispose();
-            vao = null;
-        }
     }
 }

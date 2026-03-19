@@ -10,7 +10,7 @@ public interface LightingShader extends IShader {
     }
 
     default void setAmbientLightUniforms(float ambientLightR, float ambientLightG, float ambientLightB) {
-        setUniform("ambientLight", ambientLightR, ambientLightG, ambientLightB);
+        setUniform("ambientColor", ambientLightR, ambientLightG, ambientLightB);
     }
 
 }

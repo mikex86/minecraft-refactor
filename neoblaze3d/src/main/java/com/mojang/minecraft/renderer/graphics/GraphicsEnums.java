@@ -86,8 +86,7 @@ public class GraphicsEnums {
         LINE_STRIP,
         TRIANGLES,
         TRIANGLE_STRIP,
-        TRIANGLE_FAN,
-        QUADS
+        TRIANGLE_FAN
     }
 
     /**

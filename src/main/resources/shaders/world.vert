@@ -1,14 +1,14 @@
-#version 330 core
+#version 450 core
 
 // Matrix uniforms
-uniform mat4 modelViewMatrix;
-uniform mat4 projectionMatrix;
+layout (location = 0) uniform mat4 modelViewMatrix;
+layout (location = 4) uniform mat4 projectionMatrix;
 
 // Fog uniforms
-uniform float fogDensity;
-uniform float fogStart;
-uniform float fogEnd;
-uniform vec4 fogColor;
+layout (location = 8) uniform float fogDensity;
+layout (location = 9) uniform float fogStart;
+layout (location = 10) uniform float fogEnd;
+layout (location = 11) uniform vec4 fogColor;
 
 // Vertex attributes (replace gl_Vertex, gl_Color, etc.)
 layout (location = 0) in vec3 position;
@@ -17,9 +17,9 @@ layout (location = 2) in vec2 texCoord0;
 layout (location = 3) in vec3 normal;
 
 // Output to fragment shader
-out float vertexColor;
-out vec2 texCoord;
-out float fogFactor;
+layout (location = 0) out float vertexColor;
+layout (location = 1) out vec2 texCoord;
+layout (location = 2) out float fogFactor;
 
 void main() {
     gl_Position = (projectionMatrix * modelViewMatrix) * vec4(position, 1.0);

@@ -1,15 +1,15 @@
-#version 330 core
+#version 450 core
 
 // Matrix uniforms
-uniform mat4 modelViewMatrix;
-uniform mat4 projectionMatrix;
+layout (location = 0) uniform mat4 modelViewMatrix;
+layout (location = 4) uniform mat4 projectionMatrix;
 
 // Vertex attributes (replace gl_Vertex, gl_Color, etc.)
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 color;
 
 // Output to fragment shader
-out vec4 vertexColor;
+layout (location = 0) out vec4 vertexColor;
 
 void main() {
     // Pass vertex position through our custom MVP matrix

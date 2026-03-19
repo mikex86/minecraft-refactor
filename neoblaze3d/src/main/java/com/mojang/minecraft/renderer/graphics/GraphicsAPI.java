@@ -1,7 +1,7 @@
 package com.mojang.minecraft.renderer.graphics;
 
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.*;
-import com.mojang.minecraft.renderer.shader.Shader;
+import com.mojang.minecraft.renderer.shader.IShader;
 
 import java.nio.ByteBuffer;
 
@@ -55,13 +55,6 @@ public interface GraphicsAPI {
      * @return A new pooled index buffer, or null if the allocation failed
      */
     IndexBuffer createPooledIndexBuffer(int sizeInBytes);
-
-    /**
-     * Creates a vertex array object.
-     *
-     * @return A new vertex array object
-     */
-    VertexArrayObject createVertexArrayObject();
 
     /**
      * Creates a texture.
@@ -227,14 +220,15 @@ public interface GraphicsAPI {
     void setMatrixMode(MatrixMode mode);
 
     /**
-     * Draws primitives using a vertex array object.
-     * 
-     * @param vao    The vertex array object
-     * @param type   The primitive type
-     * @param start  The start index
-     * @param count  The number of indices to draw
+     * Draws primitives using explicit vertex/index buffers.
+     *
+     * @param type        The primitive type
+     * @param vertexBuffer The vertex buffer to source vertex attributes from
+     * @param indexBuffer  Optional index buffer, or null for non-indexed drawing
+     * @param start       Vertex or index start offset
+     * @param count       Number of vertices or indices to draw
      */
-    void drawPrimitives(VertexArrayObject vao, PrimitiveType type, int start, int count);
+    void draw(PrimitiveType type, VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int start, int count);
 
     /**
      * Sets the active texture.
@@ -244,11 +238,11 @@ public interface GraphicsAPI {
     void setTexture(Texture texture);
 
     /**
-     * Sets the active shader.
+     * Sets the active shader program.
      *
      * @param shader The shader to use
      */
-    void setShader(Shader shader);
+    void setShader(IShader shader);
 
     /**
      * Gets the matrix stack.

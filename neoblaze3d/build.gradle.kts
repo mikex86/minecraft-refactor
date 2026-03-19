@@ -37,6 +37,39 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
 }
 
+val shaderTools by sourceSets.creating
+
+dependencies {
+    add(shaderTools.implementationConfigurationName, platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
+    add(shaderTools.implementationConfigurationName, "org.lwjgl:lwjgl")
+    add(shaderTools.implementationConfigurationName, "org.lwjgl:lwjgl-shaderc")
+
+    add(shaderTools.runtimeOnlyConfigurationName, "org.lwjgl:lwjgl::$lwjglNatives")
+    add(shaderTools.runtimeOnlyConfigurationName, "org.lwjgl:lwjgl-shaderc::$lwjglNatives")
+}
+
+val generatedTestShaderOutputDir = layout.buildDirectory.dir("generated/resources/test/shaders")
+
+val compileTestShaders by tasks.registering(JavaExec::class) {
+    group = "build"
+    description = "Compiles test GLSL shaders to SPIR-V binaries with Shaderc."
+    classpath = shaderTools.runtimeClasspath
+    mainClass.set("com.mojang.minecraft.tools.ShaderBinaryCompiler")
+    args(
+            file("src/test/resources/shaders").absolutePath,
+            generatedTestShaderOutputDir.get().asFile.absolutePath
+    )
+    inputs.dir(file("src/test/resources/shaders"))
+    outputs.dir(generatedTestShaderOutputDir)
+}
+
+tasks.processTestResources {
+    dependsOn(compileTestShaders)
+    from(generatedTestShaderOutputDir) {
+        into("shaders")
+    }
+}
+
 tasks.test {
     useJUnitPlatform()
 }

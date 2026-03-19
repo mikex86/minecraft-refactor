@@ -2,6 +2,8 @@ package com.mojang.minecraft.renderer;
 
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
+import com.mojang.minecraft.renderer.swapchain.Swapchain;
+import com.mojang.minecraft.renderer.swapchain.opengl.OpenGLSwapchain;
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
@@ -38,6 +40,8 @@ public class GameWindow implements Disposable {
 
     // Graphics context
     private final GraphicsAPI graphics;
+    private final Swapchain swapchain;
+    private int currentSwapchainImageIndex = -1;
 
     // Flag to check if window was created or is embedded
     private final boolean isStandalone;
@@ -164,6 +168,11 @@ public class GameWindow implements Disposable {
 
         // Initialize the graphics API
         graphics.initialize();
+
+        // Create swapchain abstraction for presentation.
+        this.swapchain = new OpenGLSwapchain(window, this.width, this.height);
+        Swapchain.AcquireResult acquireResult = this.swapchain.acquireNextImage();
+        this.currentSwapchainImageIndex = acquireResult.getImageIndex();
     }
 
     public void show() {
@@ -189,13 +198,19 @@ public class GameWindow implements Disposable {
     }
 
     /**
-     * Updates the window, swapping buffers and polling events.
+     * Updates the window, presenting the previous frame, polling events,
+     * handling resize/swapchain lifecycle, and acquiring the next frame.
      *
      * @return true if the window should remain open, false if it should close
      */
     public boolean update() {
-        // Swap buffers
-        glfwSwapBuffers(window);
+        // Present the previously rendered frame when a valid image is available.
+        if (currentSwapchainImageIndex >= 0) {
+            Swapchain.PresentStatus presentStatus = swapchain.present();
+            if (presentStatus == Swapchain.PresentStatus.OUT_OF_DATE) {
+                swapchain.markOutOfDate();
+            }
+        }
 
         // Poll for events
         glfwPollEvents();
@@ -218,7 +233,7 @@ public class GameWindow implements Disposable {
             if (newWidth != width || newHeight != height) {
                 width = newWidth;
                 height = newHeight;
-                graphics.setViewport(0, 0, width, height);
+                swapchain.markOutOfDate();
             }
 
             if (newWindowWidth != windowWidth || newWindowHeight != windowHeight) {
@@ -227,6 +242,30 @@ public class GameWindow implements Disposable {
             }
 
             updateMouseToFramebufferScale();
+        }
+
+        // Minimized/hidden framebuffer: skip acquire until we have a valid extent again.
+        if (width <= 0 || height <= 0) {
+            currentSwapchainImageIndex = -1;
+            return !glfwWindowShouldClose(window);
+        }
+
+        if (swapchain.isOutOfDate()) {
+            swapchain.recreate(width, height);
+            graphics.setViewport(0, 0, width, height);
+        }
+
+        // Acquire next frame image for upcoming rendering work.
+        Swapchain.AcquireResult acquireResult = swapchain.acquireNextImage();
+        if (acquireResult.getStatus() == Swapchain.AcquireStatus.OUT_OF_DATE) {
+            swapchain.recreate(width, height);
+            graphics.setViewport(0, 0, width, height);
+            acquireResult = swapchain.acquireNextImage();
+        }
+        if (acquireResult.getStatus() != Swapchain.AcquireStatus.OUT_OF_DATE) {
+            currentSwapchainImageIndex = acquireResult.getImageIndex();
+        } else {
+            currentSwapchainImageIndex = -1;
         }
 
         // Check if window should close
@@ -311,6 +350,8 @@ public class GameWindow implements Disposable {
             scrollCallback.free();
         }
         if (isStandalone) {
+            swapchain.dispose();
+
             // Free the callbacks
             glfwFreeCallbacks(window);
 
@@ -365,6 +406,21 @@ public class GameWindow implements Disposable {
 
     public void requestFocus() {
         glfwFocusWindow(window);
+    }
+
+    /**
+     * Gets the currently acquired swapchain image index for this frame.
+     * OpenGL-backed swapchains always use image index 0.
+     */
+    public int getCurrentSwapchainImageIndex() {
+        return currentSwapchainImageIndex;
+    }
+
+    /**
+     * Returns the backend-neutral swapchain abstraction.
+     */
+    public Swapchain getSwapchain() {
+        return swapchain;
     }
 
     /**

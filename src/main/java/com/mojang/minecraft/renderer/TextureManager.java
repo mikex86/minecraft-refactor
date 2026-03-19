@@ -4,8 +4,9 @@ import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.Texture;
-import com.mojang.minecraft.util.io.IOUtils;
+import com.mojang.minecraft.renderer.resource.ResourceBufferLoader;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.jemalloc.JEmalloc;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -56,37 +57,44 @@ public class TextureManager implements Disposable {
             // Flip vertically if your textures expect bottom‐up origin:
             stbi_set_flip_vertically_on_load(false);
 
-            byte[] bytes;
+            ByteBuffer imageBuffer = null;
             try {
-                bytes = IOUtils.readAllBytes(Objects.requireNonNull(getClass().getResourceAsStream(resourcePath)));
+                imageBuffer = ResourceBufferLoader.loadResourceRequired(
+                        getClass(),
+                        resourcePath,
+                        JEmalloc::je_malloc
+                );
+                ByteBuffer decoded = stbi_load_from_memory(imageBuffer, w, h, comp, 4);
+                if (decoded == null) {
+                    throw new RuntimeException("STBImage failed to load: " + stbi_failure_reason());
+                }
+
+                try {
+                    int width = w.get(0);
+                    int height = h.get(0);
+
+                    Texture texture = graphics.createTextureHostAccessible(
+                            width,
+                            height,
+                            GraphicsEnums.TextureFormat.RGBA8,
+                            decoded
+                    );
+                    texture.setFiltering(filterMode, filterMode);
+
+                    textureCache.put(resourcePath, texture);
+                    System.out.println("Loaded texture: " + resourcePath +
+                            " (" + width + "x" + height + ")");
+                    return texture;
+                } finally {
+                    stbi_image_free(decoded);
+                }
             } catch (IOException e) {
                 throw new RuntimeException("Failed to load texture: " + resourcePath, e);
+            } finally {
+                if (imageBuffer != null) {
+                    JEmalloc.je_free(imageBuffer);
+                }
             }
-
-            ByteBuffer imageBuffer = ByteBuffer.allocateDirect(bytes.length);
-            imageBuffer.put(bytes);
-            imageBuffer.flip();
-            ByteBuffer decoded = stbi_load_from_memory(imageBuffer, w, h, comp, 4);
-            if (decoded == null) {
-                throw new RuntimeException("STBImage failed to load: " + stbi_failure_reason());
-            }
-
-            int width = w.get(0);
-            int height = h.get(0);
-
-            Texture texture = graphics.createTextureHostAccessible(
-                    width,
-                    height,
-                    GraphicsEnums.TextureFormat.RGBA8,
-                    decoded
-            );
-            texture.setFiltering(filterMode, filterMode);
-
-            textureCache.put(resourcePath, texture);
-            System.out.println("Loaded texture: " + resourcePath +
-                    " (" + width + "x" + height + ")");
-            stbi_image_free(decoded);
-            return texture;
         }
     }
 

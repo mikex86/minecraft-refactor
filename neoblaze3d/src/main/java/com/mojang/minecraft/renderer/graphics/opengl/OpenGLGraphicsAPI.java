@@ -6,14 +6,15 @@ import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 import com.mojang.minecraft.renderer.graphics.IndexBuffer;
-import com.mojang.minecraft.renderer.shader.Shader;
-import com.mojang.minecraft.renderer.graphics.VertexArrayObject;
-import com.mojang.minecraft.profiler.GpuMemoryTracker;
+import com.mojang.minecraft.renderer.graphics.DataType;
+import com.mojang.minecraft.renderer.graphics.allocator.BufferAllocator;
+import com.mojang.minecraft.renderer.shader.IShader;
 
 import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.logging.Logger;
 
+import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL30.*;
 
@@ -28,15 +29,16 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     private final MatrixStack matrixStack;
 
     // Current shader
-    private Shader currentShader = null;
+    private IShader currentShader = null;
 
     // Default VAO (required for OpenGL core profile)
     private int defaultVaoId;
 
     // Buffer pools for vertex and index buffers
     private static final long DEFAULT_POOL_SIZE = 128L * 1024L * 1024L; // 128 MB starting size
-    private OpenGLBufferPool vertexBufferPool;
-    private OpenGLBufferPool indexBufferPool;
+
+    private BufferAllocator<OpenGLBufferAllocation> vertexBufferAllocator;
+    private BufferAllocator<OpenGLBufferAllocation> indexBufferAllocator;
     
     // Logging intervals
     private static final long LOG_INTERVAL_MS = 10000; // Log every 10 seconds
@@ -70,8 +72,8 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
         loadIdentity();
 
         // Initialize buffer pools
-        vertexBufferPool = new OpenGLBufferPool(GL_ARRAY_BUFFER, DEFAULT_POOL_SIZE);
-        indexBufferPool = new OpenGLBufferPool(GL_ELEMENT_ARRAY_BUFFER, DEFAULT_POOL_SIZE);
+        vertexBufferAllocator = new OpenGLPooledAllocator(GL_ARRAY_BUFFER, DEFAULT_POOL_SIZE);
+        indexBufferAllocator = new OpenGLPooledAllocator(GL_ELEMENT_ARRAY_BUFFER, DEFAULT_POOL_SIZE);
         
         LOGGER.info("Initialized buffer pools with " + (DEFAULT_POOL_SIZE / (1024 * 1024)) + " MB each");
     }
@@ -82,16 +84,16 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
         glDeleteVertexArrays(defaultVaoId);
 
         // Clean up buffer pools
-        if (vertexBufferPool != null) {
-            LOGGER.info("Disposing vertex buffer pool: " + vertexBufferPool.getStats());
-            vertexBufferPool.dispose();
-            vertexBufferPool = null;
+        if (vertexBufferAllocator != null) {
+            LOGGER.info("Disposing vertex buffer allocator: " + vertexBufferAllocator.getStats());
+            vertexBufferAllocator.dispose();
+            vertexBufferAllocator = null;
         }
 
-        if (indexBufferPool != null) {
-            LOGGER.info("Disposing index buffer pool: " + indexBufferPool.getStats());
-            indexBufferPool.dispose();
-            indexBufferPool = null;
+        if (indexBufferAllocator != null) {
+            LOGGER.info("Disposing index buffer allocator: " + indexBufferAllocator.getStats());
+            indexBufferAllocator.dispose();
+            indexBufferAllocator = null;
         }
     }
 
@@ -107,17 +109,17 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
         // Periodically log stats
         long now = System.currentTimeMillis();
         if (now - lastLogTime > LOG_INTERVAL_MS) {
-            LOGGER.info("VBO Pool: " + vertexBufferPool.getStats());
-            LOGGER.info("IBO Pool: " + indexBufferPool.getStats());
+            LOGGER.info("VBO Allocator: " + vertexBufferAllocator.getStats());
+            LOGGER.info("IBO Allocator: " + indexBufferAllocator.getStats());
             lastLogTime = now;
         }
         
-        OpenGLBufferPool.BufferRegion region = vertexBufferPool.allocate(sizeInBytes);
-        if (region == null) {
+        OpenGLBufferAllocation allocation = vertexBufferAllocator.allocate(sizeInBytes);
+        if (allocation == null) {
             LOGGER.warning("Failed to allocate pooled vertex buffer of size " + sizeInBytes + " bytes");
             return null;
         }
-        return new OpenGLPooledVertexBuffer(region);
+        return new OpenGLPooledVertexBuffer(allocation);
     }
 
     @Override
@@ -129,17 +131,12 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     public IndexBuffer createPooledIndexBuffer(int sizeInBytes) {
         allocCount++;
         // Only log stats in createPooledVertexBuffer to avoid duplicate logs
-        OpenGLBufferPool.BufferRegion region = indexBufferPool.allocate(sizeInBytes);
-        if (region == null) {
+        OpenGLBufferAllocation allocation = indexBufferAllocator.allocate(sizeInBytes);
+        if (allocation == null) {
             LOGGER.warning("Failed to allocate pooled index buffer of size " + sizeInBytes + " bytes");
             return null;
         }
-        return new OpenGLPooledIndexBuffer(region);
-    }
-
-    @Override
-    public VertexArrayObject createVertexArrayObject() {
-        return new OpenGLVertexArrayObject();
+        return new OpenGLPooledIndexBuffer(allocation);
     }
 
     @Override
@@ -278,37 +275,23 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     }
 
     @Override
-    public void drawPrimitives(VertexArrayObject vao, PrimitiveType type, int start, int count) {
-        if (vao instanceof OpenGLVertexArrayObject) {
-            OpenGLVertexArrayObject glVao = (OpenGLVertexArrayObject) vao;
+    public void draw(PrimitiveType type, VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int start, int count) {
+        Objects.requireNonNull(vertexBuffer, "Vertex buffer cannot be null");
 
-            // Bind the VAO
-            glVao.bind();
+        setupVertexAttributes(vertexBuffer);
 
-            // Determine if we're using a pooled index buffer
-            long indexOffset = start * 4L; // 4 bytes per int (default)
-
-
-            // If using a pooled index buffer, add its base offset to the start
-            IndexBuffer indexBuffer = glVao.getIndexBuffer();
-            if (indexBuffer != null) {
-                if (indexBuffer instanceof OpenGLPooledIndexBuffer) {
-                    OpenGLPooledIndexBuffer pooledIndexBuffer = (OpenGLPooledIndexBuffer) indexBuffer;
-                    indexOffset += pooledIndexBuffer.getOffset();
-                }
-
-                // Draw the indexed primitives
-                glDrawElements(translatePrimitiveType(type), count, GL_UNSIGNED_INT, indexOffset);
-            } else {
-                // Draw the non-indexed primitives
-                glDrawArrays(translatePrimitiveType(type), start, count);
+        if (indexBuffer != null) {
+            long indexOffset = start * 4L; // 4 bytes per int
+            bindIndexBuffer(indexBuffer);
+            if (indexBuffer instanceof OpenGLPooledIndexBuffer) {
+                indexOffset += ((OpenGLPooledIndexBuffer) indexBuffer).getOffset();
             }
-
-            // Unbind the VAO
-            glVao.unbind();
+            glDrawElements(translatePrimitiveType(type), count, GL_UNSIGNED_INT, indexOffset);
         } else {
-            throw new IllegalArgumentException("VAO must be an OpenGL VAO");
+            glDrawArrays(translatePrimitiveType(type), start, count);
         }
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
     @Override
@@ -323,7 +306,7 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     }
 
     @Override
-    public void setShader(Shader shader) {
+    public void setShader(IShader shader) {
         if (shader != null) {
             shader.use();
             currentShader = shader;
@@ -478,10 +461,98 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
                 return GL_TRIANGLE_STRIP;
             case TRIANGLE_FAN:
                 return GL_TRIANGLE_FAN;
-            case QUADS:
-                return GL_QUADS;
             default:
                 return GL_TRIANGLES;
+        }
+    }
+
+    private void setupVertexAttributes(VertexBuffer vertexBuffer) {
+        if (!(vertexBuffer instanceof OpenGLVertexBuffer) && !(vertexBuffer instanceof OpenGLPooledVertexBuffer)) {
+            throw new IllegalArgumentException("VertexBuffer must be an OpenGL buffer");
+        }
+
+        VertexBuffer.VertexFormat format = vertexBuffer.getFormat();
+        Objects.requireNonNull(format, "Vertex buffer format must be set before drawing");
+
+        long bufferOffset = 0L;
+        if (vertexBuffer instanceof OpenGLVertexBuffer) {
+            ((OpenGLVertexBuffer) vertexBuffer).bind();
+        } else {
+            OpenGLPooledVertexBuffer pooledVertexBuffer = (OpenGLPooledVertexBuffer) vertexBuffer;
+            pooledVertexBuffer.bind();
+            bufferOffset = pooledVertexBuffer.getOffset();
+        }
+
+        disableVertexAttributes();
+
+        int stride = format.getStrideInBytes();
+        long offset = bufferOffset;
+
+        if (format.hasTexCoords()) {
+            glEnableVertexAttribArray(2);
+            glVertexAttribPointer(2, 2, mapDataType(format.getTexCoordDataType()), false, stride, offset);
+            offset += 2L * format.getTexCoordDataType().getSize();
+        }
+
+        if (format.hasColors()) {
+            glEnableVertexAttribArray(1);
+            glVertexAttribPointer(1, 3, mapDataType(format.getColorDataType()), false, stride, offset);
+            offset += 3L * format.getColorDataType().getSize();
+        } else if (format.hasGrayScale()) {
+            glEnableVertexAttribArray(1);
+            glVertexAttribIPointer(1, 1, mapDataType(format.getGrayScaleDataType()), stride, offset);
+            offset += format.getGrayScaleDataType().getSize();
+        }
+
+        if (format.hasNormals()) {
+            glEnableVertexAttribArray(3);
+            glVertexAttribPointer(3, 3, mapDataType(format.getNormalDataType()), false, stride, offset);
+            offset += 3L * format.getNormalDataType().getSize();
+        }
+
+        if (format.hasPositions()) {
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0, 3, mapDataType(format.getPositionDataType()), false, stride, offset);
+        }
+    }
+
+    private void bindIndexBuffer(IndexBuffer indexBuffer) {
+        if (indexBuffer instanceof OpenGLIndexBuffer) {
+            ((OpenGLIndexBuffer) indexBuffer).bind();
+            return;
+        }
+        if (indexBuffer instanceof OpenGLPooledIndexBuffer) {
+            ((OpenGLPooledIndexBuffer) indexBuffer).bind();
+            return;
+        }
+        throw new IllegalArgumentException("IndexBuffer must be an OpenGL buffer");
+    }
+
+    private void disableVertexAttributes() {
+        glDisableVertexAttribArray(0);
+        glDisableVertexAttribArray(1);
+        glDisableVertexAttribArray(2);
+        glDisableVertexAttribArray(3);
+    }
+
+    private int mapDataType(DataType type) {
+        switch (type) {
+            case UNSIGNED_BYTE:
+                return GL_UNSIGNED_BYTE;
+            case BYTE:
+                return GL_BYTE;
+            case UNSIGNED_SHORT:
+                return GL_UNSIGNED_SHORT;
+            case SHORT:
+                return GL_SHORT;
+            case FLOAT:
+                return GL_FLOAT;
+            case HALF_FLOAT:
+                return GL_HALF_FLOAT;
+            case INT:
+                return GL_INT;
+            default:
+                throw new IllegalArgumentException("Unsupported data type: " + type);
         }
     }
 }
