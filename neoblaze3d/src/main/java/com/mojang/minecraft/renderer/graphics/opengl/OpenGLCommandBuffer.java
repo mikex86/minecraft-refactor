@@ -2,6 +2,7 @@ package com.mojang.minecraft.renderer.graphics.opengl;
 
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.DataType;
+import com.mojang.minecraft.renderer.graphics.DescriptorSet;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BlendFactor;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.CompareFunc;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.CullMode;
@@ -9,10 +10,11 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums.FillMode;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.PrimitiveType;
 import com.mojang.minecraft.renderer.graphics.IndexBuffer;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
+import com.mojang.minecraft.renderer.graphics.PipelineLayout;
+import com.mojang.minecraft.renderer.graphics.ShaderProgram;
 import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.Uniform;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
-import com.mojang.minecraft.renderer.shader.IShader;
 
 import java.util.Objects;
 
@@ -30,19 +32,20 @@ import static org.lwjgl.opengl.GL30.glVertexAttribIPointer;
  */
 final class OpenGLCommandBuffer implements CommandBuffer {
 
-    private IShader currentShader;
+    private OpenGLShaderProgram currentShader;
     private Pipeline currentPipeline;
 
     void reset() {
-        bindShader(null);
-        bindTexture(0, null);
+        glUseProgram(0);
+        currentShader = null;
         currentPipeline = null;
     }
 
     @Override
     public void setPipeline(Pipeline pipeline) {
         if (pipeline == null) {
-            bindShader(null);
+            glUseProgram(0);
+            currentShader = null;
             currentPipeline = null;
             return;
         }
@@ -53,7 +56,7 @@ final class OpenGLCommandBuffer implements CommandBuffer {
             throw new IllegalStateException("Cannot bind a disposed pipeline");
         }
 
-        bindShader(pipeline.getShader());
+        bindProgram(pipeline.getProgram());
         applyBlendState(pipeline.getBlendState());
         applyDepthState(pipeline.getDepthState());
         applyRasterizerState(pipeline.getRasterizerState());
@@ -102,82 +105,125 @@ final class OpenGLCommandBuffer implements CommandBuffer {
     }
 
     @Override
-    public void bindTexture(int binding, Texture texture) {
+    public void bindDescriptorSet(DescriptorSet descriptorSet) {
+        Objects.requireNonNull(descriptorSet, "descriptorSet cannot be null");
+        Objects.requireNonNull(currentPipeline, "No pipeline set");
+        Objects.requireNonNull(currentShader, "No shader set");
+
+        if (descriptorSet.isDisposed()) {
+            throw new IllegalStateException("Cannot bind a disposed descriptor set");
+        }
+        if (descriptorSet.getLayout() != currentPipeline.getLayout()) {
+            throw new IllegalStateException(
+                    "Descriptor set layout '" + descriptorSet.getLayout().getDebugName()
+                            + "' does not match current pipeline layout '" + currentPipeline.getLayout().getDebugName() + "'"
+            );
+        }
+
+        for (PipelineLayout.Binding declaredBinding : descriptorSet.getLayout().getBindings()) {
+            int binding = declaredBinding.getBinding();
+            if (isTextureResourceType(declaredBinding.getResourceType())) {
+                Texture texture = descriptorSet.getTexture(binding);
+                bindTextureUnit(binding, texture);
+                bindTextureSamplerUniform(binding);
+                continue;
+            }
+            if (isUniformResourceType(declaredBinding.getResourceType())) {
+                Uniform uniform = descriptorSet.getUniform(binding);
+                if (uniform == null) {
+                    throw new IllegalStateException(
+                            "Descriptor set '" + descriptorSet.getLayout().getDebugName()
+                                    + "' is missing required uniform binding " + binding
+                    );
+                }
+                uploadUniform(uniform);
+            }
+        }
+    }
+
+    private void bindProgram(ShaderProgram program) {
+        if (!(program instanceof OpenGLShaderProgram)) {
+            throw new IllegalArgumentException("Program must be an OpenGL shader program");
+        }
+        OpenGLShaderProgram shader = (OpenGLShaderProgram) program;
+        glUseProgram(shader.getProgramId());
+        currentShader = shader;
+    }
+
+    private void uploadUniform(Uniform uniform) {
+        if (!(uniform instanceof OpenGLUniform)) {
+            throw new IllegalArgumentException("Uniform must be an OpenGL uniform");
+        }
+        OpenGLUniform glUniform = (OpenGLUniform) uniform;
+        int binding = glUniform.getBinding();
+        if (!currentShader.hasUniformLocation(binding)) {
+            return;
+        }
+        switch (glUniform.getType()) {
+            case INT1:
+                glUniform1i(binding, glUniform.intValue());
+                return;
+            case FLOAT1: {
+                float[] values = glUniform.floatValues();
+                glUniform1f(binding, values[0]);
+                return;
+            }
+            case FLOAT2: {
+                float[] values = glUniform.floatValues();
+                glUniform2f(binding, values[0], values[1]);
+                return;
+            }
+            case FLOAT3: {
+                float[] values = glUniform.floatValues();
+                glUniform3f(binding, values[0], values[1], values[2]);
+                return;
+            }
+            case FLOAT4: {
+                float[] values = glUniform.floatValues();
+                glUniform4f(binding, values[0], values[1], values[2], values[3]);
+                return;
+            }
+            case MAT3:
+                glUniformMatrix3fv(binding, false, glUniform.floatValues());
+                return;
+            case MAT4:
+                glUniformMatrix4fv(binding, false, glUniform.floatValues());
+                return;
+            default:
+                throw new IllegalArgumentException("Unsupported uniform type: " + glUniform.getType());
+        }
+    }
+
+    private static void bindTextureUnit(int binding, Texture texture) {
         if (binding < 0) {
             throw new IllegalArgumentException("Texture binding must be >= 0");
         }
         glActiveTexture(GL_TEXTURE0 + binding);
         if (texture == null) {
             glBindTexture(GL_TEXTURE_2D, 0);
-        } else if (texture instanceof OpenGLTexture) {
-            ((OpenGLTexture) texture).bind();
-        } else {
-            throw new IllegalArgumentException("Not an OpenGL texture");
+            return;
+        }
+        if (!(texture instanceof OpenGLTexture)) {
+            throw new IllegalArgumentException("Texture must be an OpenGL texture");
+        }
+        ((OpenGLTexture) texture).bind();
+    }
+
+    private void bindTextureSamplerUniform(int binding) {
+        if (currentShader.hasUniformLocation(binding)) {
+            glUniform1i(binding, binding);
         }
     }
 
-    @Override
-    public void bindUniform(Uniform uniform) {
-        Objects.requireNonNull(uniform, "uniform cannot be null");
-        Objects.requireNonNull(currentShader, "No shader set");
-        Objects.requireNonNull(currentPipeline, "No pipeline set");
-
-        if (!(uniform instanceof OpenGLUniform)) {
-            throw new IllegalArgumentException("Uniform must be an OpenGL uniform");
-        }
-
-        OpenGLUniform glUniform = (OpenGLUniform) uniform;
-        int binding = glUniform.getBinding();
-        if (!currentPipeline.getLayout().hasBinding(binding)) {
-            throw new IllegalStateException("Uniform binding " + binding + " is not declared by pipeline layout " + currentPipeline.getDebugName());
-        }
-
-        switch (glUniform.getType()) {
-            case INT1:
-                glUniform1i(binding, glUniform.intValue());
-                break;
-            case FLOAT1: {
-                float[] values = glUniform.floatValues();
-                glUniform1f(binding, values[0]);
-                break;
-            }
-            case FLOAT2: {
-                float[] values = glUniform.floatValues();
-                glUniform2f(binding, values[0], values[1]);
-                break;
-            }
-            case FLOAT3: {
-                float[] values = glUniform.floatValues();
-                glUniform3f(binding, values[0], values[1], values[2]);
-                break;
-            }
-            case FLOAT4: {
-                float[] values = glUniform.floatValues();
-                glUniform4f(binding, values[0], values[1], values[2], values[3]);
-                break;
-            }
-            case MAT3:
-                glUniformMatrix3fv(binding, false, glUniform.floatValues());
-                break;
-            case MAT4:
-                glUniformMatrix4fv(binding, false, glUniform.floatValues());
-                break;
-            default:
-                throw new IllegalArgumentException("Unsupported uniform type: " + glUniform.getType());
-        }
+    private static boolean isTextureResourceType(PipelineLayout.ResourceType resourceType) {
+        return resourceType == PipelineLayout.ResourceType.SAMPLED_TEXTURE
+                || resourceType == PipelineLayout.ResourceType.SAMPLER
+                || resourceType == PipelineLayout.ResourceType.COMBINED_IMAGE_SAMPLER;
     }
 
-    private void bindShader(IShader shader) {
-        if (shader != null) {
-            shader.use();
-            currentShader = shader;
-        } else {
-            if (currentShader != null) {
-                currentShader.detach();
-                currentShader = null;
-            }
-        }
-        currentPipeline = null;
+    private static boolean isUniformResourceType(PipelineLayout.ResourceType resourceType) {
+        return resourceType == PipelineLayout.ResourceType.UNIFORM_BUFFER
+                || resourceType == PipelineLayout.ResourceType.STORAGE_BUFFER;
     }
 
     private void applyBlendState(Pipeline.BlendState state) {

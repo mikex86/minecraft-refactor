@@ -4,6 +4,8 @@ import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.Texture;
+import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -33,6 +35,7 @@ public class Font {
     // Character width mapping for proportional font rendering
     private final int[] charWidths = new int[256];
     private final Texture fontTexture;
+    private final MutableDescriptorSet noFogFontDescriptorSet;
     private final Tesselator tessellator;
 
     /**
@@ -41,7 +44,7 @@ public class Font {
      * @param name           The path to the font texture resource
      * @param textureManager The textures manager to register the font texture with
      */
-    public Font(String name, TextureManager textureManager) {
+    public Font(String name, TextureManager textureManager, PipelineRegistry pipelineRegistry) {
         BufferedImage fontImage;
         try {
             fontImage = ImageIO.read(Objects.requireNonNull(TextureManager.class.getResourceAsStream(name)));
@@ -60,6 +63,7 @@ public class Font {
 
         // Load the font texture
         this.fontTexture = textureManager.fontTexture;
+        this.noFogFontDescriptorSet = pipelineRegistry.getDescriptorSet(fontTexture, PipelineRegistry.FogPreset.NONE);
 
         this.tessellator = Tesselator.instance;
     }
@@ -144,7 +148,7 @@ public class Font {
             color = (color & COLOR_DARKEN_MASK) >> 2;
         }
 
-        commandBuffer.bindTexture(0, this.fontTexture);
+        commandBuffer.bindDescriptorSet(noFogFontDescriptorSet);
 
         // Initialize the tessellator for rendering
         tessellator.init();
@@ -253,6 +257,10 @@ public class Font {
 
     public Texture getFontTexture() {
         return fontTexture;
+    }
+
+    public MutableDescriptorSet getNoFogFontDescriptorSet() {
+        return noFogFontDescriptorSet;
     }
 
     public float getFontHeight() {

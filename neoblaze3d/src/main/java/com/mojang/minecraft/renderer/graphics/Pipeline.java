@@ -4,7 +4,6 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BlendFactor;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.CompareFunc;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.CullMode;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.FillMode;
-import com.mojang.minecraft.renderer.shader.IShader;
 
 /**
  * Backend-neutral graphics pipeline object.
@@ -19,7 +18,7 @@ public interface Pipeline extends GraphicsResource {
     /**
      * Gets the shader program used by this pipeline.
      */
-    IShader getShader();
+    ShaderProgram getProgram();
 
     /**
      * Optional blend state.
@@ -113,20 +112,20 @@ public interface Pipeline extends GraphicsResource {
     final class Descriptor {
         private final String debugName;
         private final PipelineLayout layout;
-        private final IShader shader;
+        private final ShaderProgram program;
         private final BlendState blendState;
         private final DepthState depthState;
         private final RasterizerState rasterizerState;
 
         public Descriptor(String debugName,
                           PipelineLayout layout,
-                          IShader shader,
+                          ShaderProgram program,
                           BlendState blendState,
                           DepthState depthState,
                           RasterizerState rasterizerState) {
             this.debugName = debugName == null ? "" : debugName;
             this.layout = layout;
-            this.shader = shader;
+            this.program = program;
             this.blendState = blendState;
             this.depthState = depthState;
             this.rasterizerState = rasterizerState;
@@ -140,8 +139,8 @@ public interface Pipeline extends GraphicsResource {
             return layout;
         }
 
-        public IShader getShader() {
-            return shader;
+        public ShaderProgram getProgram() {
+            return program;
         }
 
         public BlendState getBlendState() {
@@ -157,4 +156,3 @@ public interface Pipeline extends GraphicsResource {
         }
     }
 }
-

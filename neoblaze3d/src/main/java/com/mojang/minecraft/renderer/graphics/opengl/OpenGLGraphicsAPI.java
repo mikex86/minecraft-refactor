@@ -7,15 +7,15 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums.TextureFormat;
 import com.mojang.minecraft.renderer.graphics.IndexBuffer;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.graphics.PipelineLayout;
+import com.mojang.minecraft.renderer.graphics.ShaderProgram;
 import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.Uniform;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 import com.mojang.minecraft.renderer.graphics.allocator.BufferAllocation;
 import com.mojang.minecraft.renderer.graphics.allocator.BufferAllocator;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
 
 import static org.lwjgl.opengl.GL11.GL_LEQUAL;
 import static org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA;
@@ -40,7 +40,6 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     private static final long DEFAULT_POOL_SIZE = 128L * 1024L * 1024L; // 128 MB
 
     private final OpenGLCommandBuffer frameCommandBuffer = new OpenGLCommandBuffer();
-    private final List<BufferAllocator<? extends BufferAllocation>> managedAllocators = new ArrayList<>();
 
     // Default VAO (required for OpenGL core profile)
     private int defaultVaoId;
@@ -70,13 +69,6 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
 
     @Override
     public void shutdown() {
-        for (BufferAllocator<? extends BufferAllocation> allocator : managedAllocators) {
-            if (allocator != null && !allocator.isDisposed()) {
-                allocator.dispose();
-            }
-        }
-        managedAllocators.clear();
-
         glDeleteVertexArrays(defaultVaoId);
     }
 
@@ -89,7 +81,6 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
         } else {
             allocator = new OpenGLDedicatedAllocator(bufferType);
         }
-        managedAllocators.add(allocator);
         return allocator;
     }
 
@@ -182,6 +173,11 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     @Override
     public Uniform createUniform(int binding, Uniform.ValueType type) {
         return new OpenGLUniform(binding, type);
+    }
+
+    @Override
+    public ShaderProgram createShaderProgramFromPrecompiled(String vertexBinaryPath, String fragmentBinaryPath) throws IOException {
+        return OpenGLShaderProgram.fromPrecompiledBinaries(vertexBinaryPath, fragmentBinaryPath);
     }
 
     private static int bufferTypeFor(BufferBinding binding) {

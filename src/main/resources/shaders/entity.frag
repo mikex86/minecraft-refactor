@@ -4,7 +4,7 @@
 layout (location = 11) uniform vec4 fogColor;
 
 // Texture sampler
-uniform sampler2D textureSampler;
+layout (binding = 1) uniform sampler2D textureSampler;
 
 // Input from vertex shader
 layout (location = 0) in vec4 vertexColor;

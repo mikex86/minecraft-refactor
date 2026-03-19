@@ -1,28 +1,29 @@
-package com.mojang.minecraft.renderer.shader;
+package com.mojang.minecraft.renderer.graphics.opengl;
 
+import com.mojang.minecraft.renderer.graphics.ShaderProgram;
+import com.mojang.minecraft.renderer.resource.ResourceBufferLoader;
 import org.lwjgl.opengl.ARBGLSPIRV;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GLCapabilities;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.jemalloc.JEmalloc;
-import com.mojang.minecraft.renderer.resource.ResourceBufferLoader;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL41C.glShaderBinary;
+import static org.lwjgl.opengl.GL43.*;
 
 /**
- * Represents an OpenGL shader program.
- * Handles loading, compiling/specializing, and linking shader programs.
+ * OpenGL shader program implementation.
  */
-public class Shader implements IShader {
+public final class OpenGLShaderProgram implements ShaderProgram {
     private static final String SHADER_ENTRY_POINT = "main";
     private static final Map<String, Integer> EXPLICIT_UNIFORM_LOCATIONS = createExplicitUniformLocationMap();
 
@@ -30,20 +31,18 @@ public class Shader implements IShader {
     private final int vertexShaderId;
     private final int fragmentShaderId;
     private final Map<String, Integer> uniformLocations;
-    private boolean disposed = false;
+    private final BitSet activeUniformLocations;
+    private boolean disposed;
 
-    private Shader(int programId, int vertexShaderId, int fragmentShaderId) {
+    private OpenGLShaderProgram(int programId, int vertexShaderId, int fragmentShaderId) {
         this.programId = programId;
         this.vertexShaderId = vertexShaderId;
         this.fragmentShaderId = fragmentShaderId;
         this.uniformLocations = new HashMap<>();
+        this.activeUniformLocations = queryActiveUniformLocations(programId);
     }
 
-    /**
-     * Creates a shader from precompiled SPIR-V binaries.
-     * Paths must be explicit classpath resources and are not modified.
-     */
-    public static Shader fromPrecompiledBinaries(String vertexBinaryPath, String fragmentBinaryPath) throws IOException {
+    public static OpenGLShaderProgram fromPrecompiledBinaries(String vertexBinaryPath, String fragmentBinaryPath) throws IOException {
         if (!supportsSpirv()) {
             throw new RuntimeException("Precompiled SPIR-V loading requires ARB_gl_spirv or OpenGL 4.6");
         }
@@ -55,12 +54,12 @@ public class Shader implements IShader {
         ByteBuffer fragmentSpirv = null;
         try {
             vertexSpirv = ResourceBufferLoader.loadResourceRequired(
-                    Shader.class,
+                    OpenGLShaderProgram.class,
                     vertexBinaryPath,
                     JEmalloc::je_malloc
             );
             fragmentSpirv = ResourceBufferLoader.loadResourceRequired(
-                    Shader.class,
+                    OpenGLShaderProgram.class,
                     fragmentBinaryPath,
                     JEmalloc::je_malloc
             );
@@ -69,7 +68,7 @@ public class Shader implements IShader {
             fragment = compileShaderFromSpirv(GL_FRAGMENT_SHADER, fragmentSpirv, fragmentBinaryPath);
             program = linkProgram(vertex, fragment);
 
-            return new Shader(program, vertex, fragment);
+            return new OpenGLShaderProgram(program, vertex, fragment);
         } catch (IOException | RuntimeException e) {
             cleanupFailedProgram(program, vertex, fragment);
             throw e;
@@ -83,27 +82,66 @@ public class Shader implements IShader {
         }
     }
 
-    /**
-     * @deprecated Runtime GLSL JIT compilation is deprecated in favor of precompiled SPIR-V binaries.
-     */
     @Deprecated
-    public static Shader fromJitSource(String vertexSourcePath, String fragmentSourcePath) throws IOException {
+    public static OpenGLShaderProgram fromJitSource(String vertexSourcePath, String fragmentSourcePath) throws IOException {
         int vertex = 0;
         int fragment = 0;
         int program = 0;
         try {
-            String vertexSource = ResourceBufferLoader.loadUtf8ResourceRequired(Shader.class, vertexSourcePath);
-            String fragmentSource = ResourceBufferLoader.loadUtf8ResourceRequired(Shader.class, fragmentSourcePath);
+            String vertexSource = ResourceBufferLoader.loadUtf8ResourceRequired(OpenGLShaderProgram.class, vertexSourcePath);
+            String fragmentSource = ResourceBufferLoader.loadUtf8ResourceRequired(OpenGLShaderProgram.class, fragmentSourcePath);
 
             vertex = compileShaderFromSource(GL_VERTEX_SHADER, vertexSource, vertexSourcePath);
             fragment = compileShaderFromSource(GL_FRAGMENT_SHADER, fragmentSource, fragmentSourcePath);
             program = linkProgram(vertex, fragment);
 
-            return new Shader(program, vertex, fragment);
+            return new OpenGLShaderProgram(program, vertex, fragment);
         } catch (IOException | RuntimeException e) {
             cleanupFailedProgram(program, vertex, fragment);
             throw e;
         }
+    }
+
+    public int getProgramId() {
+        return programId;
+    }
+
+    public boolean hasUniformLocation(int location) {
+        return location >= 0 && activeUniformLocations.get(location);
+    }
+
+    public int getUniformLocation(String name) {
+        Integer cached = uniformLocations.get(name);
+        if (cached != null) {
+            return cached;
+        }
+
+        int location = glGetUniformLocation(programId, name);
+        if (location < 0) {
+            Integer explicitLocation = EXPLICIT_UNIFORM_LOCATIONS.get(name);
+            if (explicitLocation != null) {
+                location = explicitLocation;
+            }
+        }
+        uniformLocations.put(name, location);
+        return location;
+    }
+
+    @Override
+    public void dispose() {
+        if (!disposed) {
+            glDetachShader(programId, vertexShaderId);
+            glDetachShader(programId, fragmentShaderId);
+            glDeleteShader(vertexShaderId);
+            glDeleteShader(fragmentShaderId);
+            glDeleteProgram(programId);
+            disposed = true;
+        }
+    }
+
+    @Override
+    public boolean isDisposed() {
+        return disposed;
     }
 
     private static boolean supportsSpirv() {
@@ -131,7 +169,6 @@ public class Shader implements IShader {
             bytes.rewind();
             glShaderBinary(shaders, ARBGLSPIRV.GL_SHADER_BINARY_FORMAT_SPIR_V_ARB, bytes);
 
-            // No specialization constants are provided, but LWJGL requires non-null buffers.
             IntBuffer constantIndices = stack.mallocInt(0);
             IntBuffer constantValues = stack.mallocInt(0);
             ARBGLSPIRV.glSpecializeShaderARB(shaderId, SHADER_ENTRY_POINT, constantIndices, constantValues);
@@ -166,7 +203,6 @@ public class Shader implements IShader {
         glAttachShader(programId, vertexShaderId);
         glAttachShader(programId, fragmentShaderId);
 
-        // Bind attribute locations to match our VAO setup
         glBindAttribLocation(programId, 0, "position");
         glBindAttribLocation(programId, 1, "color");
         glBindAttribLocation(programId, 2, "texCoord0");
@@ -183,6 +219,45 @@ public class Shader implements IShader {
         return programId;
     }
 
+    private static BitSet queryActiveUniformLocations(int programId) {
+        BitSet locations = new BitSet();
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            if (GL.getCapabilities().OpenGL43 || GL.getCapabilities().GL_ARB_program_interface_query) {
+                int activeUniformCount = glGetProgramInterfacei(programId, GL_UNIFORM, GL_ACTIVE_RESOURCES);
+                IntBuffer property = stack.ints(GL_LOCATION);
+                IntBuffer length = stack.mallocInt(1);
+                IntBuffer value = stack.mallocInt(1);
+                for (int i = 0; i < activeUniformCount; i++) {
+                    glGetProgramResourceiv(programId, GL_UNIFORM, i, property, length, value);
+                    int location = value.get(0);
+                    if (location >= 0) {
+                        locations.set(location);
+                    }
+                    value.position(0);
+                }
+                return locations;
+            }
+
+            int activeUniformCount = glGetProgrami(programId, GL_ACTIVE_UNIFORMS);
+            if (activeUniformCount <= 0) {
+                return locations;
+            }
+            IntBuffer size = stack.mallocInt(1);
+            IntBuffer type = stack.mallocInt(1);
+            for (int i = 0; i < activeUniformCount; i++) {
+                String uniformName = glGetActiveUniform(programId, i, size, type);
+                if (uniformName.isEmpty()) {
+                    continue;
+                }
+                int location = glGetUniformLocation(programId, uniformName);
+                if (location >= 0) {
+                    locations.set(location);
+                }
+            }
+        }
+        return locations;
+    }
+
     private static Map<String, Integer> createExplicitUniformLocationMap() {
         Map<String, Integer> locations = new HashMap<>();
         locations.put("modelViewMatrix", 0);
@@ -194,88 +269,8 @@ public class Shader implements IShader {
         locations.put("lightDirection", 12);
         locations.put("lightColor", 13);
         locations.put("ambientColor", 14);
-        // Backward-compat alias used by LightingShader helper.
         locations.put("ambientLight", 14);
         locations.put("normalMatrix", 16);
         return Collections.unmodifiableMap(locations);
-    }
-
-    @Override
-    public void use() {
-        glUseProgram(programId);
-    }
-
-    @Override
-    public void detach() {
-        glUseProgram(0);
-    }
-
-    /**
-     * Gets the location of a uniform variable.
-     *
-     * @param name The name of the uniform
-     * @return The location of the uniform
-     */
-    public int getUniformLocation(String name) {
-        if (uniformLocations.containsKey(name)) {
-            return uniformLocations.get(name);
-        }
-
-        int location = glGetUniformLocation(programId, name);
-        if (location < 0) {
-            Integer explicitLocation = EXPLICIT_UNIFORM_LOCATIONS.get(name);
-            if (explicitLocation != null) {
-                location = explicitLocation;
-            }
-        }
-        uniformLocations.put(name, location);
-        return location;
-    }
-
-    void setUniform(String name, boolean value) {
-        glUniform1i(getUniformLocation(name), value ? 1 : 0);
-    }
-
-    void setUniform(String name, int value) {
-        glUniform1i(getUniformLocation(name), value);
-    }
-
-    void setUniform(String name, float value) {
-        glUniform1f(getUniformLocation(name), value);
-    }
-
-    void setUniform(String name, float x, float y) {
-        glUniform2f(getUniformLocation(name), x, y);
-    }
-
-    void setUniform(String name, float x, float y, float z) {
-        glUniform3f(getUniformLocation(name), x, y, z);
-    }
-
-    void setUniform(String name, float x, float y, float z, float w) {
-        glUniform4f(getUniformLocation(name), x, y, z, w);
-    }
-
-    void setUniform4fv(String name, FloatBuffer buffer) {
-        glUniform4fv(getUniformLocation(name), buffer);
-    }
-
-    void setUniformMatrix4fv(String name, FloatBuffer matrix) {
-        glUniformMatrix4fv(getUniformLocation(name), false, matrix);
-    }
-
-    /**
-     * Disposes of this shader program.
-     */
-    @Override
-    public void dispose() {
-        if (!disposed) {
-            glDetachShader(programId, vertexShaderId);
-            glDetachShader(programId, fragmentShaderId);
-            glDeleteShader(vertexShaderId);
-            glDeleteShader(fragmentShaderId);
-            glDeleteProgram(programId);
-            disposed = true;
-        }
     }
 }

@@ -53,7 +53,8 @@ public interface PipelineLayout extends GraphicsResource {
     enum BindingSemantic {
         NONE,
         MODEL_VIEW_MATRIX,
-        PROJECTION_MATRIX
+        PROJECTION_MATRIX,
+        DIFFUSE_TEXTURE
     }
 
     /**

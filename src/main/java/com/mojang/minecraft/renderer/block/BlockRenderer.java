@@ -7,9 +7,9 @@ import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.DataType;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
-import com.mojang.minecraft.renderer.graphics.MatrixUniformBinder;
+import com.mojang.minecraft.renderer.graphics.MatrixUniforms;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
-import com.mojang.minecraft.renderer.shader.PipelineRegistry;
+import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -17,13 +17,18 @@ import java.util.Map;
 public class BlockRenderer {
     private static final Map<Block, IndexedMesh> blockMeshes = new HashMap<>();
 
-    public static void renderBlockPreview(CommandBuffer commandBuffer, MatrixStack matrixStack, Block block, float scale) {
+    public static void renderBlockPreview(CommandBuffer commandBuffer,
+                                          MatrixStack matrixStack,
+                                          Block block,
+                                          float scale,
+                                          MutableDescriptorSet noFogTerrainDescriptorSet) {
         matrixStack.scale(scale, scale, scale);
         matrixStack.rotateX(30.0F);
         matrixStack.rotateY(45.0F);
         matrixStack.scale(-1.0F, -1.0F, 1.0F);
 
-        MatrixUniformBinder.bindStandardMatrices(commandBuffer, PipelineRegistry.getInstance().getSharedUniforms(), matrixStack);
+        MatrixUniforms.writeStandardMatrices(noFogTerrainDescriptorSet, matrixStack);
+        commandBuffer.bindDescriptorSet(noFogTerrainDescriptorSet);
         getBlockMesh(block).draw(commandBuffer);
     }
 

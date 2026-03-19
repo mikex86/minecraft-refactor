@@ -12,6 +12,8 @@ import com.mojang.minecraft.profiler.GpuMemoryTracker;
 import com.mojang.minecraft.profiler.NativeMemoryTracker;
 import com.mojang.minecraft.renderer.GameRenderer;
 import com.mojang.minecraft.renderer.TextureManager;
+import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 import com.mojang.minecraft.util.logging.LoggingUtils;
 import com.mojang.minecraft.util.math.MathUtils;
@@ -28,6 +30,8 @@ public class Minecraft implements Runnable {
     // Core systems
     private final GameEngine engine;
     private final PipelineRegistry pipelineRegistry;
+    private Pipeline worldPipeline;
+    private MutableDescriptorSet worldFogTerrainDescriptorSet;
     private GameInputHandler gameInputHandler;
     private GameRenderer renderer;
     private ScreenManager screenManager;
@@ -53,7 +57,7 @@ public class Minecraft implements Runnable {
     public Minecraft(int width, int height, boolean fullscreen) {
         this.engine = new GameEngine(width, height, fullscreen, MINECRAFT_VERSION_STRING);
         this.textureManager = new TextureManager();
-        this.pipelineRegistry = PipelineRegistry.getInstance();
+        this.pipelineRegistry = new PipelineRegistry();
     }
 
     /**
@@ -71,9 +75,12 @@ public class Minecraft implements Runnable {
 
             // Initialize texture manager
             textureManager.loadTextures();
+            pipelineRegistry.configureSharedDescriptorSets(textureManager);
+            worldPipeline = pipelineRegistry.getWorldPipeline();
+            worldFogTerrainDescriptorSet = pipelineRegistry.getDescriptorSet(textureManager.terrainTexture, PipelineRegistry.FogPreset.WORLD);
 
             // Create game state (manages level, entities, player)
-            this.gameState = new GameState(this.textureManager);
+            this.gameState = new GameState(this.textureManager, this.pipelineRegistry);
             this.gameState.initialize();
 
             // Create renderer
@@ -88,7 +95,7 @@ public class Minecraft implements Runnable {
                     engine.getHeight()
             );
 
-            this.screenManager = new ScreenManager(gameState.getPlayer(), this.textureManager, this.renderer);
+            this.screenManager = new ScreenManager(gameState.getPlayer(), this.textureManager, this.renderer, this.pipelineRegistry);
 
             // Initialize game input handler
             this.gameInputHandler = new GameInputHandler(
@@ -208,7 +215,7 @@ public class Minecraft implements Runnable {
         BlockState oldBlock = level.getBlockState(x, y, z);
         boolean changed = level.setBlockState(x, y, z, null);
         if (oldBlock != null && changed) {
-            oldBlock.block.destroy(level, x, y, z, particleEngine);
+            oldBlock.block.destroy(level, x, y, z, particleEngine, worldPipeline, worldFogTerrainDescriptorSet);
         }
         return changed;
     }

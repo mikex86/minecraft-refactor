@@ -3,6 +3,7 @@ package com.mojang.minecraft.renderer.graphics;
 import com.mojang.minecraft.renderer.graphics.allocator.BufferAllocation;
 import com.mojang.minecraft.renderer.graphics.allocator.BufferAllocator;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.*;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
@@ -48,6 +49,7 @@ public interface GraphicsAPI {
     /**
      * Creates a backend-managed allocator for a buffer binding point.
      * Allocation strategy is hint-based; backends may substitute an equivalent strategy.
+     * Caller owns allocator lifecycle and must dispose the returned allocator.
      */
     BufferAllocator<? extends BufferAllocation> createAllocator(BufferBinding binding, BufferAllocatorHint hint);
 
@@ -120,5 +122,10 @@ public interface GraphicsAPI {
      * Creates a reusable uniform object bound to a numeric shader location.
      */
     Uniform createUniform(int binding, Uniform.ValueType type);
+
+    /**
+     * Creates a backend shader program from precompiled binaries.
+     */
+    ShaderProgram createShaderProgramFromPrecompiled(String vertexBinaryPath, String fragmentBinaryPath) throws IOException;
 
 }

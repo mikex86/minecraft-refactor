@@ -7,20 +7,32 @@ import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
+import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
-import com.mojang.minecraft.renderer.shader.impl.EntityShader;
 
 import static com.mojang.minecraft.entity.EntityPlayer.PLAYER_MODEL;
 
 public class InventoryScreen extends AbstractInventoryScreen {
 
-    private static final EntityShader ENTITY_SHADER = PipelineRegistry.getInstance().getEntityShader();
-    private static final Pipeline ENTITY_PIPELINE = PipelineRegistry.getInstance().getEntityPipeline();
-    private static final Pipeline HUD_PIPELINE = PipelineRegistry.getInstance().getHudPipeline();
+    private final Pipeline entityPipeline;
+    private final Pipeline hudPipeline;
+    private final MutableDescriptorSet noFogCharDescriptorSet;
+    private final MutableDescriptorSet noFogInventoryDescriptorSet;
+    private final InventoryItemRenderer inventoryItemRenderer;
 
-    public InventoryScreen(TextureManager textureManager, HeldItemRenderer heldItemRenderer, Font font, Inventory inventory) {
+    public InventoryScreen(TextureManager textureManager,
+                           HeldItemRenderer heldItemRenderer,
+                           Font font,
+                           Inventory inventory,
+                           PipelineRegistry pipelineRegistry,
+                           InventoryItemRenderer inventoryItemRenderer) {
         super(textureManager, heldItemRenderer, font, inventory);
+        this.entityPipeline = pipelineRegistry.getEntityPipeline();
+        this.hudPipeline = pipelineRegistry.getHudPipeline();
+        this.noFogCharDescriptorSet = pipelineRegistry.getDescriptorSet(textureManager.charTexture, PipelineRegistry.FogPreset.NONE);
+        this.noFogInventoryDescriptorSet = pipelineRegistry.getDescriptorSet(textureManager.inventoryTexture, PipelineRegistry.FogPreset.NONE);
+        this.inventoryItemRenderer = inventoryItemRenderer;
     }
 
     @Override
@@ -43,14 +55,14 @@ public class InventoryScreen extends AbstractInventoryScreen {
             mouseY = centerY;
         }
 
-        drawInventoryScreenBackground(commandBuffer, centerX, centerY, textureManager.inventoryTexture);
+        drawInventoryScreenBackground(commandBuffer, matrixStack, centerX, centerY, noFogInventoryDescriptorSet);
 
         // draw items
-        InventoryItemRenderer.renderInventoryItems(commandBuffer, matrixStack, textureManager, heldItemRenderer, this, centerX, centerY);
+        inventoryItemRenderer.renderInventoryItems(commandBuffer, matrixStack, heldItemRenderer, this, centerX, centerY);
 
         drawPlayerModel(commandBuffer, matrixStack, partialTicks, centerX, centerY);
 
-        InventoryItemRenderer.drawSelectedItem(commandBuffer, matrixStack, textureManager, heldItemRenderer, inventory, mouseX, mouseY, stackSizeSelectedItemLabel);
+        inventoryItemRenderer.drawSelectedItem(commandBuffer, matrixStack, heldItemRenderer, inventory, mouseX, mouseY, stackSizeSelectedItemLabel);
 
         this.screenWidth = screenWidth;
         this.screenHeight = screenHeight;
@@ -62,9 +74,9 @@ public class InventoryScreen extends AbstractInventoryScreen {
     }
 
     private void drawPlayerModel(CommandBuffer commandBuffer, MatrixStack matrixStack, float partialTicks, float centerX, float centerY) {
-        commandBuffer.setPipeline(ENTITY_PIPELINE);
-        ENTITY_SHADER.setFogUniforms(0f, 0f, 0f, 0f, 0f, 0f, 0f);
-        commandBuffer.bindTexture(0, textureManager.charTexture);
+        commandBuffer.setPipeline(entityPipeline);
+        MutableDescriptorSet descriptorSet = noFogCharDescriptorSet;
+        commandBuffer.bindDescriptorSet(noFogCharDescriptorSet);
         matrixStack.pushMatrix();
 
         // Apply scaling and orientation
@@ -91,8 +103,8 @@ public class InventoryScreen extends AbstractInventoryScreen {
         matrixStack.rotateX(-mousePitch);
 
         // Render the model
-        PLAYER_MODEL.render(commandBuffer, matrixStack, this.player, partialTicks);
-        commandBuffer.setPipeline(HUD_PIPELINE);
+        PLAYER_MODEL.render(commandBuffer, matrixStack, descriptorSet, this.player, partialTicks);
+        commandBuffer.setPipeline(hudPipeline);
 
         matrixStack.popMatrix();
     }

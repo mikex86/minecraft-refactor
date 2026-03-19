@@ -4,14 +4,15 @@ import com.mojang.minecraft.renderer.Disposable;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
-import com.mojang.minecraft.renderer.graphics.MatrixUniformBinder;
+import com.mojang.minecraft.renderer.graphics.MatrixUniforms;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
-import com.mojang.minecraft.renderer.shader.PipelineRegistry;
+import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
 
 public class TextLabel implements Disposable {
     private final Font font;
     private final int color;
     private final boolean shadow;
+    private final MutableDescriptorSet noFogFontDescriptorSet;
 
     private String text = "";
     private int width = -1;
@@ -22,6 +23,7 @@ public class TextLabel implements Disposable {
         this.font = font;
         this.color = color;
         this.shadow = shadow;
+        this.noFogFontDescriptorSet = font.getNoFogFontDescriptorSet();
     }
 
     public void render(CommandBuffer commandBuffer, MatrixStack matrixStack, float x, float y) {
@@ -37,10 +39,10 @@ public class TextLabel implements Disposable {
             }
         }
 
-        commandBuffer.bindTexture(0, this.font.getFontTexture());
         matrixStack.pushMatrix();
         matrixStack.translate(x, y, 0);
-        MatrixUniformBinder.bindStandardMatrices(commandBuffer, PipelineRegistry.getInstance().getSharedUniforms(), matrixStack);
+        MatrixUniforms.writeStandardMatrices(noFogFontDescriptorSet, matrixStack);
+        commandBuffer.bindDescriptorSet(noFogFontDescriptorSet);
         for (IndexedMesh mesh : this.meshes) {
             mesh.draw(commandBuffer);
         }

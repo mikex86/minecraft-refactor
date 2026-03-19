@@ -9,6 +9,8 @@ import com.mojang.minecraft.level.chunk.Chunk;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
+import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.model.Model;
 import com.mojang.minecraft.renderer.model.ModelRegistry;
 import com.mojang.minecraft.renderer.model.impl.PlayerModel;
@@ -79,6 +81,9 @@ public class EntityPlayer extends EntityLiving {
     public float prevViewYawBob = 0.0F;
 
     private final Inventory inventory;
+    private final MutableDescriptorSet worldFogCharDescriptorSet;
+    private final Pipeline worldPipeline;
+    private final MutableDescriptorSet worldFogTerrainDescriptorSet;
 
     // Animation constants
     public static final float MODEL_SIZE = 0.058333334F;
@@ -105,11 +110,23 @@ public class EntityPlayer extends EntityLiving {
      * @param level The level in which the player exists
      */
     public EntityPlayer(Level level, CraftingManager craftingManager, boolean isThePlayer) {
+        this(level, craftingManager, isThePlayer, null, null, null);
+    }
+
+    public EntityPlayer(Level level,
+                        CraftingManager craftingManager,
+                        boolean isThePlayer,
+                        MutableDescriptorSet worldFogCharDescriptorSet,
+                        Pipeline worldPipeline,
+                        MutableDescriptorSet worldFogTerrainDescriptorSet) {
         super(level);
         this.heightOffset = 1.62F; // Eye height offset
         this.prevHeightOffset = this.heightOffset;
         this.isThePlayer = isThePlayer;
         this.inventory = new Inventory(craftingManager);
+        this.worldFogCharDescriptorSet = worldFogCharDescriptorSet;
+        this.worldPipeline = worldPipeline;
+        this.worldFogTerrainDescriptorSet = worldFogTerrainDescriptorSet;
     }
 
     /**
@@ -486,7 +503,10 @@ public class EntityPlayer extends EntityLiving {
      */
     @Override
     public void render(CommandBuffer commandBuffer, MatrixStack matrixStack, TextureManager textureManager, float partialTicks) {
-        commandBuffer.bindTexture(0, textureManager.charTexture);
+        if (worldFogCharDescriptorSet == null) {
+            throw new IllegalStateException("EntityPlayer render descriptor set was not provided");
+        }
+        commandBuffer.bindDescriptorSet(worldFogCharDescriptorSet);
 
         matrixStack.pushMatrix();
 
@@ -502,7 +522,7 @@ public class EntityPlayer extends EntityLiving {
         matrixStack.translate(0.0F, MODEL_Y_OFFSET, 0.0F);
 
         // Render the model
-        PLAYER_MODEL.render(commandBuffer, matrixStack, this, partialTicks);
+        PLAYER_MODEL.render(commandBuffer, matrixStack, worldFogCharDescriptorSet, this, partialTicks);
 
         matrixStack.popMatrix();
     }
@@ -724,7 +744,7 @@ public class EntityPlayer extends EntityLiving {
     }
 
     private void dropItem(ItemStack itemStack) {
-        EntityItem entityItem = new EntityItem(level, itemStack);
+        EntityItem entityItem = new EntityItem(level, itemStack, worldPipeline, worldFogTerrainDescriptorSet);
         entityItem.setPosition(x, y, z);
         float yawRadians = this.yaw * ((float) Math.PI / 180.0F);
         float sin = (float) Math.sin(yawRadians);

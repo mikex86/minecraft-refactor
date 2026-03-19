@@ -12,6 +12,8 @@ import com.mojang.minecraft.particle.Particle;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.Tesselator;
+import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.Pipeline;
 
 import java.util.Collections;
 import java.util.List;
@@ -549,7 +551,13 @@ public class Block {
      * @param z              Z coordinate
      * @param particleEngine The particle engine
      */
-    public void destroy(Level level, int x, int y, int z, ParticleEngine particleEngine) {
+    public void destroy(Level level,
+                        int x,
+                        int y,
+                        int z,
+                        ParticleEngine particleEngine,
+                        Pipeline worldPipeline,
+                        MutableDescriptorSet worldFogTerrainDescriptorSet) {
         int subdivisionsPerAxis = 4;
 
         for (int xx = 0; xx < subdivisionsPerAxis; ++xx) {
@@ -569,7 +577,7 @@ public class Block {
             }
         }
         BlockItem blockItem = BlockItems.getBlockItemForBlockOrNull(this);
-        EntityItem entityItem = new EntityItem(level, new ItemStack(blockItem, 1));
+        EntityItem entityItem = new EntityItem(level, new ItemStack(blockItem, 1), worldPipeline, worldFogTerrainDescriptorSet);
         entityItem.setPosition(x + 0.25f, y + 0.01f, z + 0.25f);
         entityItem.xd = (float) (ThreadLocalRandom.current().nextGaussian() * 0.05F);
         entityItem.yd = (float) (ThreadLocalRandom.current().nextGaussian() * 0.05F + 0.2F);

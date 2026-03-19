@@ -6,9 +6,10 @@ import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
-import com.mojang.minecraft.renderer.graphics.MatrixUniformBinder;
+import com.mojang.minecraft.renderer.graphics.MatrixUniforms;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Texture;
+import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 
 import java.nio.ByteBuffer;
@@ -24,13 +25,15 @@ public class HeldItemRenderer {
     private final ByteBuffer itemsTextureData;
     private final int itemsTextureWidth;
     private final int itemsTextureHeight;
+    private final MutableDescriptorSet noFogItemsDescriptorSet;
 
-    public HeldItemRenderer(TextureManager textureManager, Texture itemsTexture) {
+    public HeldItemRenderer(TextureManager textureManager, Texture itemsTexture, PipelineRegistry pipelineRegistry) {
         ByteBuffer hostData = textureManager.getRetainedTextureData(itemsTexture)
                 .orElseThrow(() -> new IllegalStateException("Items texture does not have retained CPU data"));
         this.itemsTextureWidth = itemsTexture.getWidth();
         this.itemsTextureHeight = itemsTexture.getHeight();
         this.itemsTextureData = hostData;
+        this.noFogItemsDescriptorSet = pipelineRegistry.getDescriptorSet(itemsTexture, PipelineRegistry.FogPreset.NONE);
     }
 
     public void renderHeldItemPreview(CommandBuffer commandBuffer, MatrixStack matrixStack, HeldItem heldItem, int itemSize) {
@@ -64,9 +67,11 @@ public class HeldItemRenderer {
 
     public void renderHeldItemModel(CommandBuffer commandBuffer, MatrixStack matrixStack, HeldItem heldItem, int itemSize) {
         IndexedMesh itemQuadMesh = getItemQuadMesh(heldItem);
+        MutableDescriptorSet descriptorSet = noFogItemsDescriptorSet;
 
         matrixStack.scale(itemSize, itemSize, itemSize);
-        MatrixUniformBinder.bindStandardMatrices(commandBuffer, PipelineRegistry.getInstance().getSharedUniforms(), matrixStack);
+        MatrixUniforms.writeStandardMatrices(descriptorSet, matrixStack);
+        commandBuffer.bindDescriptorSet(descriptorSet);
         itemQuadMesh.draw(commandBuffer);
     }
 

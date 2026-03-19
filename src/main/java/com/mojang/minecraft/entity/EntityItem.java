@@ -8,19 +8,19 @@ import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.block.BlockRenderer;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
-import com.mojang.minecraft.renderer.graphics.MatrixUniformBinder;
+import com.mojang.minecraft.renderer.graphics.MatrixUniforms;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
-import com.mojang.minecraft.renderer.shader.PipelineRegistry;
+import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
 import com.mojang.minecraft.util.math.CollisionUtils;
 
 public class EntityItem extends Entity {
 
-    private static final Pipeline WORLD_PIPELINE = PipelineRegistry.getInstance().getWorldPipeline();
-
     private final ItemStack itemStack;
 
     private final float hoverPhase;
+    private final Pipeline worldPipeline;
+    private final MutableDescriptorSet worldFogTerrainDescriptorSet;
 
     private EntityPlayer target;
 
@@ -32,10 +32,12 @@ public class EntityItem extends Entity {
      * @param level     The level this entity belongs to
      * @param itemStack the item stack to render
      */
-    public EntityItem(Level level, ItemStack itemStack) {
+    public EntityItem(Level level, ItemStack itemStack, Pipeline worldPipeline, MutableDescriptorSet worldFogTerrainDescriptorSet) {
         super(level);
         this.itemStack = itemStack;
         this.hoverPhase = (float) (Math.random() * Math.PI * 2.0D);
+        this.worldPipeline = worldPipeline;
+        this.worldFogTerrainDescriptorSet = worldFogTerrainDescriptorSet;
         this.bbWidth = 0.25f;
         this.bbHeight = 0.25f;
     }
@@ -83,16 +85,20 @@ public class EntityItem extends Entity {
 
     @Override
     public void render(CommandBuffer commandBuffer, MatrixStack matrixStack, TextureManager textureManager, float partialTick) {
+        if (worldPipeline == null || worldFogTerrainDescriptorSet == null) {
+            throw new IllegalStateException("EntityItem render resources were not provided");
+        }
         Item item = itemStack.getItem(); // TODO: RENDER > STACK SIZE AS ITEM BUNDLE
         if (item instanceof BlockItem) {
-            renderBlockItem((BlockItem) item, commandBuffer, matrixStack, textureManager, partialTick);
+            renderBlockItem((BlockItem) item, commandBuffer, matrixStack, partialTick);
         }
     }
 
-    private void renderBlockItem(BlockItem blockItem, CommandBuffer commandBuffer, MatrixStack matrixStack, TextureManager textureManager, float partialTicks) {
+    private void renderBlockItem(BlockItem blockItem, CommandBuffer commandBuffer, MatrixStack matrixStack, float partialTicks) {
         IndexedMesh mesh = BlockRenderer.getBlockMesh(blockItem.getBlock());
-        commandBuffer.bindTexture(0, textureManager.terrainTexture);
-        commandBuffer.setPipeline(WORLD_PIPELINE);
+        MutableDescriptorSet descriptorSet = worldFogTerrainDescriptorSet;
+        commandBuffer.setPipeline(worldPipeline);
+        commandBuffer.bindDescriptorSet(descriptorSet);
 
         matrixStack.pushMatrix();
 
@@ -115,7 +121,8 @@ public class EntityItem extends Entity {
         matrixStack.rotateY(rot);
         matrixStack.translate(-0.5f, -0.0f, -0.5f);
 
-        MatrixUniformBinder.bindStandardMatrices(commandBuffer, PipelineRegistry.getInstance().getSharedUniforms(), matrixStack);
+        MatrixUniforms.writeStandardMatrices(descriptorSet, matrixStack);
+        commandBuffer.bindDescriptorSet(descriptorSet);
 
         mesh.draw(commandBuffer);
 

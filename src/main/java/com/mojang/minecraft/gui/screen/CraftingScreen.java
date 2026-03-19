@@ -6,14 +6,25 @@ import com.mojang.minecraft.item.inventory.Inventory;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
+import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
+import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 
 public class CraftingScreen extends AbstractInventoryScreen {
 
     private float mouseX, mouseY;
+    private final MutableDescriptorSet noFogCraftingDescriptorSet;
+    private final InventoryItemRenderer inventoryItemRenderer;
 
-    public CraftingScreen(TextureManager textureManager, HeldItemRenderer heldItemRenderer, Font font, Inventory inventory) {
+    public CraftingScreen(TextureManager textureManager,
+                          HeldItemRenderer heldItemRenderer,
+                          Font font,
+                          Inventory inventory,
+                          PipelineRegistry pipelineRegistry,
+                          InventoryItemRenderer inventoryItemRenderer) {
         super(textureManager, heldItemRenderer, font, inventory);
+        this.noFogCraftingDescriptorSet = pipelineRegistry.getDescriptorSet(textureManager.craftingTexture, PipelineRegistry.FogPreset.NONE);
+        this.inventoryItemRenderer = inventoryItemRenderer;
     }
 
     @Override
@@ -41,10 +52,10 @@ public class CraftingScreen extends AbstractInventoryScreen {
             mouseY = centerY;
         }
 
-        drawInventoryScreenBackground(commandBuffer, centerX, centerY, textureManager.craftingTexture);
+        drawInventoryScreenBackground(commandBuffer, matrixStack, centerX, centerY, noFogCraftingDescriptorSet);
 
-        InventoryItemRenderer.renderInventoryItems(commandBuffer, matrixStack, textureManager, heldItemRenderer, this, centerX, centerY);
-        InventoryItemRenderer.drawSelectedItem(commandBuffer, matrixStack, textureManager, heldItemRenderer, inventory, mouseX, mouseY, stackSizeSelectedItemLabel);
+        inventoryItemRenderer.renderInventoryItems(commandBuffer, matrixStack, heldItemRenderer, this, centerX, centerY);
+        inventoryItemRenderer.drawSelectedItem(commandBuffer, matrixStack, heldItemRenderer, inventory, mouseX, mouseY, stackSizeSelectedItemLabel);
 
         this.screenWidth = screenWidth;
         this.screenHeight = screenHeight;

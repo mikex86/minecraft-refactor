@@ -1,39 +1,59 @@
 package com.mojang.minecraft.renderer.shader;
 
 import com.mojang.minecraft.renderer.Disposable;
+import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BlendFactor;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.CompareFunc;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.CullMode;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.FillMode;
+import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.graphics.PipelineLayout;
+import com.mojang.minecraft.renderer.graphics.ShaderProgram;
+import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.Uniform;
-import com.mojang.minecraft.renderer.graphics.UniformCollection;
-import com.mojang.minecraft.renderer.shader.impl.*;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 public class PipelineRegistry implements Disposable {
 
-    private static PipelineRegistry instance;
-
-    // Cache of loaded shaders
-    private final Map<String, Shader> shaders = new HashMap<>();
+    private static final int MODEL_VIEW_BINDING = 0;
+    private static final int DIFFUSE_TEXTURE_BINDING = 1;
+    private static final int PROJECTION_BINDING = 4;
+    private static final int FOG_DENSITY_BINDING = 8;
+    private static final int FOG_START_BINDING = 9;
+    private static final int FOG_END_BINDING = 10;
+    private static final int FOG_COLOR_BINDING = 11;
+    private static final float WORLD_FOG_DENSITY = 0.001F;
+    private static final float WORLD_FOG_START = 0.0F;
+    private static final float WORLD_FOG_END = 10.0F;
+    private static final float WORLD_FOG_R = 0.5F;
+    private static final float WORLD_FOG_G = 0.8F;
+    private static final float WORLD_FOG_B = 1.0F;
+    private static final float WORLD_FOG_A = 1.0F;
+    private static final float NO_FOG_DENSITY = 0.0F;
+    private static final float NO_FOG_START = 0.0F;
+    private static final float NO_FOG_END = 10.0F;
+    private static final float NO_FOG_R = 0.5F;
+    private static final float NO_FOG_G = 0.8F;
+    private static final float NO_FOG_B = 1.0F;
+    private static final float NO_FOG_A = 1.0F;
 
     // Core shader programs
-    private WorldShader worldShader;
-    private ParticleShader particleShader;
-    private EntityShader entityShader;
-    private HudShader hudShader;
-    private HudNoTexShader hudNoTexShader;
-    private OutlineShader outlineShader;
+    private ShaderProgram worldProgram;
+    private ShaderProgram particleProgram;
+    private ShaderProgram entityProgram;
+    private ShaderProgram hudProgram;
+    private ShaderProgram hudNoTexProgram;
+    private ShaderProgram outlineProgram;
 
     private PipelineLayout sharedPipelineLayout;
-    private UniformCollection sharedUniforms;
+    private Map<DescriptorKey, MutableDescriptorSet> sharedDescriptorSetsByKey;
 
     // Core pipelines
     private Pipeline worldPipeline;
@@ -47,62 +67,61 @@ public class PipelineRegistry implements Disposable {
     private Pipeline worldNoCullPipeline;
     private Pipeline worldOverlayPipeline;
 
-    /**
-     * Gets the singleton instance of the shader manager.
-     *
-     * @return The shader manager instance
-     */
-    public static PipelineRegistry getInstance() {
-        if (instance == null) {
-            instance = new PipelineRegistry();
-        }
-        return instance;
+    public PipelineRegistry() {
     }
 
-    /**
-     * Private constructor to enforce singleton pattern.
-     */
-    private PipelineRegistry() {
-    }
-
-    /**
-     * Initializes core shaders.
-     * Should be called once at the start of the application.
-     *
-     * @throws IOException If shader loading fails
-     */
     public void initialize() throws IOException {
-        worldShader = new WorldShader();
-        particleShader = new ParticleShader();
-        entityShader = new EntityShader();
-        hudShader = new HudShader();
-        hudNoTexShader = new HudNoTexShader();
-        outlineShader = new OutlineShader();
+        worldProgram = GraphicsFactory.getGraphicsAPI().createShaderProgramFromPrecompiled("/shaders/world.vert.spv", "/shaders/world.frag.spv");
+        particleProgram = GraphicsFactory.getGraphicsAPI().createShaderProgramFromPrecompiled("/shaders/particle.vert.spv", "/shaders/particle.frag.spv");
+        entityProgram = GraphicsFactory.getGraphicsAPI().createShaderProgramFromPrecompiled("/shaders/entity.vert.spv", "/shaders/entity.frag.spv");
+        hudProgram = GraphicsFactory.getGraphicsAPI().createShaderProgramFromPrecompiled("/shaders/hud.vert.spv", "/shaders/hud.frag.spv");
+        hudNoTexProgram = GraphicsFactory.getGraphicsAPI().createShaderProgramFromPrecompiled("/shaders/hud_notexture.vert.spv", "/shaders/hud_notexture.frag.spv");
+        outlineProgram = GraphicsFactory.getGraphicsAPI().createShaderProgramFromPrecompiled("/shaders/outline.vert.spv", "/shaders/outline.frag.spv");
 
         sharedPipelineLayout = GraphicsFactory.getGraphicsAPI().createPipelineLayout(
                 new PipelineLayout.Descriptor(
                         "legacy-shader-layout",
                         Arrays.asList(
                                 new PipelineLayout.Binding(
-                                        0,
+                                        MODEL_VIEW_BINDING,
                                         PipelineLayout.ResourceType.UNIFORM_BUFFER,
                                         PipelineLayout.ShaderStage.VERTEX,
                                         PipelineLayout.BindingSemantic.MODEL_VIEW_MATRIX
                                 ),
                                 new PipelineLayout.Binding(
-                                        4,
+                                        DIFFUSE_TEXTURE_BINDING,
+                                        PipelineLayout.ResourceType.COMBINED_IMAGE_SAMPLER,
+                                        PipelineLayout.ShaderStage.FRAGMENT,
+                                        PipelineLayout.BindingSemantic.DIFFUSE_TEXTURE
+                                ),
+                                new PipelineLayout.Binding(
+                                        PROJECTION_BINDING,
                                         PipelineLayout.ResourceType.UNIFORM_BUFFER,
                                         PipelineLayout.ShaderStage.VERTEX,
                                         PipelineLayout.BindingSemantic.PROJECTION_MATRIX
+                                ),
+                                new PipelineLayout.Binding(
+                                        FOG_DENSITY_BINDING,
+                                        PipelineLayout.ResourceType.UNIFORM_BUFFER,
+                                        PipelineLayout.ShaderStage.VERTEX
+                                ),
+                                new PipelineLayout.Binding(
+                                        FOG_START_BINDING,
+                                        PipelineLayout.ResourceType.UNIFORM_BUFFER,
+                                        PipelineLayout.ShaderStage.VERTEX
+                                ),
+                                new PipelineLayout.Binding(
+                                        FOG_END_BINDING,
+                                        PipelineLayout.ResourceType.UNIFORM_BUFFER,
+                                        PipelineLayout.ShaderStage.VERTEX
+                                ),
+                                new PipelineLayout.Binding(
+                                        FOG_COLOR_BINDING,
+                                        PipelineLayout.ResourceType.UNIFORM_BUFFER,
+                                        PipelineLayout.ShaderStage.VERTEX
                                 )
                         )
                 )
-        );
-        Uniform modelViewMatrixUniform = createMatrixUniform(PipelineLayout.BindingSemantic.MODEL_VIEW_MATRIX);
-        Uniform projectionMatrixUniform = createMatrixUniform(PipelineLayout.BindingSemantic.PROJECTION_MATRIX);
-        sharedUniforms = new UniformCollection(
-                sharedPipelineLayout,
-                Arrays.asList(modelViewMatrixUniform, projectionMatrixUniform)
         );
 
         Pipeline.BlendState blendDisabled = new Pipeline.BlendState(false, BlendFactor.ONE, BlendFactor.ZERO);
@@ -116,75 +135,63 @@ public class PipelineRegistry implements Disposable {
         Pipeline.RasterizerState cullBack = new Pipeline.RasterizerState(CullMode.BACK, FillMode.SOLID);
         Pipeline.RasterizerState cullNone = new Pipeline.RasterizerState(CullMode.NONE, FillMode.SOLID);
 
-        worldPipeline = createPipeline("world-pipeline", worldShader, blendDisabled, depthReadWrite, cullBack);
-        worldNoCullPipeline = createPipeline("world-nocull-pipeline", worldShader, blendDisabled, depthReadWrite, cullNone);
-        worldOverlayPipeline = createPipeline("world-overlay-pipeline", worldShader, blendBreakOverlay, depthReadOnly, cullNone);
+        worldPipeline = createPipeline("world-pipeline", worldProgram, blendDisabled, depthReadWrite, cullBack);
+        worldNoCullPipeline = createPipeline("world-nocull-pipeline", worldProgram, blendDisabled, depthReadWrite, cullNone);
+        worldOverlayPipeline = createPipeline("world-overlay-pipeline", worldProgram, blendBreakOverlay, depthReadOnly, cullNone);
 
-        particlePipeline = createPipeline("particle-pipeline", particleShader, blendAlpha, depthReadWrite, cullBack);
-        entityPipeline = createPipeline("entity-pipeline", entityShader, blendDisabled, depthReadWrite, cullBack);
+        particlePipeline = createPipeline("particle-pipeline", particleProgram, blendAlpha, depthReadWrite, cullBack);
+        entityPipeline = createPipeline("entity-pipeline", entityProgram, blendDisabled, depthReadWrite, cullBack);
 
-        hudPipeline = createPipeline("hud-pipeline", hudShader, blendAlpha, depthDisabled, cullBack);
-        hudNoCullPipeline = createPipeline("hud-nocull-pipeline", hudShader, blendAlpha, depthDisabled, cullNone);
-        hudItemPipeline = createPipeline("hud-item-pipeline", hudShader, blendDisabled, depthReadWrite, cullNone);
-        hudNoTexPipeline = createPipeline("hud-notex-pipeline", hudNoTexShader, blendDisabled, depthDisabled, cullBack);
+        hudPipeline = createPipeline("hud-pipeline", hudProgram, blendAlpha, depthDisabled, cullBack);
+        hudNoCullPipeline = createPipeline("hud-nocull-pipeline", hudProgram, blendAlpha, depthDisabled, cullNone);
+        hudItemPipeline = createPipeline("hud-item-pipeline", hudProgram, blendDisabled, depthReadWrite, cullNone);
+        hudNoTexPipeline = createPipeline("hud-notex-pipeline", hudNoTexProgram, blendDisabled, depthDisabled, cullBack);
 
-        outlinePipeline = createPipeline("outline-pipeline", outlineShader, blendAlpha, depthReadWrite, cullNone);
+        outlinePipeline = createPipeline("outline-pipeline", outlineProgram, blendAlpha, depthReadWrite, cullNone);
     }
 
-    private Uniform createMatrixUniform(PipelineLayout.BindingSemantic semantic) {
-        int binding = sharedPipelineLayout.findBinding(semantic);
-        if (binding < 0) {
-            throw new IllegalStateException("Missing required matrix binding " + semantic + " in layout " + sharedPipelineLayout.getDebugName());
+    public void configureSharedDescriptorSets(TextureManager textureManager) {
+        Objects.requireNonNull(textureManager, "textureManager cannot be null");
+        if (sharedPipelineLayout == null) {
+            throw new IllegalStateException("PipelineRegistry must be initialized before configuring descriptor sets");
         }
-        return GraphicsFactory.getGraphicsAPI().createUniform(binding, Uniform.ValueType.MAT4);
+
+        disposeSharedDescriptorSets();
+        sharedDescriptorSetsByKey = new HashMap<>();
+
+        registerSharedDescriptorSet(textureManager.terrainTexture, FogPreset.WORLD);
+        registerSharedDescriptorSet(textureManager.terrainTexture, FogPreset.NONE);
+        registerSharedDescriptorSet(textureManager.charTexture, FogPreset.WORLD);
+        registerSharedDescriptorSet(textureManager.charTexture, FogPreset.NONE);
+        registerSharedDescriptorSet(textureManager.itemsTexture, FogPreset.NONE);
+        registerSharedDescriptorSet(textureManager.fontTexture, FogPreset.NONE);
+        registerSharedDescriptorSet(textureManager.guiTexture, FogPreset.NONE);
+        registerSharedDescriptorSet(textureManager.inventoryTexture, FogPreset.NONE);
+        registerSharedDescriptorSet(textureManager.craftingTexture, FogPreset.NONE);
+        registerSharedDescriptorSet(null, FogPreset.NONE);
+    }
+
+    private Uniform createUniform(int binding, Uniform.ValueType type) {
+        return GraphicsFactory.getGraphicsAPI().createUniform(binding, type);
     }
 
     private Pipeline createPipeline(String name,
-                                    IShader shader,
+                                    ShaderProgram program,
                                     Pipeline.BlendState blendState,
                                     Pipeline.DepthState depthState,
                                     Pipeline.RasterizerState rasterizerState) {
         return GraphicsFactory.getGraphicsAPI().createPipeline(
-                new Pipeline.Descriptor(name, sharedPipelineLayout, shader, blendState, depthState, rasterizerState)
+                new Pipeline.Descriptor(name, sharedPipelineLayout, program, blendState, depthState, rasterizerState)
         );
     }
 
-    /**
-     * Gets the world shader.
-     *
-     * @return The world shader
-     */
-    public WorldShader getWorldShader() {
-        return worldShader;
-    }
-    
-    /**
-     * Gets the particle shader.
-     *
-     * @return The particle shader
-     */
-    public ParticleShader getParticleShader() {
-        return particleShader;
-    }
-
-    public EntityShader getEntityShader() {
-        return entityShader;
-    }
-
-    public HudShader getHudShader() {
-        return hudShader;
-    }
-
-    public HudNoTexShader getHudNoTexShader() {
-        return hudNoTexShader;
-    }
-
-    public PipelineLayout getSharedPipelineLayout() {
-        return sharedPipelineLayout;
-    }
-
-    public UniformCollection getSharedUniforms() {
-        return sharedUniforms;
+    public MutableDescriptorSet getDescriptorSet(Texture texture, FogPreset fogPreset) {
+        assertDescriptorSetsConfigured();
+        MutableDescriptorSet descriptorSet = sharedDescriptorSetsByKey.get(new DescriptorKey(texture, fogPreset));
+        if (descriptorSet == null) {
+            throw new IllegalStateException("No shared descriptor set registered for fog preset " + fogPreset);
+        }
+        return descriptorSet;
     }
 
     public Pipeline getWorldPipeline() {
@@ -227,103 +234,161 @@ public class PipelineRegistry implements Disposable {
         return worldOverlayPipeline;
     }
 
-    /**
-     * Gets a shader by name.
-     *
-     * @param name The name of the shader
-     * @return The shader, or null if not found
-     */
-    public Shader getShader(String name) {
-        return shaders.get(name);
-    }
-
-    /**
-     * Disposes of all shaders.
-     */
     @Override
     public void dispose() {
-        for (Shader shader : shaders.values()) {
-            shader.dispose();
-        }
-        shaders.clear();
+        disposePipeline(worldPipeline);
+        worldPipeline = null;
+        disposePipeline(particlePipeline);
+        particlePipeline = null;
+        disposePipeline(entityPipeline);
+        entityPipeline = null;
+        disposePipeline(hudPipeline);
+        hudPipeline = null;
+        disposePipeline(hudNoTexPipeline);
+        hudNoTexPipeline = null;
+        disposePipeline(hudNoCullPipeline);
+        hudNoCullPipeline = null;
+        disposePipeline(hudItemPipeline);
+        hudItemPipeline = null;
+        disposePipeline(outlinePipeline);
+        outlinePipeline = null;
+        disposePipeline(worldNoCullPipeline);
+        worldNoCullPipeline = null;
+        disposePipeline(worldOverlayPipeline);
+        worldOverlayPipeline = null;
 
-        if (worldPipeline != null) {
-            worldPipeline.dispose();
-            worldPipeline = null;
-        }
-        if (particlePipeline != null) {
-            particlePipeline.dispose();
-            particlePipeline = null;
-        }
-        if (entityPipeline != null) {
-            entityPipeline.dispose();
-            entityPipeline = null;
-        }
-        if (hudPipeline != null) {
-            hudPipeline.dispose();
-            hudPipeline = null;
-        }
-        if (hudNoTexPipeline != null) {
-            hudNoTexPipeline.dispose();
-            hudNoTexPipeline = null;
-        }
-        if (hudNoCullPipeline != null) {
-            hudNoCullPipeline.dispose();
-            hudNoCullPipeline = null;
-        }
-        if (hudItemPipeline != null) {
-            hudItemPipeline.dispose();
-            hudItemPipeline = null;
-        }
-        if (outlinePipeline != null) {
-            outlinePipeline.dispose();
-            outlinePipeline = null;
-        }
-        if (worldNoCullPipeline != null) {
-            worldNoCullPipeline.dispose();
-            worldNoCullPipeline = null;
-        }
-        if (worldOverlayPipeline != null) {
-            worldOverlayPipeline.dispose();
-            worldOverlayPipeline = null;
-        }
         if (sharedPipelineLayout != null) {
             sharedPipelineLayout.dispose();
             sharedPipelineLayout = null;
         }
-        if (sharedUniforms != null) {
-            sharedUniforms.dispose();
-            sharedUniforms = null;
-        }
-        
-        if (worldShader != null) {
-            worldShader.dispose();
-        }
-        
-        if (particleShader != null) {
-            particleShader.dispose();
-        }
+        disposeSharedDescriptorSets();
 
-        if (entityShader != null) {
-            entityShader.dispose();
-        }
-
-        if (hudShader != null) {
-            hudShader.dispose();
-        }
-
-        if (hudNoTexShader != null) {
-            hudNoTexShader.dispose();
-        }
-
-        if (outlineShader != null) {
-            outlineShader.dispose();
-        }
-        
-        instance = null;
+        disposeShader(worldProgram);
+        worldProgram = null;
+        disposeShader(particleProgram);
+        particleProgram = null;
+        disposeShader(entityProgram);
+        entityProgram = null;
+        disposeShader(hudProgram);
+        hudProgram = null;
+        disposeShader(hudNoTexProgram);
+        hudNoTexProgram = null;
+        disposeShader(outlineProgram);
+        outlineProgram = null;
     }
 
-    public OutlineShader getOutlineShader() {
-        return outlineShader;
+    private static void disposePipeline(Pipeline pipeline) {
+        if (pipeline != null) {
+            pipeline.dispose();
+        }
+    }
+
+    private static void disposeShader(ShaderProgram shader) {
+        if (shader != null) {
+            shader.dispose();
+        }
+    }
+
+    private MutableDescriptorSet createSharedDescriptorSet(Texture texture, FogPreset fogPreset) {
+        Uniform modelView = createUniform(MODEL_VIEW_BINDING, Uniform.ValueType.MAT4);
+        Uniform projection = createUniform(PROJECTION_BINDING, Uniform.ValueType.MAT4);
+        Uniform fogDensity = createUniform(FOG_DENSITY_BINDING, Uniform.ValueType.FLOAT1);
+        Uniform fogStart = createUniform(FOG_START_BINDING, Uniform.ValueType.FLOAT1);
+        Uniform fogEnd = createUniform(FOG_END_BINDING, Uniform.ValueType.FLOAT1);
+        Uniform fogColor = createUniform(FOG_COLOR_BINDING, Uniform.ValueType.FLOAT4);
+        applyFogPreset(fogPreset, fogDensity, fogStart, fogEnd, fogColor);
+
+        MutableDescriptorSet descriptorSet = new MutableDescriptorSet(
+                sharedPipelineLayout,
+                Arrays.asList(
+                        modelView,
+                        projection,
+                        fogDensity,
+                        fogStart,
+                        fogEnd,
+                        fogColor
+                )
+        );
+        if (texture != null) {
+            descriptorSet.setTexture(PipelineLayout.BindingSemantic.DIFFUSE_TEXTURE, texture);
+        }
+        return descriptorSet;
+    }
+
+    private void registerSharedDescriptorSet(Texture texture, FogPreset fogPreset) {
+        MutableDescriptorSet descriptorSet = createSharedDescriptorSet(texture, fogPreset);
+        sharedDescriptorSetsByKey.put(new DescriptorKey(texture, fogPreset), descriptorSet);
+    }
+
+    private void assertDescriptorSetsConfigured() {
+        if (sharedDescriptorSetsByKey == null) {
+            throw new IllegalStateException("Shared descriptor sets are not configured. Call configureSharedDescriptorSets(textureManager) after textures are loaded.");
+        }
+    }
+
+    private void disposeSharedDescriptorSets() {
+        if (sharedDescriptorSetsByKey != null) {
+            for (MutableDescriptorSet descriptorSet : sharedDescriptorSetsByKey.values()) {
+                disposeDescriptorSet(descriptorSet);
+            }
+            sharedDescriptorSetsByKey.clear();
+            sharedDescriptorSetsByKey = null;
+        }
+    }
+
+    private static void disposeDescriptorSet(MutableDescriptorSet descriptorSet) {
+        if (descriptorSet != null) {
+            descriptorSet.dispose();
+        }
+    }
+
+    private static void applyFogPreset(FogPreset fogPreset,
+                                       Uniform fogDensityUniform,
+                                       Uniform fogStartUniform,
+                                       Uniform fogEndUniform,
+                                       Uniform fogColorUniform) {
+        if (fogPreset == FogPreset.WORLD) {
+            fogDensityUniform.setFloat(WORLD_FOG_DENSITY);
+            fogStartUniform.setFloat(WORLD_FOG_START);
+            fogEndUniform.setFloat(WORLD_FOG_END);
+            fogColorUniform.setFloat4(WORLD_FOG_R, WORLD_FOG_G, WORLD_FOG_B, WORLD_FOG_A);
+            return;
+        }
+        fogDensityUniform.setFloat(NO_FOG_DENSITY);
+        fogStartUniform.setFloat(NO_FOG_START);
+        fogEndUniform.setFloat(NO_FOG_END);
+        fogColorUniform.setFloat4(NO_FOG_R, NO_FOG_G, NO_FOG_B, NO_FOG_A);
+    }
+
+    public enum FogPreset {
+        WORLD,
+        NONE
+    }
+
+    private static final class DescriptorKey {
+        private final Texture texture;
+        private final FogPreset fogPreset;
+
+        private DescriptorKey(Texture texture, FogPreset fogPreset) {
+            this.texture = texture;
+            this.fogPreset = fogPreset;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (!(obj instanceof DescriptorKey)) {
+                return false;
+            }
+            DescriptorKey other = (DescriptorKey) obj;
+            return texture == other.texture && fogPreset == other.fogPreset;
+        }
+
+        @Override
+        public int hashCode() {
+            return System.identityHashCode(texture) * 31 + fogPreset.hashCode();
+        }
     }
 }

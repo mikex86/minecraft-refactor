@@ -1,7 +1,7 @@
 #version 450 core
 
 // Texture sampler
-uniform sampler2D textureSampler;
+layout (binding = 1) uniform sampler2D textureSampler;
 
 // Input from vertex shader
 layout (location = 0) in vec4 vertexColor;

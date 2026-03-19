@@ -3,6 +3,7 @@ package com.mojang.minecraft.renderer.model.impl;
 import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
+import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
 import com.mojang.minecraft.renderer.model.Model;
 import com.mojang.minecraft.renderer.shape.Cube;
 
@@ -59,7 +60,7 @@ public class PlayerModel implements Model<EntityPlayer> {
      * Renders the player model
      */
     @Override
-    public void render(CommandBuffer commandBuffer, MatrixStack matrixStack, EntityPlayer player, float partialTicks) {
+    public void render(CommandBuffer commandBuffer, MatrixStack matrixStack, MutableDescriptorSet descriptorSet, EntityPlayer player, float partialTicks) {
         float limbSwingAmount = player.prevLimbSwingAmount + (player.limbSwingAmount - player.prevLimbSwingAmount) * partialTicks;
         float limbSwing = player.limbSwing + (player.limbSwing - player.prevLimbSwing) * partialTicks;
 
@@ -73,14 +74,14 @@ public class PlayerModel implements Model<EntityPlayer> {
         setRotationAngles(limbSwing, limbSwingAmount, headYaw, headPitch);
 
         // Render all body parts
-        this.head.render(commandBuffer, matrixStack);
+        this.head.render(commandBuffer, matrixStack, descriptorSet);
 
         matrixStack.rotateY(bodyYaw);
-        this.body.render(commandBuffer, matrixStack);
-        this.rightArm.render(commandBuffer, matrixStack);
-        this.leftArm.render(commandBuffer, matrixStack);
-        this.rightLeg.render(commandBuffer, matrixStack);
-        this.leftLeg.render(commandBuffer, matrixStack);
+        this.body.render(commandBuffer, matrixStack, descriptorSet);
+        this.rightArm.render(commandBuffer, matrixStack, descriptorSet);
+        this.leftArm.render(commandBuffer, matrixStack, descriptorSet);
+        this.rightLeg.render(commandBuffer, matrixStack, descriptorSet);
+        this.leftLeg.render(commandBuffer, matrixStack, descriptorSet);
     }
 
     protected void setRotationAngles(float limbSwing, float limbSwingAmount, float netHeadYaw, float headPitch) {

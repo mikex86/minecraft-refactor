@@ -2,7 +2,7 @@ package com.mojang.minecraft.renderer.graphics.opengl;
 
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.graphics.PipelineLayout;
-import com.mojang.minecraft.renderer.shader.IShader;
+import com.mojang.minecraft.renderer.graphics.ShaderProgram;
 
 /**
  * OpenGL implementation of Pipeline.
@@ -21,8 +21,8 @@ public final class OpenGLPipeline implements Pipeline {
         if (!(descriptor.getLayout() instanceof OpenGLPipelineLayout)) {
             throw new IllegalArgumentException("layout must be an OpenGLPipelineLayout");
         }
-        if (descriptor.getShader() == null) {
-            throw new IllegalArgumentException("shader cannot be null");
+        if (descriptor.getProgram() == null) {
+            throw new IllegalArgumentException("program cannot be null");
         }
         if (descriptor.getBlendState() == null) {
             throw new IllegalArgumentException("blend state cannot be null");
@@ -42,8 +42,8 @@ public final class OpenGLPipeline implements Pipeline {
     }
 
     @Override
-    public IShader getShader() {
-        return descriptor.getShader();
+    public ShaderProgram getProgram() {
+        return descriptor.getProgram();
     }
 
     @Override

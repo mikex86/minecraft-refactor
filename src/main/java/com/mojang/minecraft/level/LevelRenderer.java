@@ -9,7 +9,8 @@ import com.mojang.minecraft.renderer.Frustum;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
-import com.mojang.minecraft.renderer.graphics.Texture;
+import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +26,7 @@ public class LevelRenderer implements Disposable {
 
     // Graphics resources
     private final TextureManager textureManager;
+    private final MutableDescriptorSet worldFogTerrainDescriptorSet;
 
     // Number of chunk sections draw calls issued this frame
     public static int numSectionDrawCalls = 0;
@@ -32,9 +34,10 @@ public class LevelRenderer implements Disposable {
     /**
      * Creates a new GraphicsLevelRenderer for the specified level.
      */
-    public LevelRenderer(Level level, TextureManager textureManager) {
+    public LevelRenderer(Level level, TextureManager textureManager, PipelineRegistry pipelineRegistry) {
         this.level = level;
         this.textureManager = textureManager;
+        this.worldFogTerrainDescriptorSet = pipelineRegistry.getDescriptorSet(textureManager.terrainTexture, PipelineRegistry.FogPreset.WORLD);
     }
 
     /**
@@ -61,9 +64,7 @@ public class LevelRenderer implements Disposable {
      * Renders the level
      */
     public void render(CommandBuffer commandBuffer, MatrixStack matrixStack, float partialTicks) {
-        // Enable texturing and bind the terrain texture
-        Texture texture = textureManager.terrainTexture;
-        commandBuffer.bindTexture(0, texture);
+        commandBuffer.bindDescriptorSet(worldFogTerrainDescriptorSet);
 
         // Get the current view frustum
         Frustum frustum = Frustum.getFrustum(matrixStack);

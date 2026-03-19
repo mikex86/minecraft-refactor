@@ -5,7 +5,8 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
-import com.mojang.minecraft.renderer.graphics.Texture;
+import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +22,7 @@ public class ParticleEngine {
     protected Level level;
     private final List<Particle> particles = new ArrayList<>();
     private final TextureManager textureManager;
+    private final MutableDescriptorSet worldFogTerrainDescriptorSet;
 
     /**
      * Creates a new particle engine for the specified level.
@@ -28,9 +30,10 @@ public class ParticleEngine {
      * @param level          The game level
      * @param textureManager The texture manager
      */
-    public ParticleEngine(Level level, TextureManager textureManager) {
+    public ParticleEngine(Level level, TextureManager textureManager, PipelineRegistry pipelineRegistry) {
         this.level = level;
         this.textureManager = textureManager;
+        this.worldFogTerrainDescriptorSet = pipelineRegistry.getDescriptorSet(textureManager.terrainTexture, PipelineRegistry.FogPreset.WORLD);
     }
 
     /**
@@ -69,9 +72,7 @@ public class ParticleEngine {
             return;
         }
 
-        // Setup texture
-        Texture texture = this.textureManager.terrainTexture;
-        commandBuffer.bindTexture(0, texture);
+        commandBuffer.bindDescriptorSet(worldFogTerrainDescriptorSet);
 
         // Calculate view vectors based on player rotation
         float xa = -((float) Math.cos(player.yaw * DEG_TO_RAD));

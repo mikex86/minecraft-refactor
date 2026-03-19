@@ -6,6 +6,7 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.renderer.TextureManager;
+import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 import com.mojang.minecraft.renderer.model.ModelRegistry;
 
 /**
@@ -28,6 +29,7 @@ public class GameState {
 
     // Resources
     private final TextureManager textureManager;
+    private final PipelineRegistry pipelineRegistry;
 
     // Models
     private final ModelRegistry modelRegistry = ModelRegistry.getInstance();
@@ -37,8 +39,9 @@ public class GameState {
      *
      * @param textureManager The texture manager to use
      */
-    public GameState(TextureManager textureManager) {
+    public GameState(TextureManager textureManager, PipelineRegistry pipelineRegistry) {
         this.textureManager = textureManager;
+        this.pipelineRegistry = pipelineRegistry;
     }
 
     /**
@@ -50,15 +53,22 @@ public class GameState {
 
         // Create level and renderer
         this.level = new Level();
-        this.levelRenderer = new LevelRenderer(this.level, this.textureManager);
+        this.levelRenderer = new LevelRenderer(this.level, this.textureManager, this.pipelineRegistry);
 
         // Create player
-        this.player = new EntityPlayer(this.level, craftingManager, true);
+        this.player = new EntityPlayer(
+                this.level,
+                craftingManager,
+                true,
+                pipelineRegistry.getDescriptorSet(textureManager.charTexture, PipelineRegistry.FogPreset.WORLD),
+                pipelineRegistry.getWorldPipeline(),
+                pipelineRegistry.getDescriptorSet(textureManager.terrainTexture, PipelineRegistry.FogPreset.WORLD)
+        );
         this.player.setPosition(0.0F, 128, 0.0F);
         this.level.spawnEntity(this.player);
 
         // Create particle engine
-        this.particleEngine = new ParticleEngine(this.level, this.textureManager);
+        this.particleEngine = new ParticleEngine(this.level, this.textureManager, this.pipelineRegistry);
     }
 
     /**

@@ -22,16 +22,13 @@ import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
-import com.mojang.minecraft.renderer.graphics.MatrixUniformBinder;
+import com.mojang.minecraft.renderer.graphics.MatrixUniforms;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
+import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
-import com.mojang.minecraft.renderer.shader.impl.*;
 import com.mojang.minecraft.world.HitResult;
-import org.lwjgl.BufferUtils;
-
-import java.nio.FloatBuffer;
 
 /**
  * Handles all rendering operations for Minecraft.
@@ -43,23 +40,12 @@ public class GameRenderer implements Disposable {
     private final GraphicsAPI device;
     private CommandBuffer commandBuffer;
     private final MatrixStack matrixStack = new MatrixStack();
-    private final PipelineRegistry pipelineRegistry;
 
     // Texture manager
     private final TextureManager textureManager;
 
     private final int renderDistance = 16; // Render distance in chunks
 
-    // Buffers for graphic operations
-    private final FloatBuffer fogColor0;
-    private final FloatBuffer fogColor1;
-
-    private final WorldShader worldShader;
-    private final ParticleShader particleShader;
-    private final EntityShader entityShader;
-    private final HudShader hudShader;
-    private final HudNoTexShader hudNoTexShader;
-    private final OutlineShader outlineShader;
     private final Pipeline worldPipeline;
     private final Pipeline worldOverlayPipeline;
     private final Pipeline particlePipeline;
@@ -69,6 +55,10 @@ public class GameRenderer implements Disposable {
     private final Pipeline hudItemPipeline;
     private final Pipeline hudNoTexPipeline;
     private final Pipeline outlinePipeline;
+    private final MutableDescriptorSet worldFogTerrainDescriptorSet;
+    private final MutableDescriptorSet noFogTerrainDescriptorSet;
+    private final MutableDescriptorSet noFogNoTextureDescriptorSet;
+    private final MutableDescriptorSet noFogGuiDescriptorSet;
     private final Level level;
 
     // Font renderer
@@ -112,7 +102,6 @@ public class GameRenderer implements Disposable {
                         ParticleEngine particleEngine, EntityPlayer player, int width, int height) {
         // Get commandBuffer API instance
         this.device = GraphicsFactory.getGraphicsAPI();
-        this.pipelineRegistry = pipelineRegistry;
 
         this.textureManager = textureManager;
         this.level = level;
@@ -121,30 +110,11 @@ public class GameRenderer implements Disposable {
         this.player = player;
         this.width = width;
         this.height = height;
-        this.heldItemRenderer = new HeldItemRenderer(textureManager, textureManager.itemsTexture);
+        this.heldItemRenderer = new HeldItemRenderer(textureManager, textureManager.itemsTexture, pipelineRegistry);
 
         // Create game resources
-        this.font = new Font("/default.gif", textureManager);
+        this.font = new Font("/default.gif", textureManager, pipelineRegistry);
 
-        // Create fog color buffers
-        this.fogColor0 = BufferUtils.createFloatBuffer(4);
-        this.fogColor1 = BufferUtils.createFloatBuffer(4);
-
-        // Initialize fog colors
-        this.fogColor0.clear();
-        this.fogColor0.put(0.5F).put(0.8F).put(1.0F).put(1.0F);
-        this.fogColor0.flip();
-
-        this.fogColor1.clear();
-        this.fogColor1.put(0.0F).put(0.0F).put(0.0F).put(1.0F);
-        this.fogColor1.flip();
-
-        this.worldShader = pipelineRegistry.getWorldShader();
-        this.particleShader = pipelineRegistry.getParticleShader();
-        this.entityShader = pipelineRegistry.getEntityShader();
-        this.hudShader = pipelineRegistry.getHudShader();
-        this.hudNoTexShader = pipelineRegistry.getHudNoTexShader();
-        this.outlineShader = pipelineRegistry.getOutlineShader();
         this.worldPipeline = pipelineRegistry.getWorldPipeline();
         this.worldOverlayPipeline = pipelineRegistry.getWorldOverlayPipeline();
         this.particlePipeline = pipelineRegistry.getParticlePipeline();
@@ -154,6 +124,10 @@ public class GameRenderer implements Disposable {
         this.hudItemPipeline = pipelineRegistry.getHudItemPipeline();
         this.hudNoTexPipeline = pipelineRegistry.getHudNoTexPipeline();
         this.outlinePipeline = pipelineRegistry.getOutlinePipeline();
+        this.worldFogTerrainDescriptorSet = pipelineRegistry.getDescriptorSet(textureManager.terrainTexture, PipelineRegistry.FogPreset.WORLD);
+        this.noFogTerrainDescriptorSet = pipelineRegistry.getDescriptorSet(textureManager.terrainTexture, PipelineRegistry.FogPreset.NONE);
+        this.noFogNoTextureDescriptorSet = pipelineRegistry.getDescriptorSet(null, PipelineRegistry.FogPreset.NONE);
+        this.noFogGuiDescriptorSet = pipelineRegistry.getDescriptorSet(textureManager.guiTexture, PipelineRegistry.FogPreset.NONE);
 
         this.versionStringLabel = new TextLabel(font, 0xFFFFFF, true);
         this.fpsStringLabel = new TextLabel(font, 0xFFFFFF, true);
@@ -353,15 +327,15 @@ public class GameRenderer implements Disposable {
                 Item item = itemStack.getItem();
                 if (item instanceof BlockItem) {
                     commandBuffer.setPipeline(worldPipeline);
-                    commandBuffer.bindTexture(0, textureManager.terrainTexture);
+                    MutableDescriptorSet descriptorSet = worldFogTerrainDescriptorSet;
                     applyBlockFirstPersonTransform(handSign);
-                    MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
+                    MatrixUniforms.writeStandardMatrices(descriptorSet, matrixStack);
+                    commandBuffer.bindDescriptorSet(descriptorSet);
                     BlockItem blockItem = (BlockItem) item;
                     Block block = blockItem.getBlock();
                     BlockRenderer.getBlockMesh(block).draw(commandBuffer);
                 } else if (item instanceof HeldItem) {
                     commandBuffer.setPipeline(hudItemPipeline);
-                    commandBuffer.bindTexture(0, textureManager.itemsTexture);
                     applyHeldItemFirstPersonTransform(handSign);
                     heldItemRenderer.renderHeldItemModel(commandBuffer, matrixStack, (HeldItem) item, 1);
                 }
@@ -428,9 +402,10 @@ public class GameRenderer implements Disposable {
 
         // render level
         {
+            MutableDescriptorSet descriptorSet = worldFogTerrainDescriptorSet;
             commandBuffer.setPipeline(worldPipeline);
-            MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
-            setupFog(worldShader);
+            MatrixUniforms.writeStandardMatrices(descriptorSet, matrixStack);
+            commandBuffer.bindDescriptorSet(descriptorSet);
 
             this.levelRenderer.render(commandBuffer, matrixStack, partialTicks);
         }
@@ -438,24 +413,17 @@ public class GameRenderer implements Disposable {
         // render entities
         {
             commandBuffer.setPipeline(entityPipeline);
-            // cannot set matrices "globally" because entities transform themselves
-            setupFog(entityShader);
-
             this.levelRenderer.renderEntities(commandBuffer, matrixStack, partialTicks);
         }
 
         // render particles
         {
+            MutableDescriptorSet descriptorSet = worldFogTerrainDescriptorSet;
             commandBuffer.setPipeline(particlePipeline);
-            MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
+            MatrixUniforms.writeStandardMatrices(descriptorSet, matrixStack);
+            commandBuffer.bindDescriptorSet(descriptorSet);
             this.particleEngine.render(this.commandBuffer, this.player, partialTicks);
         }
-    }
-
-    private void setupFog(FogShader fogShader) {
-        fogShader.setFogUniforms(0.001F, 0.0F, 10.0F,
-                0.5F, 0.8F, 1.0F, 1.0F);
-
     }
 
     private IndexedMesh blockOutlineMesh;
@@ -548,7 +516,9 @@ public class GameRenderer implements Disposable {
         matrixStack.translate(hitResult.x, hitResult.y, hitResult.z);
 
         commandBuffer.setPipeline(outlinePipeline);
-        MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
+        MutableDescriptorSet descriptorSet = noFogNoTextureDescriptorSet;
+        MatrixUniforms.writeStandardMatrices(descriptorSet, matrixStack);
+        commandBuffer.bindDescriptorSet(descriptorSet);
 
         blockOutlineMesh.draw(commandBuffer, GraphicsEnums.PrimitiveType.TRIANGLES);
 
@@ -577,9 +547,9 @@ public class GameRenderer implements Disposable {
         matrixStack.translate(player.breakingBlockX, player.breakingBlockY, player.breakingBlockZ);
 
         commandBuffer.setPipeline(worldOverlayPipeline);
-        setupFog(worldShader);
-        commandBuffer.bindTexture(0, textureManager.terrainTexture);
-        MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
+        MutableDescriptorSet descriptorSet = worldFogTerrainDescriptorSet;
+        MatrixUniforms.writeStandardMatrices(descriptorSet, matrixStack);
+        commandBuffer.bindDescriptorSet(descriptorSet);
 
         breakingMesh.draw(commandBuffer);
 
@@ -678,13 +648,16 @@ public class GameRenderer implements Disposable {
         drawHotbar(commandBuffer, scaledWidth, scaledHeight, player.hotbarSlotIndex);
 
         commandBuffer.setPipeline(hudNoTexPipeline);
-        MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
+        MutableDescriptorSet noTextureDescriptorSet = noFogNoTextureDescriptorSet;
+        MatrixUniforms.writeStandardMatrices(noTextureDescriptorSet, matrixStack);
+        commandBuffer.bindDescriptorSet(noTextureDescriptorSet);
 
         // Draw cross-hair
         drawCrosshair(commandBuffer, scaledWidth, scaledHeight);
 
         commandBuffer.setPipeline(hudPipeline);
-        MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
+        MatrixUniforms.writeStandardMatrices(noTextureDescriptorSet, matrixStack);
+        commandBuffer.bindDescriptorSet(noTextureDescriptorSet);
 
         // Draw current screen if it exists
         if (currentScreen != null) {
@@ -750,15 +723,13 @@ public class GameRenderer implements Disposable {
         }
 
         // draw hot-bar background
-        commandBuffer.bindTexture(0, textureManager.guiTexture);
-        MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
+        MutableDescriptorSet guiDescriptorSet = noFogGuiDescriptorSet;
+        MatrixUniforms.writeStandardMatrices(guiDescriptorSet, matrixStack);
+        commandBuffer.bindDescriptorSet(guiDescriptorSet);
         hotbarMesh.draw(commandBuffer);
 
         // draw hot-bar blocks
-        commandBuffer.bindTexture(0, textureManager.terrainTexture);
         commandBuffer.setPipeline(worldPipeline);
-        worldShader.setFogUniforms(0.0F, 0.0F, 10.0F,
-                0.5F, 0.8F, 1.0F, 1.0F);
 
         int hotBarSize = player.getInventory().getHotbarSize();
         for (int i = 0; i < hotBarSize; i++) {
@@ -775,13 +746,12 @@ public class GameRenderer implements Disposable {
                 // render item pickup animation
                 renderPickupAnimation(itemStack);
 
-                BlockRenderer.renderBlockPreview(commandBuffer, matrixStack, blockItem.getBlock(), BLOCK_ITEM_SIZE);
+                BlockRenderer.renderBlockPreview(commandBuffer, matrixStack, blockItem.getBlock(), BLOCK_ITEM_SIZE, noFogTerrainDescriptorSet);
                 matrixStack.popMatrix();
             }
         }
 
         // draw hot-bar items
-        commandBuffer.bindTexture(0, textureManager.itemsTexture);
         commandBuffer.setPipeline(hudPipeline);
 
         for (int i = 0; i < hotBarSize; i++) {
@@ -808,8 +778,9 @@ public class GameRenderer implements Disposable {
         {
             matrixStack.pushMatrix();
             matrixStack.translate(centerX - HOTBAR_WIDTH / 2f + hotbarSlotIndex * HOTBAR_SLOT_WIDTH - 1, screenHeight - HOTBAR_SELECTOR_SIZE + 1, 0.0F);
-            MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
-            commandBuffer.bindTexture(0, textureManager.guiTexture);
+            MutableDescriptorSet selectorDescriptorSet = noFogGuiDescriptorSet;
+            MatrixUniforms.writeStandardMatrices(selectorDescriptorSet, matrixStack);
+            commandBuffer.bindDescriptorSet(selectorDescriptorSet);
             hotbarSelectorMesh.draw(commandBuffer);
             matrixStack.popMatrix();
         }
@@ -896,7 +867,9 @@ public class GameRenderer implements Disposable {
         float centerX = screenWidth / 2f;
         float centerY = screenHeight / 2f;
 
-        MatrixUniformBinder.bindStandardMatrices(commandBuffer, pipelineRegistry.getSharedUniforms(), matrixStack);
+        MutableDescriptorSet descriptorSet = noFogNoTextureDescriptorSet;
+        MatrixUniforms.writeStandardMatrices(descriptorSet, matrixStack);
+        commandBuffer.bindDescriptorSet(descriptorSet);
 
         if (crosshairMesh == null) {
             Tesselator t = Tesselator.instance;
