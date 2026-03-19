@@ -9,7 +9,7 @@ import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 import com.mojang.minecraft.renderer.graphics.MatrixUniforms;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Texture;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 
 import java.nio.ByteBuffer;
@@ -25,7 +25,7 @@ public class HeldItemRenderer {
     private final ByteBuffer itemsTextureData;
     private final int itemsTextureWidth;
     private final int itemsTextureHeight;
-    private final MutableDescriptorSet noFogItemsDescriptorSet;
+    private final ImmutableDescriptorSet noFogItemsDescriptorSet;
 
     public HeldItemRenderer(TextureManager textureManager, Texture itemsTexture, PipelineRegistry pipelineRegistry) {
         ByteBuffer hostData = textureManager.getRetainedTextureData(itemsTexture)
@@ -67,7 +67,7 @@ public class HeldItemRenderer {
 
     public void renderHeldItemModel(CommandBuffer commandBuffer, MatrixStack matrixStack, HeldItem heldItem, int itemSize) {
         IndexedMesh itemQuadMesh = getItemQuadMesh(heldItem);
-        MutableDescriptorSet descriptorSet = noFogItemsDescriptorSet;
+        ImmutableDescriptorSet descriptorSet = noFogItemsDescriptorSet;
 
         matrixStack.scale(itemSize, itemSize, itemSize);
         MatrixUniforms.writeStandardMatrices(descriptorSet, matrixStack);

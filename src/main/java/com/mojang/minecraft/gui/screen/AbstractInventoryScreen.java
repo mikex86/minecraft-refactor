@@ -13,7 +13,7 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 import com.mojang.minecraft.renderer.graphics.MatrixUniforms;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
 
 import java.util.ArrayList;
@@ -135,7 +135,7 @@ public class AbstractInventoryScreen extends GuiScreen {
         }
     }
 
-    protected void drawInventoryScreenBackground(CommandBuffer commandBuffer, MatrixStack matrixStack, float centerX, float centerY, MutableDescriptorSet descriptorSet) {
+    protected void drawInventoryScreenBackground(CommandBuffer commandBuffer, MatrixStack matrixStack, float centerX, float centerY, ImmutableDescriptorSet descriptorSet) {
         if (inventoryQuadMesh == null) {
             Tesselator t = Tesselator.instance;
             t.init();

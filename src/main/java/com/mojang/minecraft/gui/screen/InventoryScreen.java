@@ -7,7 +7,7 @@ import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 
@@ -17,8 +17,8 @@ public class InventoryScreen extends AbstractInventoryScreen {
 
     private final Pipeline entityPipeline;
     private final Pipeline hudPipeline;
-    private final MutableDescriptorSet noFogCharDescriptorSet;
-    private final MutableDescriptorSet noFogInventoryDescriptorSet;
+    private final ImmutableDescriptorSet noFogCharDescriptorSet;
+    private final ImmutableDescriptorSet noFogInventoryDescriptorSet;
     private final InventoryItemRenderer inventoryItemRenderer;
 
     public InventoryScreen(TextureManager textureManager,
@@ -75,7 +75,7 @@ public class InventoryScreen extends AbstractInventoryScreen {
 
     private void drawPlayerModel(CommandBuffer commandBuffer, MatrixStack matrixStack, float partialTicks, float centerX, float centerY) {
         commandBuffer.setPipeline(entityPipeline);
-        MutableDescriptorSet descriptorSet = noFogCharDescriptorSet;
+        ImmutableDescriptorSet descriptorSet = noFogCharDescriptorSet;
         commandBuffer.bindDescriptorSet(noFogCharDescriptorSet);
         matrixStack.pushMatrix();
 

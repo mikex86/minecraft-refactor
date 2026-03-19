@@ -9,7 +9,7 @@ import com.mojang.minecraft.renderer.Frustum;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.graphics.annotation.RenderThreadOnly;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 
@@ -27,7 +27,7 @@ public class LevelRenderer implements Disposable {
 
     // Graphics resources
     private final TextureManager textureManager;
-    private final MutableDescriptorSet worldFogTerrainDescriptorSet;
+    private final ImmutableDescriptorSet worldFogTerrainDescriptorSet;
 
     // Number of chunk sections draw calls issued this frame
     public static int numSectionDrawCalls = 0;

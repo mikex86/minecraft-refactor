@@ -5,7 +5,7 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 
 import java.util.ArrayList;
@@ -22,7 +22,7 @@ public class ParticleEngine {
     protected Level level;
     private final List<Particle> particles = new ArrayList<>();
     private final TextureManager textureManager;
-    private final MutableDescriptorSet worldFogTerrainDescriptorSet;
+    private final ImmutableDescriptorSet worldFogTerrainDescriptorSet;
 
     /**
      * Creates a new particle engine for the specified level.

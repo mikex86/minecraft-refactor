@@ -3,7 +3,7 @@ package com.mojang.minecraft.renderer.shape;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.MatrixUniforms;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.model.ModelMesh;
 
 /**
@@ -179,7 +179,7 @@ public class Cube {
      *
      * @param graphics the graphics API to render with
      */
-    public void render(CommandBuffer commandBuffer, MatrixStack matrixStack, MutableDescriptorSet descriptorSet) {
+    public void render(CommandBuffer commandBuffer, MatrixStack matrixStack, ImmutableDescriptorSet descriptorSet) {
         // Build the mesh if needed
         if (this.dirty) {
             buildMesh();

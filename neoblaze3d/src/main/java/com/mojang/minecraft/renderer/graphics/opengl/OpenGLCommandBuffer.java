@@ -141,7 +141,7 @@ final class OpenGLCommandBuffer implements CommandBuffer {
         uniformBufferOffsetAlignment = Math.max(16, glGetInteger(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT));
         uniformRingGpuBufferId = glGenBuffers();
         glBindBuffer(GL_UNIFORM_BUFFER, uniformRingGpuBufferId);
-        glBufferData(GL_UNIFORM_BUFFER, (long) uniformRingGpuCapacity, GL_DYNAMIC_DRAW);
+        glBufferData(GL_UNIFORM_BUFFER, uniformRingGpuCapacity, GL_DYNAMIC_DRAW);
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
     }
 
@@ -588,7 +588,7 @@ final class OpenGLCommandBuffer implements CommandBuffer {
             return;
         }
         glBindBuffer(GL_UNIFORM_BUFFER, uniformRingGpuBufferId);
-        glBufferData(GL_UNIFORM_BUFFER, (long) newCapacity, GL_DYNAMIC_DRAW);
+        glBufferData(GL_UNIFORM_BUFFER, newCapacity, GL_DYNAMIC_DRAW);
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
         uniformRingGpuCapacity = newCapacity;
     }

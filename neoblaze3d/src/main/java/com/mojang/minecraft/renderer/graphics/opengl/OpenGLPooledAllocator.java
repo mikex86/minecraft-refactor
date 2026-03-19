@@ -436,7 +436,7 @@ final class OpenGLPooledAllocator implements BufferAllocator<OpenGLBufferAllocat
                 long size = region.getSize();
 
                 // Update region offset (internal state only)
-                ((MutableBufferRegion) region).setOffset(newOffset);
+                region.setOffset(newOffset);
 
                 // Upload data back to GPU at new location
                 ByteBuffer data = regionData.get(region);
@@ -470,7 +470,7 @@ final class OpenGLPooledAllocator implements BufferAllocator<OpenGLBufferAllocat
     }
 
     private static ByteBuffer allocateJemallocBuffer(int sizeInBytes, String context) {
-        ByteBuffer buffer = JEmalloc.je_malloc((long) sizeInBytes);
+        ByteBuffer buffer = JEmalloc.je_malloc(sizeInBytes);
         if (buffer == null) {
             throw new OutOfMemoryError("jemalloc failed to allocate " + sizeInBytes + " bytes for " + context);
         }

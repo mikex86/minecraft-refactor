@@ -16,7 +16,7 @@ import com.mojang.minecraft.renderer.graphics.PipelineLayout;
 import com.mojang.minecraft.renderer.graphics.RenderPassAttachments;
 import com.mojang.minecraft.renderer.graphics.ShaderProgram;
 import com.mojang.minecraft.renderer.graphics.Uniform;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
@@ -92,7 +92,7 @@ class HeadlessTriangleRenderTest {
         VertexBuffer vertexBuffer = null;
         PipelineLayout pipelineLayout = null;
         Pipeline pipeline = null;
-        MutableDescriptorSet descriptorSet = null;
+        ImmutableDescriptorSet descriptorSet = null;
         Uniform modelViewUniform = null;
         Uniform projectionUniform = null;
         CommandBuffer commandBuffer = graphics.beginFrame();
@@ -183,7 +183,7 @@ class HeadlessTriangleRenderTest {
         VertexBuffer vertexBuffer = null;
         PipelineLayout pipelineLayout = null;
         Pipeline pipeline = null;
-        MutableDescriptorSet descriptorSet = null;
+        ImmutableDescriptorSet descriptorSet = null;
         Uniform modelViewUniform = null;
         Uniform projectionUniform = null;
         CommandBuffer commandBuffer = graphics.beginFrame();
@@ -214,7 +214,7 @@ class HeadlessTriangleRenderTest {
             pipeline = createTestPipeline("test-triangle-matrix-pipeline", pipelineLayout, shaderProgram, format);
             modelViewUniform = graphics.createUniform(0, Uniform.ValueType.MAT4);
             projectionUniform = graphics.createUniform(4, Uniform.ValueType.MAT4);
-            descriptorSet = new MutableDescriptorSet(pipelineLayout, List.of(modelViewUniform, projectionUniform));
+            descriptorSet = new ImmutableDescriptorSet(pipelineLayout, List.of(modelViewUniform, projectionUniform));
             commandBuffer.setPipeline(pipeline);
 
             matrixStack.setMatrixMode(MatrixStack.MatrixMode.PROJECTION);
@@ -297,7 +297,7 @@ class HeadlessTriangleRenderTest {
         VertexBuffer vertexBuffer = null;
         PipelineLayout pipelineLayout = null;
         Pipeline pipeline = null;
-        MutableDescriptorSet descriptorSet = null;
+        ImmutableDescriptorSet descriptorSet = null;
         Uniform modelViewUniform = null;
         Uniform projectionUniform = null;
         CommandBuffer commandBuffer = graphics.beginFrame();
@@ -328,7 +328,7 @@ class HeadlessTriangleRenderTest {
             pipeline = createTestPipeline("test-triangle-stack-pipeline", pipelineLayout, shaderProgram, format);
             modelViewUniform = graphics.createUniform(0, Uniform.ValueType.MAT4);
             projectionUniform = graphics.createUniform(4, Uniform.ValueType.MAT4);
-            descriptorSet = new MutableDescriptorSet(pipelineLayout, List.of(modelViewUniform, projectionUniform));
+            descriptorSet = new ImmutableDescriptorSet(pipelineLayout, List.of(modelViewUniform, projectionUniform));
             commandBuffer.setPipeline(pipeline);
 
             matrixStack.setMatrixMode(MatrixStack.MatrixMode.PROJECTION);
@@ -443,7 +443,7 @@ class HeadlessTriangleRenderTest {
         buffer.putFloat(x).putFloat(y).putFloat(z);
     }
 
-    private static void bindMatrixUniforms(CommandBuffer commandBuffer, MatrixStack matrixStack, MutableDescriptorSet descriptorSet) {
+    private static void bindMatrixUniforms(CommandBuffer commandBuffer, MatrixStack matrixStack, ImmutableDescriptorSet descriptorSet) {
         Uniform modelViewUniform = descriptorSet.getRequired(PipelineLayout.BindingSemantic.MODEL_VIEW_MATRIX);
         Uniform projectionUniform = descriptorSet.getRequired(PipelineLayout.BindingSemantic.PROJECTION_MATRIX);
         modelViewUniform.setFloatBuffer(matrixStack.getModelViewBuffer());

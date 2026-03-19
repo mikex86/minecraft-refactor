@@ -12,7 +12,7 @@ import com.mojang.minecraft.profiler.GpuMemoryTracker;
 import com.mojang.minecraft.profiler.NativeMemoryTracker;
 import com.mojang.minecraft.renderer.GameRenderer;
 import com.mojang.minecraft.renderer.TextureManager;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 import com.mojang.minecraft.util.logging.LoggingUtils;
@@ -31,7 +31,7 @@ public class Minecraft implements Runnable {
     private final GameEngine engine;
     private final PipelineRegistry pipelineRegistry;
     private Pipeline worldPipeline;
-    private MutableDescriptorSet worldFogTerrainDescriptorSet;
+    private ImmutableDescriptorSet worldFogTerrainDescriptorSet;
     private GameInputHandler gameInputHandler;
     private GameRenderer renderer;
     private ScreenManager screenManager;

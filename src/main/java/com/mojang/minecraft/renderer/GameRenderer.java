@@ -26,7 +26,7 @@ import com.mojang.minecraft.renderer.graphics.MatrixUniforms;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.graphics.DataType;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.graphics.RenderPassAttachments;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
@@ -83,10 +83,10 @@ public class GameRenderer implements Disposable {
     private final Pipeline hudItemPipeline;
     private final Pipeline hudNoTexPipeline;
     private final Pipeline outlinePipeline;
-    private final MutableDescriptorSet worldFogTerrainDescriptorSet;
-    private final MutableDescriptorSet noFogTerrainDescriptorSet;
-    private final MutableDescriptorSet noFogNoTextureDescriptorSet;
-    private final MutableDescriptorSet noFogGuiDescriptorSet;
+    private final ImmutableDescriptorSet worldFogTerrainDescriptorSet;
+    private final ImmutableDescriptorSet noFogTerrainDescriptorSet;
+    private final ImmutableDescriptorSet noFogNoTextureDescriptorSet;
+    private final ImmutableDescriptorSet noFogGuiDescriptorSet;
     private final Level level;
 
     // Font renderer
@@ -366,7 +366,7 @@ public class GameRenderer implements Disposable {
                 Item item = itemStack.getItem();
                 if (item instanceof BlockItem) {
                     commandBuffer.setPipeline(worldPipeline);
-                    MutableDescriptorSet descriptorSet = worldFogTerrainDescriptorSet;
+                    ImmutableDescriptorSet descriptorSet = worldFogTerrainDescriptorSet;
                     applyBlockFirstPersonTransform(handSign);
                     MatrixUniforms.writeStandardMatrices(descriptorSet, matrixStack);
                     commandBuffer.bindDescriptorSet(descriptorSet);
@@ -441,7 +441,7 @@ public class GameRenderer implements Disposable {
 
         // render level
         {
-            MutableDescriptorSet descriptorSet = worldFogTerrainDescriptorSet;
+            ImmutableDescriptorSet descriptorSet = worldFogTerrainDescriptorSet;
             commandBuffer.setPipeline(worldPipeline);
             MatrixUniforms.writeStandardMatrices(descriptorSet, matrixStack);
             commandBuffer.bindDescriptorSet(descriptorSet);
@@ -457,7 +457,7 @@ public class GameRenderer implements Disposable {
 
         // render particles
         {
-            MutableDescriptorSet descriptorSet = worldFogTerrainDescriptorSet;
+            ImmutableDescriptorSet descriptorSet = worldFogTerrainDescriptorSet;
             commandBuffer.setPipeline(particlePipeline);
             MatrixUniforms.writeStandardMatrices(descriptorSet, matrixStack);
             commandBuffer.bindDescriptorSet(descriptorSet);
@@ -555,7 +555,7 @@ public class GameRenderer implements Disposable {
         matrixStack.translate(hitResult.x, hitResult.y, hitResult.z);
 
         commandBuffer.setPipeline(outlinePipeline);
-        MutableDescriptorSet descriptorSet = noFogNoTextureDescriptorSet;
+        ImmutableDescriptorSet descriptorSet = noFogNoTextureDescriptorSet;
         MatrixUniforms.writeStandardMatrices(descriptorSet, matrixStack);
         commandBuffer.bindDescriptorSet(descriptorSet);
 
@@ -586,7 +586,7 @@ public class GameRenderer implements Disposable {
         matrixStack.translate(player.breakingBlockX, player.breakingBlockY, player.breakingBlockZ);
 
         commandBuffer.setPipeline(worldOverlayPipeline);
-        MutableDescriptorSet descriptorSet = worldFogTerrainDescriptorSet;
+        ImmutableDescriptorSet descriptorSet = worldFogTerrainDescriptorSet;
         MatrixUniforms.writeStandardMatrices(descriptorSet, matrixStack);
         commandBuffer.bindDescriptorSet(descriptorSet);
 
@@ -686,7 +686,7 @@ public class GameRenderer implements Disposable {
         drawHotbar(commandBuffer, scaledWidth, scaledHeight, player.hotbarSlotIndex);
 
         commandBuffer.setPipeline(hudNoTexPipeline);
-        MutableDescriptorSet noTextureDescriptorSet = noFogNoTextureDescriptorSet;
+        ImmutableDescriptorSet noTextureDescriptorSet = noFogNoTextureDescriptorSet;
         MatrixUniforms.writeStandardMatrices(noTextureDescriptorSet, matrixStack);
         commandBuffer.bindDescriptorSet(noTextureDescriptorSet);
 
@@ -761,7 +761,7 @@ public class GameRenderer implements Disposable {
         }
 
         // draw hot-bar background
-        MutableDescriptorSet guiDescriptorSet = noFogGuiDescriptorSet;
+        ImmutableDescriptorSet guiDescriptorSet = noFogGuiDescriptorSet;
         MatrixUniforms.writeStandardMatrices(guiDescriptorSet, matrixStack);
         commandBuffer.bindDescriptorSet(guiDescriptorSet);
         hotbarMesh.draw(commandBuffer);
@@ -816,7 +816,7 @@ public class GameRenderer implements Disposable {
         {
             matrixStack.pushMatrix();
             matrixStack.translate(centerX - HOTBAR_WIDTH / 2f + hotbarSlotIndex * HOTBAR_SLOT_WIDTH - 1, screenHeight - HOTBAR_SELECTOR_SIZE + 1, 0.0F);
-            MutableDescriptorSet selectorDescriptorSet = noFogGuiDescriptorSet;
+            ImmutableDescriptorSet selectorDescriptorSet = noFogGuiDescriptorSet;
             MatrixUniforms.writeStandardMatrices(selectorDescriptorSet, matrixStack);
             commandBuffer.bindDescriptorSet(selectorDescriptorSet);
             hotbarSelectorMesh.draw(commandBuffer);
@@ -905,7 +905,7 @@ public class GameRenderer implements Disposable {
         float centerX = screenWidth / 2f;
         float centerY = screenHeight / 2f;
 
-        MutableDescriptorSet descriptorSet = noFogNoTextureDescriptorSet;
+        ImmutableDescriptorSet descriptorSet = noFogNoTextureDescriptorSet;
         MatrixUniforms.writeStandardMatrices(descriptorSet, matrixStack);
         commandBuffer.bindDescriptorSet(descriptorSet);
 

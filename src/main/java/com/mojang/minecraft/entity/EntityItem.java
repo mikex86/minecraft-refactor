@@ -11,7 +11,7 @@ import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 import com.mojang.minecraft.renderer.graphics.MatrixUniforms;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.util.math.CollisionUtils;
 
 public class EntityItem extends Entity {
@@ -20,7 +20,7 @@ public class EntityItem extends Entity {
 
     private final float hoverPhase;
     private final Pipeline worldPipeline;
-    private final MutableDescriptorSet worldFogTerrainDescriptorSet;
+    private final ImmutableDescriptorSet worldFogTerrainDescriptorSet;
 
     private EntityPlayer target;
 
@@ -32,7 +32,7 @@ public class EntityItem extends Entity {
      * @param level     The level this entity belongs to
      * @param itemStack the item stack to render
      */
-    public EntityItem(Level level, ItemStack itemStack, Pipeline worldPipeline, MutableDescriptorSet worldFogTerrainDescriptorSet) {
+    public EntityItem(Level level, ItemStack itemStack, Pipeline worldPipeline, ImmutableDescriptorSet worldFogTerrainDescriptorSet) {
         super(level);
         this.itemStack = itemStack;
         this.hoverPhase = (float) (Math.random() * Math.PI * 2.0D);
@@ -96,7 +96,7 @@ public class EntityItem extends Entity {
 
     private void renderBlockItem(BlockItem blockItem, CommandBuffer commandBuffer, MatrixStack matrixStack, float partialTicks) {
         IndexedMesh mesh = BlockRenderer.getBlockMesh(blockItem.getBlock());
-        MutableDescriptorSet descriptorSet = worldFogTerrainDescriptorSet;
+        ImmutableDescriptorSet descriptorSet = worldFogTerrainDescriptorSet;
         commandBuffer.setPipeline(worldPipeline);
         commandBuffer.bindDescriptorSet(descriptorSet);
 

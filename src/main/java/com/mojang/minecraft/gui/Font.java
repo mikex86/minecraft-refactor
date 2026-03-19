@@ -4,7 +4,7 @@ import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.Texture;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 
 import javax.imageio.ImageIO;
@@ -35,7 +35,7 @@ public class Font {
     // Character width mapping for proportional font rendering
     private final int[] charWidths = new int[256];
     private final Texture fontTexture;
-    private final MutableDescriptorSet noFogFontDescriptorSet;
+    private final ImmutableDescriptorSet noFogFontDescriptorSet;
     private final Tesselator tessellator;
 
     /**
@@ -259,7 +259,7 @@ public class Font {
         return fontTexture;
     }
 
-    public MutableDescriptorSet getNoFogFontDescriptorSet() {
+    public ImmutableDescriptorSet getNoFogFontDescriptorSet() {
         return noFogFontDescriptorSet;
     }
 

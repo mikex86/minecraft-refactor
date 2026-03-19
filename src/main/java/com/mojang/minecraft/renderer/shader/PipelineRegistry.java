@@ -8,7 +8,7 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums.CompareFunc;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.CullMode;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.FillMode;
 import com.mojang.minecraft.renderer.graphics.DataType;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.graphics.PipelineLayout;
 import com.mojang.minecraft.renderer.graphics.ShaderProgram;
@@ -80,7 +80,7 @@ public class PipelineRegistry implements Disposable {
     private ShaderProgram outlineProgram;
 
     private PipelineLayout sharedPipelineLayout;
-    private Map<DescriptorKey, MutableDescriptorSet> sharedDescriptorSetsByKey;
+    private Map<DescriptorKey, ImmutableDescriptorSet> sharedDescriptorSetsByKey;
 
     // Core pipelines
     private Pipeline worldPipeline;
@@ -213,9 +213,9 @@ public class PipelineRegistry implements Disposable {
         );
     }
 
-    public MutableDescriptorSet getDescriptorSet(Texture texture, FogPreset fogPreset) {
+    public ImmutableDescriptorSet getDescriptorSet(Texture texture, FogPreset fogPreset) {
         assertDescriptorSetsConfigured();
-        MutableDescriptorSet descriptorSet = sharedDescriptorSetsByKey.get(new DescriptorKey(texture, fogPreset));
+        ImmutableDescriptorSet descriptorSet = sharedDescriptorSetsByKey.get(new DescriptorKey(texture, fogPreset));
         if (descriptorSet == null) {
             throw new IllegalStateException("No shared descriptor set registered for fog preset " + fogPreset);
         }
@@ -317,7 +317,7 @@ public class PipelineRegistry implements Disposable {
         }
     }
 
-    private MutableDescriptorSet createSharedDescriptorSet(Texture texture, FogPreset fogPreset) {
+    private ImmutableDescriptorSet createSharedDescriptorSet(Texture texture, FogPreset fogPreset) {
         Uniform modelView = createUniform(MODEL_VIEW_BINDING, Uniform.ValueType.MAT4);
         Uniform projection = createUniform(PROJECTION_BINDING, Uniform.ValueType.MAT4);
         Uniform fogDensity = createUniform(FOG_DENSITY_BINDING, Uniform.ValueType.FLOAT1);
@@ -326,7 +326,11 @@ public class PipelineRegistry implements Disposable {
         Uniform fogColor = createUniform(FOG_COLOR_BINDING, Uniform.ValueType.FLOAT4);
         applyFogPreset(fogPreset, fogDensity, fogStart, fogEnd, fogColor);
 
-        MutableDescriptorSet descriptorSet = new MutableDescriptorSet(
+        Map<Integer, Texture> texturesByBinding = new HashMap<>();
+        if (texture != null) {
+            texturesByBinding.put(DIFFUSE_TEXTURE_BINDING, texture);
+        }
+        return new ImmutableDescriptorSet(
                 sharedPipelineLayout,
                 Arrays.asList(
                         modelView,
@@ -335,16 +339,13 @@ public class PipelineRegistry implements Disposable {
                         fogStart,
                         fogEnd,
                         fogColor
-                )
+                ),
+                texturesByBinding
         );
-        if (texture != null) {
-            descriptorSet.setTexture(PipelineLayout.BindingSemantic.DIFFUSE_TEXTURE, texture);
-        }
-        return descriptorSet;
     }
 
     private void registerSharedDescriptorSet(Texture texture, FogPreset fogPreset) {
-        MutableDescriptorSet descriptorSet = createSharedDescriptorSet(texture, fogPreset);
+        ImmutableDescriptorSet descriptorSet = createSharedDescriptorSet(texture, fogPreset);
         sharedDescriptorSetsByKey.put(new DescriptorKey(texture, fogPreset), descriptorSet);
     }
 
@@ -356,7 +357,7 @@ public class PipelineRegistry implements Disposable {
 
     private void disposeSharedDescriptorSets() {
         if (sharedDescriptorSetsByKey != null) {
-            for (MutableDescriptorSet descriptorSet : sharedDescriptorSetsByKey.values()) {
+            for (ImmutableDescriptorSet descriptorSet : sharedDescriptorSetsByKey.values()) {
                 disposeDescriptorSet(descriptorSet);
             }
             sharedDescriptorSetsByKey.clear();
@@ -364,7 +365,7 @@ public class PipelineRegistry implements Disposable {
         }
     }
 
-    private static void disposeDescriptorSet(MutableDescriptorSet descriptorSet) {
+    private static void disposeDescriptorSet(ImmutableDescriptorSet descriptorSet) {
         if (descriptorSet != null) {
             descriptorSet.dispose();
         }

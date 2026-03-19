@@ -9,7 +9,7 @@ import com.mojang.minecraft.level.chunk.Chunk;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.model.Model;
 import com.mojang.minecraft.renderer.model.ModelRegistry;
@@ -81,9 +81,9 @@ public class EntityPlayer extends EntityLiving {
     public float prevViewYawBob = 0.0F;
 
     private final Inventory inventory;
-    private final MutableDescriptorSet worldFogCharDescriptorSet;
+    private final ImmutableDescriptorSet worldFogCharDescriptorSet;
     private final Pipeline worldPipeline;
-    private final MutableDescriptorSet worldFogTerrainDescriptorSet;
+    private final ImmutableDescriptorSet worldFogTerrainDescriptorSet;
 
     // Animation constants
     public static final float MODEL_SIZE = 0.058333334F;
@@ -116,9 +116,9 @@ public class EntityPlayer extends EntityLiving {
     public EntityPlayer(Level level,
                         CraftingManager craftingManager,
                         boolean isThePlayer,
-                        MutableDescriptorSet worldFogCharDescriptorSet,
+                        ImmutableDescriptorSet worldFogCharDescriptorSet,
                         Pipeline worldPipeline,
-                        MutableDescriptorSet worldFogTerrainDescriptorSet) {
+                        ImmutableDescriptorSet worldFogTerrainDescriptorSet) {
         super(level);
         this.heightOffset = 1.62F; // Eye height offset
         this.prevHeightOffset = this.heightOffset;

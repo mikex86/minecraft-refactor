@@ -6,14 +6,14 @@ import com.mojang.minecraft.item.inventory.Inventory;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 
 public class CraftingScreen extends AbstractInventoryScreen {
 
     private float mouseX, mouseY;
-    private final MutableDescriptorSet noFogCraftingDescriptorSet;
+    private final ImmutableDescriptorSet noFogCraftingDescriptorSet;
     private final InventoryItemRenderer inventoryItemRenderer;
 
     public CraftingScreen(TextureManager textureManager,

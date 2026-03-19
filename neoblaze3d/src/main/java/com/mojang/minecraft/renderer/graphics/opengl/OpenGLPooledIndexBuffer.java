@@ -76,7 +76,7 @@ public class OpenGLPooledIndexBuffer implements IndexBuffer {
                 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
             }
         } else {
-            ByteBuffer byteBuffer = JEmalloc.je_malloc((long) sizeInBytes);
+            ByteBuffer byteBuffer = JEmalloc.je_malloc(sizeInBytes);
             if (byteBuffer == null) {
                 throw new OutOfMemoryError("jemalloc failed to allocate " + sizeInBytes + " bytes");
             }
@@ -114,7 +114,7 @@ public class OpenGLPooledIndexBuffer implements IndexBuffer {
                 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
             }
         } else {
-            ByteBuffer byteBuffer = JEmalloc.je_malloc((long) sizeInBytes);
+            ByteBuffer byteBuffer = JEmalloc.je_malloc(sizeInBytes);
             if (byteBuffer == null) {
                 throw new OutOfMemoryError("jemalloc failed to allocate " + sizeInBytes + " bytes");
             }

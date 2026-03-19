@@ -14,7 +14,7 @@ import com.mojang.minecraft.renderer.block.BlockRenderer;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 
@@ -27,8 +27,8 @@ public class InventoryItemRenderer {
     private final Pipeline worldPipeline;
     private final Pipeline hudPipeline;
     private final Pipeline hudNoCullPipeline;
-    private final MutableDescriptorSet noFogTerrainDescriptorSet;
-    private final MutableDescriptorSet noFogItemsDescriptorSet;
+    private final ImmutableDescriptorSet noFogTerrainDescriptorSet;
+    private final ImmutableDescriptorSet noFogItemsDescriptorSet;
 
     public InventoryItemRenderer(TextureManager textureManager, PipelineRegistry pipelineRegistry) {
         this.worldPipeline = pipelineRegistry.getWorldPipeline();
@@ -44,7 +44,7 @@ public class InventoryItemRenderer {
         commandBuffer.setPipeline(worldPipeline);
 
         // set terrain texture
-        MutableDescriptorSet descriptorSet = noFogTerrainDescriptorSet;
+        ImmutableDescriptorSet descriptorSet = noFogTerrainDescriptorSet;
         commandBuffer.bindDescriptorSet(descriptorSet);
 
         for (InventoryScreen.Slot slot : inventoryScreen.slots) {
@@ -109,7 +109,7 @@ public class InventoryItemRenderer {
                 Item item = selectedItem.getItem();
                 if (item instanceof BlockItem) {
                     commandBuffer.setPipeline(worldPipeline);
-                    MutableDescriptorSet descriptorSet = noFogTerrainDescriptorSet;
+                    ImmutableDescriptorSet descriptorSet = noFogTerrainDescriptorSet;
                     commandBuffer.bindDescriptorSet(descriptorSet);
                     BlockItem blockItem = (BlockItem) item;
                     matrixStack.pushMatrix();
@@ -118,7 +118,7 @@ public class InventoryItemRenderer {
                     matrixStack.popMatrix();
                 } else if (item instanceof HeldItem) {
                     commandBuffer.setPipeline(hudNoCullPipeline);
-                    MutableDescriptorSet descriptorSet = noFogItemsDescriptorSet;
+                    ImmutableDescriptorSet descriptorSet = noFogItemsDescriptorSet;
                     commandBuffer.bindDescriptorSet(descriptorSet);
                     HeldItem heldItem = (HeldItem) item;
                     matrixStack.pushMatrix();

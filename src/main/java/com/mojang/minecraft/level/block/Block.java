@@ -12,7 +12,7 @@ import com.mojang.minecraft.particle.Particle;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.Tesselator;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 
 import java.util.Collections;
@@ -557,7 +557,7 @@ public class Block {
                         int z,
                         ParticleEngine particleEngine,
                         Pipeline worldPipeline,
-                        MutableDescriptorSet worldFogTerrainDescriptorSet) {
+                        ImmutableDescriptorSet worldFogTerrainDescriptorSet) {
         int subdivisionsPerAxis = 4;
 
         for (int xx = 0; xx < subdivisionsPerAxis; ++xx) {

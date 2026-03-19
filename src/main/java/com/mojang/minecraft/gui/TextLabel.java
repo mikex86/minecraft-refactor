@@ -6,13 +6,13 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 import com.mojang.minecraft.renderer.graphics.MatrixUniforms;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 
 public class TextLabel implements Disposable {
     private final Font font;
     private final int color;
     private final boolean shadow;
-    private final MutableDescriptorSet noFogFontDescriptorSet;
+    private final ImmutableDescriptorSet noFogFontDescriptorSet;
 
     private String text = "";
     private int width = -1;

@@ -9,7 +9,7 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 import com.mojang.minecraft.renderer.graphics.MatrixUniforms;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
-import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -21,7 +21,7 @@ public class BlockRenderer {
                                           MatrixStack matrixStack,
                                           Block block,
                                           float scale,
-                                          MutableDescriptorSet noFogTerrainDescriptorSet) {
+                                          ImmutableDescriptorSet noFogTerrainDescriptorSet) {
         matrixStack.scale(scale, scale, scale);
         matrixStack.rotateX(30.0F);
         matrixStack.rotateY(45.0F);
