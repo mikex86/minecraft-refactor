@@ -22,18 +22,18 @@ val lwjglNatives = when (System.getProperty("os.name")) {
     else -> "natives-windows"
 }
 dependencies {
+    implementation(project(":neoblaze3d"))
+
     // LWJGL 3 core dependencies
     implementation(platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
     implementation("org.lwjgl:lwjgl")
     implementation("org.lwjgl:lwjgl-glfw")
-    implementation("org.lwjgl:lwjgl-opengl")
     implementation("org.lwjgl:lwjgl-stb")
     implementation("org.lwjgl:lwjgl-jemalloc")
 
     // Runtime natives
     runtimeOnly("org.lwjgl:lwjgl::$lwjglNatives")
     runtimeOnly("org.lwjgl:lwjgl-glfw::$lwjglNatives")
-    runtimeOnly("org.lwjgl:lwjgl-opengl::$lwjglNatives")
     runtimeOnly("org.lwjgl:lwjgl-stb::$lwjglNatives")
     runtimeOnly("org.lwjgl:lwjgl-jemalloc::$lwjglNatives")
 
