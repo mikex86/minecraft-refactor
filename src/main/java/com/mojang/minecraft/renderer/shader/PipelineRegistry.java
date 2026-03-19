@@ -7,12 +7,14 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BlendFactor;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.CompareFunc;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.CullMode;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.FillMode;
+import com.mojang.minecraft.renderer.graphics.DataType;
 import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.graphics.PipelineLayout;
 import com.mojang.minecraft.renderer.graphics.ShaderProgram;
 import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.Uniform;
+import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -43,6 +45,31 @@ public class PipelineRegistry implements Disposable {
     private static final float NO_FOG_G = 0.8F;
     private static final float NO_FOG_B = 1.0F;
     private static final float NO_FOG_A = 1.0F;
+
+    private static final VertexBuffer.VertexFormat WORLD_VERTEX_FORMAT = new VertexBuffer.VertexFormat(
+            DataType.SHORT, DataType.FLOAT, DataType.UNSIGNED_BYTE, DataType.HALF_FLOAT, DataType.FLOAT,
+            true, false, true, true, false
+    );
+    
+    private static final VertexBuffer.VertexFormat COLOR_TEX_VERTEX_FORMAT = new VertexBuffer.VertexFormat(
+            DataType.FLOAT, DataType.FLOAT, DataType.UNSIGNED_BYTE, DataType.FLOAT, DataType.FLOAT,
+            true, true, false, true, false
+    );
+    
+    private static final VertexBuffer.VertexFormat COLOR_VERTEX_FORMAT = new VertexBuffer.VertexFormat(
+            DataType.FLOAT, DataType.FLOAT, DataType.UNSIGNED_BYTE, DataType.FLOAT, DataType.FLOAT,
+            true, true, false, false, false
+    );
+    
+    private static final VertexBuffer.VertexFormat POSITION_ONLY_VERTEX_FORMAT = new VertexBuffer.VertexFormat(
+            DataType.FLOAT, DataType.FLOAT, DataType.UNSIGNED_BYTE, DataType.FLOAT, DataType.FLOAT,
+            true, false, false, false, false
+    );
+    
+    private static final VertexBuffer.VertexFormat WORLD_OVERLAY_VERTEX_FORMAT = new VertexBuffer.VertexFormat(
+            DataType.FLOAT, DataType.FLOAT, DataType.UNSIGNED_BYTE, DataType.FLOAT, DataType.FLOAT,
+            true, false, true, true, false
+    );
 
     // Core shader programs
     private ShaderProgram worldProgram;
@@ -135,19 +162,19 @@ public class PipelineRegistry implements Disposable {
         Pipeline.RasterizerState cullBack = new Pipeline.RasterizerState(CullMode.BACK, FillMode.SOLID);
         Pipeline.RasterizerState cullNone = new Pipeline.RasterizerState(CullMode.NONE, FillMode.SOLID);
 
-        worldPipeline = createPipeline("world-pipeline", worldProgram, blendDisabled, depthReadWrite, cullBack);
-        worldNoCullPipeline = createPipeline("world-nocull-pipeline", worldProgram, blendDisabled, depthReadWrite, cullNone);
-        worldOverlayPipeline = createPipeline("world-overlay-pipeline", worldProgram, blendBreakOverlay, depthReadOnly, cullNone);
+        worldPipeline = createPipeline("world-pipeline", worldProgram, WORLD_VERTEX_FORMAT, blendDisabled, depthReadWrite, cullBack);
+        worldNoCullPipeline = createPipeline("world-nocull-pipeline", worldProgram, WORLD_VERTEX_FORMAT, blendDisabled, depthReadWrite, cullNone);
+        worldOverlayPipeline = createPipeline("world-overlay-pipeline", worldProgram, WORLD_OVERLAY_VERTEX_FORMAT, blendBreakOverlay, depthReadOnly, cullNone);
 
-        particlePipeline = createPipeline("particle-pipeline", particleProgram, blendAlpha, depthReadWrite, cullBack);
-        entityPipeline = createPipeline("entity-pipeline", entityProgram, blendDisabled, depthReadWrite, cullBack);
+        particlePipeline = createPipeline("particle-pipeline", particleProgram, COLOR_TEX_VERTEX_FORMAT, blendAlpha, depthReadWrite, cullBack);
+        entityPipeline = createPipeline("entity-pipeline", entityProgram, COLOR_TEX_VERTEX_FORMAT, blendDisabled, depthReadWrite, cullBack);
 
-        hudPipeline = createPipeline("hud-pipeline", hudProgram, blendAlpha, depthDisabled, cullBack);
-        hudNoCullPipeline = createPipeline("hud-nocull-pipeline", hudProgram, blendAlpha, depthDisabled, cullNone);
-        hudItemPipeline = createPipeline("hud-item-pipeline", hudProgram, blendDisabled, depthReadWrite, cullNone);
-        hudNoTexPipeline = createPipeline("hud-notex-pipeline", hudNoTexProgram, blendDisabled, depthDisabled, cullBack);
+        hudPipeline = createPipeline("hud-pipeline", hudProgram, COLOR_TEX_VERTEX_FORMAT, blendAlpha, depthDisabled, cullBack);
+        hudNoCullPipeline = createPipeline("hud-nocull-pipeline", hudProgram, COLOR_TEX_VERTEX_FORMAT, blendAlpha, depthDisabled, cullNone);
+        hudItemPipeline = createPipeline("hud-item-pipeline", hudProgram, COLOR_TEX_VERTEX_FORMAT, blendDisabled, depthReadWrite, cullNone);
+        hudNoTexPipeline = createPipeline("hud-notex-pipeline", hudNoTexProgram, COLOR_VERTEX_FORMAT, blendDisabled, depthDisabled, cullBack);
 
-        outlinePipeline = createPipeline("outline-pipeline", outlineProgram, blendAlpha, depthReadWrite, cullNone);
+        outlinePipeline = createPipeline("outline-pipeline", outlineProgram, POSITION_ONLY_VERTEX_FORMAT, blendAlpha, depthReadWrite, cullNone);
     }
 
     public void configureSharedDescriptorSets(TextureManager textureManager) {
@@ -177,11 +204,12 @@ public class PipelineRegistry implements Disposable {
 
     private Pipeline createPipeline(String name,
                                     ShaderProgram program,
+                                    VertexBuffer.VertexFormat vertexFormat,
                                     Pipeline.BlendState blendState,
                                     Pipeline.DepthState depthState,
                                     Pipeline.RasterizerState rasterizerState) {
         return GraphicsFactory.getGraphicsAPI().createPipeline(
-                new Pipeline.Descriptor(name, sharedPipelineLayout, program, blendState, depthState, rasterizerState)
+                new Pipeline.Descriptor(name, sharedPipelineLayout, program, vertexFormat, blendState, depthState, rasterizerState)
         );
     }
 

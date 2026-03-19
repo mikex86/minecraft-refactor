@@ -26,32 +26,11 @@ public interface VertexBuffer extends GraphicsResource {
     void updateData(ByteBuffer data, int offsetInBytes, int sizeInBytes);
 
     /**
-     * Gets the vertex format of this buffer.
-     *
-     * @return The vertex format
-     */
-    VertexFormat getFormat();
-
-    /**
-     * Sets the vertex format of this buffer.
-     *
-     * @param format The vertex format
-     */
-    void setFormat(VertexFormat format);
-
-    /**
      * Gets the size of this buffer in bytes.
      *
      * @return The size in bytes
      */
     long getSizeInBytes();
-
-    /**
-     * Gets the number of vertices in this buffer.
-     *
-     * @return The number of vertices
-     */
-    long getVertexCount();
 
     /**
      * A format descriptor for vertex data.

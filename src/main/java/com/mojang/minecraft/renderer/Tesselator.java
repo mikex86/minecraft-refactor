@@ -53,7 +53,6 @@ public final class Tesselator implements Disposable {
     private final GraphicsAPI graphics;
     private VertexBuffer vertexBuffer;
     private IndexBuffer indexBuffer;
-    private VertexBuffer.VertexFormat format;
 
     // Shared pooled allocators must outlive transient tesselator instances.
     private static BufferAllocator<? extends BufferAllocation> sharedPooledVertexAllocator = null;
@@ -159,24 +158,7 @@ public final class Tesselator implements Disposable {
         if (this.vertexCount > 0) {
             ensureGpuBuffersInitialized();
 
-            // Update format
-            format = new VertexBuffer.VertexFormat(
-                    this.positionDataType, // Position data type
-                    DataType.FLOAT, // Color data type
-                    DataType.UNSIGNED_BYTE, // Grayscale data type
-                    this.texCoordsDataType, // Texture coordinate data type
-                    DataType.FLOAT, // Normal data type
-
-                    true,      // Always has positions
-                    this.hasColor,        // May have colors
-                    this.hasGrayScale,    // May have grayscale
-                    this.hasTexture,      // May have textures
-                    false                 // No normals
-            );
-
             int elementCount = useIndexBuffer ? indexCount : vertexCount;
-
-            vertexBuffer.setFormat(format);
 
             // Upload data to GPU
             vertexBuffer.setData(getBuffer(), dataIndex);
@@ -254,8 +236,6 @@ public final class Tesselator implements Disposable {
                 indexBuffer = graphics.createIndexBuffer(bufferUsage);
             }
         }
-
-        vertexBuffer.setFormat(format);
 
         // Upload data
         vertexBuffer.setData(getBuffer(), vertexDataSizeInBytes);

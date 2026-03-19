@@ -1,11 +1,9 @@
 package com.mojang.minecraft.renderer.graphics.opengl;
 
 import com.mojang.minecraft.profiler.GpuMemoryTracker;
-import com.mojang.minecraft.renderer.graphics.DataType;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 
 import java.nio.ByteBuffer;
-import java.util.Objects;
 
 import static org.lwjgl.opengl.GL15.*;
 
@@ -17,10 +15,7 @@ public class OpenGLVertexBuffer implements VertexBuffer {
     // OpenGL VBO ID
     private int vboId;
 
-    // Buffer state
-    private VertexFormat format;
     private int sizeInBytes;
-    private int vertexCount;
     private final int usage;
 
     // State tracking
@@ -34,13 +29,10 @@ public class OpenGLVertexBuffer implements VertexBuffer {
     public OpenGLVertexBuffer(int usage) {
         this.vboId = glGenBuffers();
         this.usage = usage;
-        this.format = null;
     }
 
     @Override
     public void setData(ByteBuffer data, int sizeInBytes) {
-        Objects.requireNonNull(format, "Vertex format must be set before uploading data");
-
         if (isDisposed()) {
             throw new IllegalStateException("Cannot use a disposed vertex buffer");
         }
@@ -52,9 +44,6 @@ public class OpenGLVertexBuffer implements VertexBuffer {
         }
 
         this.sizeInBytes = sizeInBytes;
-
-        // Calculate vertex count based on format stride
-        this.vertexCount = sizeInBytes / format.getStrideInBytes();
 
         // Upload data to VBO
         glBindBuffer(GL_ARRAY_BUFFER, vboId);
@@ -68,8 +57,6 @@ public class OpenGLVertexBuffer implements VertexBuffer {
 
     @Override
     public void updateData(ByteBuffer data, int offsetInBytes, int sizeInBytes) {
-        Objects.requireNonNull(format, "Vertex format must be set before uploading data");
-
         if (isDisposed()) {
             throw new IllegalStateException("Cannot use a disposed vertex buffer");
         }
@@ -85,28 +72,8 @@ public class OpenGLVertexBuffer implements VertexBuffer {
     }
 
     @Override
-    public VertexFormat getFormat() {
-        return format;
-    }
-
-    @Override
-    public void setFormat(VertexFormat format) {
-        this.format = format;
-
-        // Recalculate vertex count if the buffer has data
-        if (sizeInBytes > 0) {
-            this.vertexCount = sizeInBytes / format.getStrideInBytes();
-        }
-    }
-
-    @Override
     public long getSizeInBytes() {
         return sizeInBytes;
-    }
-
-    @Override
-    public long getVertexCount() {
-        return vertexCount;
     }
 
     @Override

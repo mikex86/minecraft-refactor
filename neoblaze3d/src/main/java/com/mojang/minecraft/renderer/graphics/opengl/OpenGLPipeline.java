@@ -3,6 +3,7 @@ package com.mojang.minecraft.renderer.graphics.opengl;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.graphics.PipelineLayout;
 import com.mojang.minecraft.renderer.graphics.ShaderProgram;
+import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 
 /**
  * OpenGL implementation of Pipeline.
@@ -24,6 +25,9 @@ public final class OpenGLPipeline implements Pipeline {
         if (descriptor.getProgram() == null) {
             throw new IllegalArgumentException("program cannot be null");
         }
+        if (descriptor.getVertexFormat() == null) {
+            throw new IllegalArgumentException("vertex format cannot be null");
+        }
         if (descriptor.getBlendState() == null) {
             throw new IllegalArgumentException("blend state cannot be null");
         }
@@ -44,6 +48,11 @@ public final class OpenGLPipeline implements Pipeline {
     @Override
     public ShaderProgram getProgram() {
         return descriptor.getProgram();
+    }
+
+    @Override
+    public VertexBuffer.VertexFormat getVertexFormat() {
+        return descriptor.getVertexFormat();
     }
 
     @Override

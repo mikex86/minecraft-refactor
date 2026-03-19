@@ -86,8 +86,9 @@ final class OpenGLCommandBuffer implements CommandBuffer {
     @Override
     public void draw(PrimitiveType type, VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int start, int count) {
         Objects.requireNonNull(vertexBuffer, "Vertex buffer cannot be null");
+        Objects.requireNonNull(currentPipeline, "No pipeline set");
 
-        setupVertexAttributes(vertexBuffer);
+        setupVertexAttributes(vertexBuffer, currentPipeline.getVertexFormat());
 
         if (indexBuffer != null) {
             long indexOffset = start * 4L; // 4 bytes per int
@@ -215,13 +216,11 @@ final class OpenGLCommandBuffer implements CommandBuffer {
         glPolygonMode(GL_FRONT_AND_BACK, translateFillMode(state.getFillMode()));
     }
 
-    private void setupVertexAttributes(VertexBuffer vertexBuffer) {
+    private void setupVertexAttributes(VertexBuffer vertexBuffer, VertexBuffer.VertexFormat format) {
         if (!(vertexBuffer instanceof OpenGLVertexBuffer) && !(vertexBuffer instanceof OpenGLPooledVertexBuffer)) {
             throw new IllegalArgumentException("VertexBuffer must be an OpenGL buffer");
         }
-
-        VertexBuffer.VertexFormat format = vertexBuffer.getFormat();
-        Objects.requireNonNull(format, "Vertex buffer format must be set before drawing");
+        Objects.requireNonNull(format, "Current pipeline vertex format must be set before drawing");
 
         long bufferOffset = 0L;
         if (vertexBuffer instanceof OpenGLVertexBuffer) {

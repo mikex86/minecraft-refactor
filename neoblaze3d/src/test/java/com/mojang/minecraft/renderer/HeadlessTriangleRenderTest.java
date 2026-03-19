@@ -93,9 +93,6 @@ class HeadlessTriangleRenderTest {
             pipelineLayout = graphics.createPipelineLayout(
                     new PipelineLayout.Descriptor("test-triangle-layout", Collections.<PipelineLayout.Binding>emptyList())
             );
-            pipeline = createTestPipeline("test-triangle-pipeline", pipelineLayout, shaderProgram);
-            commandBuffer.setPipeline(pipeline);
-
             VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
                     DataType.FLOAT,
                     DataType.FLOAT,
@@ -108,9 +105,10 @@ class HeadlessTriangleRenderTest {
                     false,
                     false
             );
+            pipeline = createTestPipeline("test-triangle-pipeline", pipelineLayout, shaderProgram, format);
+            commandBuffer.setPipeline(pipeline);
 
             vertexBuffer = graphics.createVertexBuffer(BufferUsage.STATIC);
-            vertexBuffer.setFormat(format);
 
             try (MemoryStack stack = MemoryStack.stackPush()) {
                 ByteBuffer vertexData = stack.malloc(3 * 6 * Float.BYTES);
@@ -175,7 +173,19 @@ class HeadlessTriangleRenderTest {
             pipelineLayout = graphics.createPipelineLayout(
                     createMatrixPipelineLayoutDescriptor("test-triangle-matrix-layout")
             );
-            pipeline = createTestPipeline("test-triangle-matrix-pipeline", pipelineLayout, shaderProgram);
+            VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
+                    DataType.FLOAT,
+                    DataType.FLOAT,
+                    null,
+                    null,
+                    null,
+                    true,
+                    true,
+                    false,
+                    false,
+                    false
+            );
+            pipeline = createTestPipeline("test-triangle-matrix-pipeline", pipelineLayout, shaderProgram, format);
             modelViewUniform = graphics.createUniform(0, Uniform.ValueType.MAT4);
             projectionUniform = graphics.createUniform(4, Uniform.ValueType.MAT4);
             descriptorSet = new MutableDescriptorSet(pipelineLayout, List.of(modelViewUniform, projectionUniform));
@@ -189,21 +199,7 @@ class HeadlessTriangleRenderTest {
             matrixStack.rotateZ(rotateDegrees);
             bindMatrixUniforms(commandBuffer, matrixStack, descriptorSet);
 
-            VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
-                    DataType.FLOAT,
-                    DataType.FLOAT,
-                    null,
-                    null,
-                    null,
-                    true,
-                    true,
-                    false,
-                    false,
-                    false
-            );
-
             vertexBuffer = graphics.createVertexBuffer(BufferUsage.STATIC);
-            vertexBuffer.setFormat(format);
 
             try (MemoryStack stack = MemoryStack.stackPush()) {
                 ByteBuffer vertexData = stack.malloc(3 * 6 * Float.BYTES);
@@ -280,7 +276,19 @@ class HeadlessTriangleRenderTest {
             pipelineLayout = graphics.createPipelineLayout(
                     createMatrixPipelineLayoutDescriptor("test-triangle-stack-layout")
             );
-            pipeline = createTestPipeline("test-triangle-stack-pipeline", pipelineLayout, shaderProgram);
+            VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
+                    DataType.FLOAT,
+                    DataType.FLOAT,
+                    null,
+                    null,
+                    null,
+                    true,
+                    true,
+                    false,
+                    false,
+                    false
+            );
+            pipeline = createTestPipeline("test-triangle-stack-pipeline", pipelineLayout, shaderProgram, format);
             modelViewUniform = graphics.createUniform(0, Uniform.ValueType.MAT4);
             projectionUniform = graphics.createUniform(4, Uniform.ValueType.MAT4);
             descriptorSet = new MutableDescriptorSet(pipelineLayout, List.of(modelViewUniform, projectionUniform));
@@ -302,21 +310,7 @@ class HeadlessTriangleRenderTest {
 
             bindMatrixUniforms(commandBuffer, matrixStack, descriptorSet);
 
-            VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
-                    DataType.FLOAT,
-                    DataType.FLOAT,
-                    null,
-                    null,
-                    null,
-                    true,
-                    true,
-                    false,
-                    false,
-                    false
-            );
-
             vertexBuffer = graphics.createVertexBuffer(BufferUsage.STATIC);
-            vertexBuffer.setFormat(format);
 
             try (MemoryStack stack = MemoryStack.stackPush()) {
                 ByteBuffer vertexData = stack.malloc(3 * 6 * Float.BYTES);
@@ -411,11 +405,15 @@ class HeadlessTriangleRenderTest {
         commandBuffer.bindDescriptorSet(descriptorSet);
     }
 
-    private static Pipeline createTestPipeline(String debugName, PipelineLayout layout, ShaderProgram shaderProgram) {
+    private static Pipeline createTestPipeline(String debugName,
+                                               PipelineLayout layout,
+                                               ShaderProgram shaderProgram,
+                                               VertexBuffer.VertexFormat vertexFormat) {
         return graphics.createPipeline(new Pipeline.Descriptor(
                 debugName,
                 layout,
                 shaderProgram,
+                vertexFormat,
                 new Pipeline.BlendState(false, BlendFactor.ONE, BlendFactor.ZERO),
                 new Pipeline.DepthState(false, false, CompareFunc.ALWAYS),
                 new Pipeline.RasterizerState(CullMode.NONE, FillMode.SOLID)

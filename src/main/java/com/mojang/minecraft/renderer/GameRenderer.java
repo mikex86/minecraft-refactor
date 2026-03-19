@@ -25,6 +25,7 @@ import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 import com.mojang.minecraft.renderer.graphics.MatrixUniforms;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
+import com.mojang.minecraft.renderer.graphics.DataType;
 import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
@@ -572,7 +573,8 @@ public class GameRenderer implements Disposable {
             float v1 = v0 + 0.0624375F;
 
             Tesselator t = Tesselator.instance;
-            t.init();
+            // Overlay uses float position/UV so the small epsilon face offset is preserved.
+            t.init(DataType.FLOAT, DataType.FLOAT, true);
             t.grayScale(1.0F);
 
             float x0 = 0.0F;

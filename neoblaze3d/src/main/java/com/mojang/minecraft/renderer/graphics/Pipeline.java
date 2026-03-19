@@ -21,6 +21,11 @@ public interface Pipeline extends GraphicsResource {
     ShaderProgram getProgram();
 
     /**
+     * Gets the vertex input layout used by this pipeline.
+     */
+    VertexBuffer.VertexFormat getVertexFormat();
+
+    /**
      * Optional blend state.
      */
     BlendState getBlendState();
@@ -113,6 +118,7 @@ public interface Pipeline extends GraphicsResource {
         private final String debugName;
         private final PipelineLayout layout;
         private final ShaderProgram program;
+        private final VertexBuffer.VertexFormat vertexFormat;
         private final BlendState blendState;
         private final DepthState depthState;
         private final RasterizerState rasterizerState;
@@ -120,12 +126,14 @@ public interface Pipeline extends GraphicsResource {
         public Descriptor(String debugName,
                           PipelineLayout layout,
                           ShaderProgram program,
+                          VertexBuffer.VertexFormat vertexFormat,
                           BlendState blendState,
                           DepthState depthState,
                           RasterizerState rasterizerState) {
             this.debugName = debugName == null ? "" : debugName;
             this.layout = layout;
             this.program = program;
+            this.vertexFormat = vertexFormat;
             this.blendState = blendState;
             this.depthState = depthState;
             this.rasterizerState = rasterizerState;
@@ -141,6 +149,10 @@ public interface Pipeline extends GraphicsResource {
 
         public ShaderProgram getProgram() {
             return program;
+        }
+
+        public VertexBuffer.VertexFormat getVertexFormat() {
+            return vertexFormat;
         }
 
         public BlendState getBlendState() {

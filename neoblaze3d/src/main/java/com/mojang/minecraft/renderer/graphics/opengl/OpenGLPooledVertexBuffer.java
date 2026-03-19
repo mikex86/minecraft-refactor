@@ -1,6 +1,5 @@
 package com.mojang.minecraft.renderer.graphics.opengl;
 
-import com.mojang.minecraft.renderer.graphics.DataType;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 
 import java.nio.ByteBuffer;
@@ -15,10 +14,6 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
     // Buffer region from the pool
     private final OpenGLBufferAllocation region;
 
-    // Buffer state
-    private VertexFormat format;
-    private long vertexCount;
-
     // State tracking
     private boolean disposed = false;
 
@@ -29,9 +24,6 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
      */
     public OpenGLPooledVertexBuffer(OpenGLBufferAllocation region) {
         this.region = region;
-        this.format = new VertexFormat(
-                DataType.BYTE, null, null, null, null,
-                true, false, false, false, false);
     }
 
     @Override
@@ -43,9 +35,6 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
         if (sizeInBytes > region.getSizeInBytes()) {
             throw new IllegalArgumentException("Data size exceeds buffer region size");
         }
-
-        // Calculate vertex count based on format stride
-        this.vertexCount = sizeInBytes / format.getStrideInBytes();
 
         // Upload data to the buffer region
         glBindBuffer(GL_ARRAY_BUFFER, region.getBufferId());
@@ -70,28 +59,8 @@ public class OpenGLPooledVertexBuffer implements VertexBuffer {
     }
 
     @Override
-    public VertexFormat getFormat() {
-        return format;
-    }
-
-    @Override
-    public void setFormat(VertexFormat format) {
-        this.format = format;
-
-        // Recalculate vertex count if the buffer has data
-        if (region.getSizeInBytes() > 0) {
-            this.vertexCount = region.getSizeInBytes() / format.getStrideInBytes();
-        }
-    }
-
-    @Override
     public long getSizeInBytes() {
         return region.getSizeInBytes();
-    }
-
-    @Override
-    public long getVertexCount() {
-        return vertexCount;
     }
 
     @Override
