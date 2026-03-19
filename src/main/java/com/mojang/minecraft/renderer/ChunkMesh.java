@@ -3,6 +3,7 @@ package com.mojang.minecraft.renderer;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
+import com.mojang.minecraft.renderer.graphics.annotation.RenderThreadOnly;
 
 /**
  * Handles VBO-based rendering for a chunk mesh.
@@ -25,6 +26,7 @@ public class ChunkMesh implements Disposable {
     /**
      * Uploads the mesh with the latest vertex data to the GPU.
      */
+    @RenderThreadOnly
     public void upload(Tesselator tesselator) {
         // Clean up existing mesh if needed
         if (mesh != null) {

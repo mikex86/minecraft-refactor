@@ -3,8 +3,12 @@
 layout (location = 0) in vec3 position;
 layout (location = 1) in vec3 color;
 
-layout (location = 0) uniform mat4 modelViewMatrix;
-layout (location = 4) uniform mat4 projectionMatrix;
+layout(std140, binding = 0) uniform ModelViewUniform {
+    mat4 modelViewMatrix;
+};
+layout(std140, binding = 4) uniform ProjectionUniform {
+    mat4 projectionMatrix;
+};
 
 layout (location = 0) out vec3 vColor;
 

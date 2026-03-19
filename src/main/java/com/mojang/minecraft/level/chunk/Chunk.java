@@ -13,6 +13,7 @@ import com.mojang.minecraft.renderer.Frustum;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.graphics.DataType;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.annotation.RenderThreadOnly;
 import com.mojang.minecraft.util.math.MathUtils;
 import com.mojang.minecraft.util.nio.NativeByteArray;
 
@@ -400,6 +401,7 @@ public final class Chunk implements Disposable {
     }
 
 
+    @RenderThreadOnly
     public void uploadPendingMeshes() {
         this.rebuildMutex.lock();
         try {
@@ -614,6 +616,7 @@ public final class Chunk implements Disposable {
             this.dirty = false;
         }
 
+        @RenderThreadOnly
         public void uploadPendingSection() {
             if (this.currentTesselator == null) {
                 return;

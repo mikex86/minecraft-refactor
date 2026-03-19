@@ -6,6 +6,7 @@ import com.mojang.minecraft.renderer.graphics.allocator.BufferAllocation;
 import com.mojang.minecraft.renderer.graphics.allocator.BufferAllocator;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BufferUsage;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.PrimitiveType;
+import com.mojang.minecraft.renderer.graphics.annotation.RenderThreadOnly;
 import com.mojang.minecraft.util.Fp16Util;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.jemalloc.JEmalloc;
@@ -206,6 +207,7 @@ public final class Tesselator implements Disposable {
      * @param pooled      Whether to use pooled buffers
      * @return The created indexed mesh
      */
+    @RenderThreadOnly
     public IndexedMesh createIndexedMesh(BufferUsage bufferUsage, boolean pooled) {
         ensureGpuBuffersInitialized();
 

@@ -10,6 +10,7 @@ import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.MutableDescriptorSet;
+import com.mojang.minecraft.renderer.graphics.annotation.RenderThreadOnly;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 
 import java.util.ArrayList;
@@ -145,6 +146,7 @@ public class LevelRenderer implements Disposable {
     /**
      * Update chunks that need to be rebuilt.
      */
+    @RenderThreadOnly
     public void updateDirtyChunks(CommandBuffer commandBuffer, MatrixStack matrixStack, EntityPlayer player) {
         Frustum frustum = Frustum.getFrustum(matrixStack);
         if (rebuildQueue == null) {

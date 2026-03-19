@@ -1,7 +1,8 @@
 #version 450 core
 
-// Fog uniforms
-layout (location = 11) uniform vec4 fogColor;
+layout(std140, binding = 11) uniform FogColorUniform {
+    vec4 fogColor;
+};
 
 // Texture sampler
 layout (binding = 1) uniform sampler2D textureSampler;

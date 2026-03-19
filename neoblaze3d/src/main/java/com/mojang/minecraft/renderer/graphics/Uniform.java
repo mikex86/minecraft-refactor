@@ -5,6 +5,7 @@ import java.nio.FloatBuffer;
 /**
  * Backend-neutral uniform object.
  * Uniform instances are expected to be created once and reused in hot paths.
+ * Implementations are buffer-backed resources suitable for descriptor-style binding.
  */
 public interface Uniform extends GraphicsResource {
 
@@ -22,6 +23,11 @@ public interface Uniform extends GraphicsResource {
 
     ValueType getType();
 
+    /**
+     * Returns the backing buffer size used by this uniform payload.
+     */
+    int getSizeInBytes();
+
     void setInt(int value);
 
     void setFloat(float value);
@@ -38,4 +44,3 @@ public interface Uniform extends GraphicsResource {
      */
     void setFloatBuffer(FloatBuffer values);
 }
-

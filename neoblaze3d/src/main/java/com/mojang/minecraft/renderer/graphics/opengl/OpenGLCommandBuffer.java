@@ -22,9 +22,11 @@ import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL13.glActiveTexture;
 import static org.lwjgl.opengl.GL15.glBindBuffer;
-import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL30.GL_HALF_FLOAT;
+import static org.lwjgl.opengl.GL30.glBindBufferBase;
 import static org.lwjgl.opengl.GL30.glVertexAttribIPointer;
+import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
+import static org.lwjgl.opengl.GL20.*;
 
 /**
  * OpenGL command buffer implementation.
@@ -32,12 +34,10 @@ import static org.lwjgl.opengl.GL30.glVertexAttribIPointer;
  */
 final class OpenGLCommandBuffer implements CommandBuffer {
 
-    private OpenGLShaderProgram currentShader;
     private Pipeline currentPipeline;
 
     void reset() {
         glUseProgram(0);
-        currentShader = null;
         currentPipeline = null;
     }
 
@@ -45,7 +45,6 @@ final class OpenGLCommandBuffer implements CommandBuffer {
     public void setPipeline(Pipeline pipeline) {
         if (pipeline == null) {
             glUseProgram(0);
-            currentShader = null;
             currentPipeline = null;
             return;
         }
@@ -108,7 +107,6 @@ final class OpenGLCommandBuffer implements CommandBuffer {
     public void bindDescriptorSet(DescriptorSet descriptorSet) {
         Objects.requireNonNull(descriptorSet, "descriptorSet cannot be null");
         Objects.requireNonNull(currentPipeline, "No pipeline set");
-        Objects.requireNonNull(currentShader, "No shader set");
 
         if (descriptorSet.isDisposed()) {
             throw new IllegalStateException("Cannot bind a disposed descriptor set");
@@ -125,7 +123,6 @@ final class OpenGLCommandBuffer implements CommandBuffer {
             if (isTextureResourceType(declaredBinding.getResourceType())) {
                 Texture texture = descriptorSet.getTexture(binding);
                 bindTextureUnit(binding, texture);
-                bindTextureSamplerUniform(binding);
                 continue;
             }
             if (isUniformResourceType(declaredBinding.getResourceType())) {
@@ -136,7 +133,7 @@ final class OpenGLCommandBuffer implements CommandBuffer {
                                     + "' is missing required uniform binding " + binding
                     );
                 }
-                uploadUniform(uniform);
+                bindUniformBuffer(binding, uniform);
             }
         }
     }
@@ -147,51 +144,20 @@ final class OpenGLCommandBuffer implements CommandBuffer {
         }
         OpenGLShaderProgram shader = (OpenGLShaderProgram) program;
         glUseProgram(shader.getProgramId());
-        currentShader = shader;
     }
 
-    private void uploadUniform(Uniform uniform) {
+    private static void bindUniformBuffer(int binding, Uniform uniform) {
         if (!(uniform instanceof OpenGLUniform)) {
             throw new IllegalArgumentException("Uniform must be an OpenGL uniform");
         }
         OpenGLUniform glUniform = (OpenGLUniform) uniform;
-        int binding = glUniform.getBinding();
-        if (!currentShader.hasUniformLocation(binding)) {
-            return;
+        if (glUniform.getBinding() != binding) {
+            throw new IllegalStateException(
+                    "Descriptor binding " + binding + " does not match uniform binding " + glUniform.getBinding()
+            );
         }
-        switch (glUniform.getType()) {
-            case INT1:
-                glUniform1i(binding, glUniform.intValue());
-                return;
-            case FLOAT1: {
-                float[] values = glUniform.floatValues();
-                glUniform1f(binding, values[0]);
-                return;
-            }
-            case FLOAT2: {
-                float[] values = glUniform.floatValues();
-                glUniform2f(binding, values[0], values[1]);
-                return;
-            }
-            case FLOAT3: {
-                float[] values = glUniform.floatValues();
-                glUniform3f(binding, values[0], values[1], values[2]);
-                return;
-            }
-            case FLOAT4: {
-                float[] values = glUniform.floatValues();
-                glUniform4f(binding, values[0], values[1], values[2], values[3]);
-                return;
-            }
-            case MAT3:
-                glUniformMatrix3fv(binding, false, glUniform.floatValues());
-                return;
-            case MAT4:
-                glUniformMatrix4fv(binding, false, glUniform.floatValues());
-                return;
-            default:
-                throw new IllegalArgumentException("Unsupported uniform type: " + glUniform.getType());
-        }
+        glUniform.uploadIfDirty();
+        glBindBufferBase(GL_UNIFORM_BUFFER, binding, glUniform.getBufferId());
     }
 
     private static void bindTextureUnit(int binding, Texture texture) {
@@ -207,12 +173,6 @@ final class OpenGLCommandBuffer implements CommandBuffer {
             throw new IllegalArgumentException("Texture must be an OpenGL texture");
         }
         ((OpenGLTexture) texture).bind();
-    }
-
-    private void bindTextureSamplerUniform(int binding) {
-        if (currentShader.hasUniformLocation(binding)) {
-            glUniform1i(binding, binding);
-        }
     }
 
     private static boolean isTextureResourceType(PipelineLayout.ResourceType resourceType) {

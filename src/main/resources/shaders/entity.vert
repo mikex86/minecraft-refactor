@@ -1,20 +1,23 @@
 #version 450 core
 
-// Matrix uniforms
-layout (location = 0) uniform mat4 modelViewMatrix;
-layout (location = 4) uniform mat4 projectionMatrix;
-
-// Fog uniforms
-layout (location = 8) uniform float fogDensity;
-layout (location = 9) uniform float fogStart;
-layout (location = 10) uniform float fogEnd;
-layout (location = 11) uniform vec4 fogColor;
-
-// Directional lighting uniforms
-layout (location = 12) uniform vec3 lightDirection;  // normalized light direction in eye space
-layout (location = 13) uniform vec3 lightColor;      // directional light color/intensity
-layout (location = 14) uniform vec3 ambientColor;    // ambient light color
-layout (location = 16) uniform mat3 normalMatrix;    // normal matrix: transpose(inverse(mat3(modelViewMatrix)))
+layout(std140, binding = 0) uniform ModelViewUniform {
+    mat4 modelViewMatrix;
+};
+layout(std140, binding = 4) uniform ProjectionUniform {
+    mat4 projectionMatrix;
+};
+layout(std140, binding = 8) uniform FogDensityUniform {
+    float fogDensity;
+};
+layout(std140, binding = 9) uniform FogStartUniform {
+    float fogStart;
+};
+layout(std140, binding = 10) uniform FogEndUniform {
+    float fogEnd;
+};
+layout(std140, binding = 11) uniform FogColorUniform {
+    vec4 fogColor;
+};
 
 // Vertex attributes (replace gl_Vertex, gl_Color, etc.)
 layout (location = 0) in vec3 position;
