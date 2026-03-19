@@ -97,6 +97,7 @@ class HeadlessTriangleRenderTest {
         Uniform projectionUniform = null;
         CommandBuffer commandBuffer = graphics.beginFrame();
         boolean renderPassActive = false;
+        boolean frameSubmitted = false;
         MatrixStack matrixStack = new MatrixStack();
 
         try {
@@ -137,6 +138,8 @@ class HeadlessTriangleRenderTest {
             commandBuffer.draw(PrimitiveType.TRIANGLES, vertexBuffer, null, 0, 3);
             commandBuffer.endRenderPass();
             renderPassActive = false;
+            graphics.endFrame();
+            frameSubmitted = true;
             glFinish();
 
             verifyGradientAtNdcPoint(SCREEN_WIDTH, SCREEN_HEIGHT, -0.3f, -0.3f, V0, V1, V2, COLOR_TOLERANCE);
@@ -145,6 +148,12 @@ class HeadlessTriangleRenderTest {
 
             maybeExportPng(SCREEN_WIDTH, SCREEN_HEIGHT, "triangle-frame.png");
         } finally {
+            if (!frameSubmitted) {
+                if (renderPassActive) {
+                    commandBuffer.endRenderPass();
+                }
+                graphics.endFrame();
+            }
             if (pipeline != null) {
                 pipeline.dispose();
             }
@@ -157,10 +166,6 @@ class HeadlessTriangleRenderTest {
             if (shaderProgram != null) {
                 shaderProgram.dispose();
             }
-            if (renderPassActive) {
-                commandBuffer.endRenderPass();
-            }
-            graphics.endFrame();
         }
     }
 
@@ -183,6 +188,7 @@ class HeadlessTriangleRenderTest {
         Uniform projectionUniform = null;
         CommandBuffer commandBuffer = graphics.beginFrame();
         boolean renderPassActive = false;
+        boolean frameSubmitted = false;
         MatrixStack matrixStack = new MatrixStack();
 
         try {
@@ -233,6 +239,8 @@ class HeadlessTriangleRenderTest {
             commandBuffer.draw(PrimitiveType.TRIANGLES, vertexBuffer, null, 0, 3);
             commandBuffer.endRenderPass();
             renderPassActive = false;
+            graphics.endFrame();
+            frameSubmitted = true;
             glFinish();
 
             verifyGradientAtNdcPoint(SCREEN_WIDTH, SCREEN_HEIGHT, 0.5f, 0.4f, transformedV0, transformedV1, transformedV2, COLOR_TOLERANCE);
@@ -242,6 +250,12 @@ class HeadlessTriangleRenderTest {
 
             maybeExportPng(SCREEN_WIDTH, SCREEN_HEIGHT, "triangle-frame-transformed.png");
         } finally {
+            if (!frameSubmitted) {
+                if (renderPassActive) {
+                    commandBuffer.endRenderPass();
+                }
+                graphics.endFrame();
+            }
             if (pipeline != null) {
                 pipeline.dispose();
             }
@@ -257,10 +271,6 @@ class HeadlessTriangleRenderTest {
             if (shaderProgram != null) {
                 shaderProgram.dispose();
             }
-            if (renderPassActive) {
-                commandBuffer.endRenderPass();
-            }
-            graphics.endFrame();
         }
     }
 
@@ -292,6 +302,7 @@ class HeadlessTriangleRenderTest {
         Uniform projectionUniform = null;
         CommandBuffer commandBuffer = graphics.beginFrame();
         boolean renderPassActive = false;
+        boolean frameSubmitted = false;
         MatrixStack matrixStack = new MatrixStack();
 
         try {
@@ -350,6 +361,8 @@ class HeadlessTriangleRenderTest {
             commandBuffer.draw(PrimitiveType.TRIANGLES, vertexBuffer, null, 0, 3);
             commandBuffer.endRenderPass();
             renderPassActive = false;
+            graphics.endFrame();
+            frameSubmitted = true;
             glFinish();
 
             verifyGradientAtNdcPoint(SCREEN_WIDTH, SCREEN_HEIGHT, -0.2f, -0.4f, expectedV0, expectedV1, expectedV2, COLOR_TOLERANCE);
@@ -363,6 +376,12 @@ class HeadlessTriangleRenderTest {
 
             maybeExportPng(SCREEN_WIDTH, SCREEN_HEIGHT, "triangle-frame-stack-pop.png");
         } finally {
+            if (!frameSubmitted) {
+                if (renderPassActive) {
+                    commandBuffer.endRenderPass();
+                }
+                graphics.endFrame();
+            }
             if (pipeline != null) {
                 pipeline.dispose();
             }
@@ -378,10 +397,6 @@ class HeadlessTriangleRenderTest {
             if (shaderProgram != null) {
                 shaderProgram.dispose();
             }
-            if (renderPassActive) {
-                commandBuffer.endRenderPass();
-            }
-            graphics.endFrame();
         }
     }
 

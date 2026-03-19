@@ -26,6 +26,10 @@ final class OpenGLUniform implements Uniform {
     private final ByteBuffer stagingBuffer;
     private boolean dirty;
     private boolean disposed;
+    private int mutationVersion;
+    private int cachedSnapshotFrameId;
+    private int cachedSnapshotVersion;
+    private int cachedSnapshotOffset;
 
     OpenGLUniform(int binding, ValueType type) {
         if (binding < 0) {
@@ -40,6 +44,10 @@ final class OpenGLUniform implements Uniform {
         this.stagingBuffer = MemoryUtil.memAlloc(sizeInBytes);
         this.bufferId = glGenBuffers();
         this.dirty = true;
+        this.mutationVersion = 1;
+        this.cachedSnapshotFrameId = -1;
+        this.cachedSnapshotVersion = -1;
+        this.cachedSnapshotOffset = -1;
 
         glBindBuffer(GL_UNIFORM_BUFFER, bufferId);
         glBufferData(GL_UNIFORM_BUFFER, sizeInBytes, GL_DYNAMIC_DRAW);
@@ -117,19 +125,20 @@ final class OpenGLUniform implements Uniform {
             throw new IllegalArgumentException("values cannot be null");
         }
 
-        FloatBuffer source = values.duplicate();
-        source.position(0);
+        int sourcePosition = values.position();
+        int sourceRemaining = values.remaining();
 
         if (type == ValueType.MAT3) {
-            if (source.remaining() < 9) {
-                throw new IllegalArgumentException("Expected at least 9 floats for MAT3, got " + source.remaining());
+            if (sourceRemaining < 9) {
+                throw new IllegalArgumentException("Expected at least 9 floats for MAT3, got " + sourceRemaining);
             }
             // std140 mat3 uses three vec4 columns (48 bytes)
             for (int column = 0; column < 3; column++) {
                 int base = column * 16;
-                stagingBuffer.putFloat(base, source.get());
-                stagingBuffer.putFloat(base + 4, source.get());
-                stagingBuffer.putFloat(base + 8, source.get());
+                int srcBase = sourcePosition + column * 3;
+                stagingBuffer.putFloat(base, values.get(srcBase));
+                stagingBuffer.putFloat(base + 4, values.get(srcBase + 1));
+                stagingBuffer.putFloat(base + 8, values.get(srcBase + 2));
                 stagingBuffer.putFloat(base + 12, 0.0f);
             }
             markDirty();
@@ -137,11 +146,11 @@ final class OpenGLUniform implements Uniform {
         }
 
         int expected = elementCount(type);
-        if (source.remaining() < expected) {
-            throw new IllegalArgumentException("Expected at least " + expected + " floats, got " + source.remaining());
+        if (sourceRemaining < expected) {
+            throw new IllegalArgumentException("Expected at least " + expected + " floats, got " + sourceRemaining);
         }
         for (int i = 0; i < expected; i++) {
-            stagingBuffer.putFloat(i * 4, source.get());
+            stagingBuffer.putFloat(i * 4, values.get(sourcePosition + i));
         }
         markDirty();
     }
@@ -170,18 +179,70 @@ final class OpenGLUniform implements Uniform {
         if (!dirty) {
             return;
         }
-        ByteBuffer uploadData = stagingBuffer.duplicate();
-        uploadData.position(0);
-        uploadData.limit(sizeInBytes);
-
         glBindBuffer(GL_UNIFORM_BUFFER, bufferId);
-        glBufferSubData(GL_UNIFORM_BUFFER, 0, uploadData);
+        stagingBuffer.position(0);
+        stagingBuffer.limit(sizeInBytes);
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, stagingBuffer);
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
         dirty = false;
     }
 
+    void copyCurrentValueTo(ByteBuffer dst, int dstOffset) {
+        ensureNotDisposed();
+        if (dst == null) {
+            throw new IllegalArgumentException("dst cannot be null");
+        }
+        if (dstOffset < 0 || dstOffset + sizeInBytes > dst.capacity()) {
+            throw new IllegalArgumentException("dstOffset out of bounds for uniform copy");
+        }
+        if (dst.isDirect()) {
+            long srcAddress = MemoryUtil.memAddress(stagingBuffer);
+            long dstAddress = MemoryUtil.memAddress(dst) + dstOffset;
+            MemoryUtil.memCopy(srcAddress, dstAddress, sizeInBytes);
+            return;
+        }
+        for (int i = 0; i < sizeInBytes; i++) {
+            dst.put(dstOffset + i, stagingBuffer.get(i));
+        }
+    }
+
+    void loadSnapshotFrom(ByteBuffer src, int srcOffset) {
+        ensureNotDisposed();
+        if (src == null) {
+            throw new IllegalArgumentException("src cannot be null");
+        }
+        if (srcOffset < 0 || srcOffset + sizeInBytes > src.capacity()) {
+            throw new IllegalArgumentException("srcOffset out of bounds for uniform snapshot load");
+        }
+        if (src.isDirect()) {
+            long srcAddress = MemoryUtil.memAddress(src) + srcOffset;
+            long dstAddress = MemoryUtil.memAddress(stagingBuffer);
+            MemoryUtil.memCopy(srcAddress, dstAddress, sizeInBytes);
+            markDirty();
+            return;
+        }
+        for (int i = 0; i < sizeInBytes; i++) {
+            stagingBuffer.put(i, src.get(srcOffset + i));
+        }
+        markDirty();
+    }
+
     private void markDirty() {
         dirty = true;
+        mutationVersion++;
+    }
+
+    int getSnapshotOffsetForFrame(int frameId) {
+        if (cachedSnapshotFrameId == frameId && cachedSnapshotVersion == mutationVersion) {
+            return cachedSnapshotOffset;
+        }
+        return -1;
+    }
+
+    void setSnapshotOffsetForFrame(int frameId, int offset) {
+        cachedSnapshotFrameId = frameId;
+        cachedSnapshotVersion = mutationVersion;
+        cachedSnapshotOffset = offset;
     }
 
     private void assertType(ValueType expected) {
@@ -230,4 +291,3 @@ final class OpenGLUniform implements Uniform {
         }
     }
 }
-

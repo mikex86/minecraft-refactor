@@ -52,7 +52,7 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
 
     @Override
     public void endFrame() {
-        // No-op for immediate mode OpenGL backend.
+        frameCommandBuffer.executeRecordedCommands();
     }
 
     @Override
@@ -65,10 +65,12 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
         glDepthFunc(GL_LEQUAL);
 
         frameCommandBuffer.reset();
+        frameCommandBuffer.initializeResources();
     }
 
     @Override
     public void shutdown() {
+        frameCommandBuffer.dispose();
         glDeleteVertexArrays(defaultVaoId);
     }
 

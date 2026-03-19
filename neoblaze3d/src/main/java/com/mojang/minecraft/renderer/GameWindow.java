@@ -358,14 +358,14 @@ public class GameWindow implements Disposable {
         if (isStandalone) {
             swapchain.dispose();
 
+            // Shutdown graphics while context is still alive.
+            graphics.shutdown();
+
             // Free the callbacks
             glfwFreeCallbacks(window);
 
             // Destroy the window
             glfwDestroyWindow(window);
-
-            // Shutdown the graphics API
-            graphics.shutdown();
 
             // Terminate GLFW
             glfwTerminate();

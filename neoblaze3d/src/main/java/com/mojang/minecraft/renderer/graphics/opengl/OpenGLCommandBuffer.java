@@ -16,58 +16,251 @@ import com.mojang.minecraft.renderer.graphics.ShaderProgram;
 import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.Uniform;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
+import org.lwjgl.system.MemoryUtil;
 
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL13.glActiveTexture;
+import static org.lwjgl.opengl.GL15.GL_DYNAMIC_DRAW;
 import static org.lwjgl.opengl.GL15.glBindBuffer;
+import static org.lwjgl.opengl.GL15.glBufferData;
+import static org.lwjgl.opengl.GL15.glBufferSubData;
+import static org.lwjgl.opengl.GL15.glDeleteBuffers;
+import static org.lwjgl.opengl.GL15.glGenBuffers;
+import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL30.GL_HALF_FLOAT;
 import static org.lwjgl.opengl.GL30.glBindBufferBase;
 import static org.lwjgl.opengl.GL30.glVertexAttribIPointer;
 import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
-import static org.lwjgl.opengl.GL20.*;
+import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT;
+import static org.lwjgl.opengl.GL30.glBindBufferRange;
+import static org.lwjgl.opengl.GL11.glGetInteger;
 
 /**
  * OpenGL command buffer implementation.
- * OpenGL executes commands immediately, but this object owns per-frame command state.
+ * <p>
+ * Commands are recorded during frame building and replayed at submit time
+ * ({@link #executeRecordedCommands()}) so backend behavior lines up better
+ * with deferred APIs like Vulkan.
  */
 final class OpenGLCommandBuffer implements CommandBuffer {
+    private static final int COMMAND_BEGIN_RENDER_PASS = 1;
+    private static final int COMMAND_END_RENDER_PASS = 2;
+    private static final int COMMAND_DRAW = 3;
+    private static final int COMMAND_SET_VIEWPORT = 4;
+
+    private static final int SNAPSHOT_KIND_TEXTURE = 1;
+    private static final int SNAPSHOT_KIND_UNIFORM = 2;
+
+    private static final int INITIAL_COMMAND_CAPACITY = 2048;
+    private static final int INITIAL_SNAPSHOT_CAPACITY = 8192;
+    private static final int INITIAL_UNIFORM_RING_CAPACITY = 1 << 20; // 1 MiB
 
     private Pipeline currentPipeline;
+    private DescriptorSet currentDescriptorSet;
     private boolean insideRenderPass;
 
+    private int commandCount;
+    private int[] commandKinds;
+    private RenderPassAttachments[] commandRenderPassAttachments;
+    private int[] commandX;
+    private int[] commandY;
+    private int[] commandWidth;
+    private int[] commandHeight;
+
+    private Pipeline[] drawPipelines;
+    private PrimitiveType[] drawPrimitiveTypes;
+    private VertexBuffer[] drawVertexBuffers;
+    private IndexBuffer[] drawIndexBuffers;
+    private int[] drawStarts;
+    private int[] drawCounts;
+    private int[] drawSnapshotStarts;
+    private int[] drawSnapshotCounts;
+
+    private int snapshotEntryCount;
+    private int[] snapshotKinds;
+    private int[] snapshotBindings;
+    private Texture[] snapshotTextures;
+    private int[] snapshotUniformSizes;
+    private int[] snapshotUniformOffsets;
+
+    private ByteBuffer uniformRingBuffer;
+    private int uniformRingWriteOffset;
+    private int uniformRingGpuBufferId;
+    private int uniformRingGpuCapacity;
+    private int uniformBufferOffsetAlignment;
+    private boolean uniformRingUploadDirty;
+    private int frameSequence;
+    private int[] boundUniformBufferIdsByBinding;
+    private int[] boundUniformOffsetsByBinding;
+    private int[] boundUniformSizesByBinding;
+
+    OpenGLCommandBuffer() {
+        this.commandKinds = new int[INITIAL_COMMAND_CAPACITY];
+        this.commandRenderPassAttachments = new RenderPassAttachments[INITIAL_COMMAND_CAPACITY];
+        this.commandX = new int[INITIAL_COMMAND_CAPACITY];
+        this.commandY = new int[INITIAL_COMMAND_CAPACITY];
+        this.commandWidth = new int[INITIAL_COMMAND_CAPACITY];
+        this.commandHeight = new int[INITIAL_COMMAND_CAPACITY];
+
+        this.drawPipelines = new Pipeline[INITIAL_COMMAND_CAPACITY];
+        this.drawPrimitiveTypes = new PrimitiveType[INITIAL_COMMAND_CAPACITY];
+        this.drawVertexBuffers = new VertexBuffer[INITIAL_COMMAND_CAPACITY];
+        this.drawIndexBuffers = new IndexBuffer[INITIAL_COMMAND_CAPACITY];
+        this.drawStarts = new int[INITIAL_COMMAND_CAPACITY];
+        this.drawCounts = new int[INITIAL_COMMAND_CAPACITY];
+        this.drawSnapshotStarts = new int[INITIAL_COMMAND_CAPACITY];
+        this.drawSnapshotCounts = new int[INITIAL_COMMAND_CAPACITY];
+
+        this.snapshotKinds = new int[INITIAL_SNAPSHOT_CAPACITY];
+        this.snapshotBindings = new int[INITIAL_SNAPSHOT_CAPACITY];
+        this.snapshotTextures = new Texture[INITIAL_SNAPSHOT_CAPACITY];
+        this.snapshotUniformSizes = new int[INITIAL_SNAPSHOT_CAPACITY];
+        this.snapshotUniformOffsets = new int[INITIAL_SNAPSHOT_CAPACITY];
+
+        this.uniformRingBuffer = MemoryUtil.memAlloc(INITIAL_UNIFORM_RING_CAPACITY);
+        this.uniformRingGpuBufferId = 0;
+        this.uniformRingGpuCapacity = INITIAL_UNIFORM_RING_CAPACITY;
+        this.uniformBufferOffsetAlignment = 16;
+        this.uniformRingUploadDirty = false;
+        this.frameSequence = 1;
+        this.boundUniformBufferIdsByBinding = new int[8];
+        this.boundUniformOffsetsByBinding = new int[8];
+        this.boundUniformSizesByBinding = new int[8];
+    }
+
+    void initializeResources() {
+        if (uniformRingGpuBufferId != 0) {
+            return;
+        }
+        uniformBufferOffsetAlignment = Math.max(16, glGetInteger(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT));
+        uniformRingGpuBufferId = glGenBuffers();
+        glBindBuffer(GL_UNIFORM_BUFFER, uniformRingGpuBufferId);
+        glBufferData(GL_UNIFORM_BUFFER, (long) uniformRingGpuCapacity, GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    }
+
     void reset() {
-        glUseProgram(0);
+        for (int i = 0; i < commandCount; i++) {
+            commandRenderPassAttachments[i] = null;
+            drawPipelines[i] = null;
+            drawPrimitiveTypes[i] = null;
+            drawVertexBuffers[i] = null;
+            drawIndexBuffers[i] = null;
+        }
+        for (int i = 0; i < snapshotEntryCount; i++) {
+            snapshotTextures[i] = null;
+            snapshotUniformSizes[i] = 0;
+        }
+
         currentPipeline = null;
+        currentDescriptorSet = null;
         insideRenderPass = false;
+
+        commandCount = 0;
+        snapshotEntryCount = 0;
+        uniformRingWriteOffset = 0;
+        uniformRingUploadDirty = false;
+        frameSequence++;
+        if (frameSequence <= 0) {
+            frameSequence = 1;
+        }
+    }
+
+    void dispose() {
+        if (uniformRingGpuBufferId != 0) {
+            glDeleteBuffers(uniformRingGpuBufferId);
+            uniformRingGpuBufferId = 0;
+        }
+        if (uniformRingBuffer != null) {
+            MemoryUtil.memFree(uniformRingBuffer);
+            uniformRingBuffer = null;
+        }
+    }
+
+    void executeRecordedCommands() {
+        ensureGpuResourcesInitialized();
+
+        Pipeline activePipeline = null;
+        boolean replayInsideRenderPass = false;
+        resetUniformBindingCache();
+
+        uploadUniformRingIfNeeded();
+
+        for (int i = 0; i < commandCount; i++) {
+            int commandKind = commandKinds[i];
+            switch (commandKind) {
+                case COMMAND_SET_VIEWPORT:
+                    executeSetViewport(commandX[i], commandY[i], commandWidth[i], commandHeight[i]);
+                    break;
+                case COMMAND_BEGIN_RENDER_PASS:
+                    executeBeginRenderPass(commandRenderPassAttachments[i], commandX[i], commandY[i], commandWidth[i], commandHeight[i]);
+                    replayInsideRenderPass = true;
+                    break;
+                case COMMAND_END_RENDER_PASS:
+                    if (!replayInsideRenderPass) {
+                        throw new IllegalStateException("Recorded endRenderPass without active render pass");
+                    }
+                    replayInsideRenderPass = false;
+                    break;
+                case COMMAND_DRAW:
+                    if (!replayInsideRenderPass) {
+                        throw new IllegalStateException("Recorded draw outside render pass");
+                    }
+                    Pipeline drawPipeline = drawPipelines[i];
+                    if (drawPipeline == null) {
+                        throw new IllegalStateException("Recorded draw has no pipeline");
+                    }
+                    if (drawPipeline != activePipeline) {
+                        applyPipelineState(drawPipeline);
+                        activePipeline = drawPipeline;
+                    }
+
+                    bindDescriptorSnapshot(drawPipeline.getLayout(), drawSnapshotStarts[i], drawSnapshotCounts[i]);
+                    executeDraw(
+                            drawPrimitiveTypes[i],
+                            drawVertexBuffers[i],
+                            drawIndexBuffers[i],
+                            drawStarts[i],
+                            drawCounts[i],
+                            drawPipeline.getVertexFormat()
+                    );
+                    break;
+                default:
+                    throw new IllegalStateException("Unknown recorded command kind: " + commandKind);
+            }
+        }
+
+        if (replayInsideRenderPass) {
+            throw new IllegalStateException("Recorded command stream ended with an open render pass");
+        }
+
+        glUseProgram(0);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
     @Override
     public void setPipeline(Pipeline pipeline) {
         if (pipeline == null) {
-            glUseProgram(0);
             currentPipeline = null;
             return;
         }
-        if (!(pipeline instanceof OpenGLPipeline)) {
-            throw new IllegalArgumentException("Not an OpenGL pipeline");
-        }
-        if (pipeline.isDisposed()) {
-            throw new IllegalStateException("Cannot bind a disposed pipeline");
-        }
-
-        bindProgram(pipeline.getProgram());
-        applyBlendState(pipeline.getBlendState());
-        applyDepthState(pipeline.getDepthState());
-        applyRasterizerState(pipeline.getRasterizerState());
+        validatePipelineForRecord(pipeline);
         currentPipeline = pipeline;
     }
 
     @Override
     public void setViewport(int x, int y, int width, int height) {
-        glViewport(x, y, width, height);
+        int commandIndex = appendCommand(COMMAND_SET_VIEWPORT);
+        commandX[commandIndex] = x;
+        commandY[commandIndex] = y;
+        commandWidth[commandIndex] = width;
+        commandHeight[commandIndex] = height;
     }
 
     @Override
@@ -77,7 +270,198 @@ final class OpenGLCommandBuffer implements CommandBuffer {
             throw new IllegalStateException("beginRenderPass called while another render pass is active");
         }
 
-        setViewport(x, y, width, height);
+        int commandIndex = appendCommand(COMMAND_BEGIN_RENDER_PASS);
+        commandRenderPassAttachments[commandIndex] = attachments;
+        commandX[commandIndex] = x;
+        commandY[commandIndex] = y;
+        commandWidth[commandIndex] = width;
+        commandHeight[commandIndex] = height;
+        insideRenderPass = true;
+    }
+
+    @Override
+    public void endRenderPass() {
+        if (!insideRenderPass) {
+            throw new IllegalStateException("endRenderPass called without an active render pass");
+        }
+        appendCommand(COMMAND_END_RENDER_PASS);
+        insideRenderPass = false;
+    }
+
+    @Override
+    public void draw(PrimitiveType type, VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int start, int count) {
+        Objects.requireNonNull(type, "Primitive type cannot be null");
+        Objects.requireNonNull(vertexBuffer, "Vertex buffer cannot be null");
+        Objects.requireNonNull(currentPipeline, "No pipeline set");
+        if (!insideRenderPass) {
+            throw new IllegalStateException("draw called without an active render pass");
+        }
+
+        int snapshotStart = snapshotEntryCount;
+        int snapshotCount = captureCurrentDescriptorSnapshotForDraw();
+
+        int commandIndex = appendCommand(COMMAND_DRAW);
+        drawPipelines[commandIndex] = currentPipeline;
+        drawPrimitiveTypes[commandIndex] = type;
+        drawVertexBuffers[commandIndex] = vertexBuffer;
+        drawIndexBuffers[commandIndex] = indexBuffer;
+        drawStarts[commandIndex] = start;
+        drawCounts[commandIndex] = count;
+        drawSnapshotStarts[commandIndex] = snapshotStart;
+        drawSnapshotCounts[commandIndex] = snapshotCount;
+    }
+
+    @Override
+    public void bindDescriptorSet(DescriptorSet descriptorSet) {
+        Objects.requireNonNull(descriptorSet, "descriptorSet cannot be null");
+        Objects.requireNonNull(currentPipeline, "No pipeline set");
+
+        if (descriptorSet.isDisposed()) {
+            throw new IllegalStateException("Cannot bind a disposed descriptor set");
+        }
+        if (descriptorSet.getLayout() != currentPipeline.getLayout()) {
+            throw new IllegalStateException(
+                    "Descriptor set layout '" + descriptorSet.getLayout().getDebugName()
+                            + "' does not match current pipeline layout '" + currentPipeline.getLayout().getDebugName() + "'"
+            );
+        }
+
+        currentDescriptorSet = descriptorSet;
+    }
+
+    private int captureCurrentDescriptorSnapshotForDraw() {
+        List<PipelineLayout.Binding> bindings = currentPipeline.getLayout().getBindings();
+        if (bindings.isEmpty()) {
+            return 0;
+        }
+
+        if (currentDescriptorSet == null) {
+            throw new IllegalStateException(
+                    "Draw for pipeline '" + currentPipeline.getDebugName() + "' requires descriptor bindings, but no descriptor set is bound"
+            );
+        }
+        if (currentDescriptorSet.getLayout() != currentPipeline.getLayout()) {
+            throw new IllegalStateException(
+                    "Current descriptor set layout does not match pipeline layout for pipeline '" + currentPipeline.getDebugName() + "'"
+            );
+        }
+
+        int snapshotStart = snapshotEntryCount;
+
+        //noinspection ForLoopReplaceableByForEach
+        for (int i = 0, n = bindings.size(); i < n; i++) {
+            PipelineLayout.Binding declaredBinding = bindings.get(i);
+            int binding = declaredBinding.getBinding();
+            PipelineLayout.ResourceType resourceType = declaredBinding.getResourceType();
+            if (isTextureResourceType(resourceType)) {
+                ensureSnapshotCapacity(1);
+                snapshotKinds[snapshotEntryCount] = SNAPSHOT_KIND_TEXTURE;
+                snapshotBindings[snapshotEntryCount] = binding;
+                snapshotTextures[snapshotEntryCount] = currentDescriptorSet.getTexture(binding);
+                snapshotUniformSizes[snapshotEntryCount] = 0;
+                snapshotUniformOffsets[snapshotEntryCount] = 0;
+                snapshotEntryCount++;
+                continue;
+            }
+            if (isUniformResourceType(resourceType)) {
+                Uniform uniform = currentDescriptorSet.getUniform(binding);
+                if (uniform == null) {
+                    throw new IllegalStateException(
+                            "Descriptor set '" + currentDescriptorSet.getLayout().getDebugName()
+                                    + "' is missing required uniform binding " + binding
+                    );
+                }
+                if (!(uniform instanceof OpenGLUniform)) {
+                    throw new IllegalArgumentException("Uniform must be an OpenGL uniform");
+                }
+
+                OpenGLUniform glUniform = (OpenGLUniform) uniform;
+                int dataOffset = appendUniformSnapshot(glUniform);
+
+                ensureSnapshotCapacity(1);
+                snapshotKinds[snapshotEntryCount] = SNAPSHOT_KIND_UNIFORM;
+                snapshotBindings[snapshotEntryCount] = binding;
+                snapshotTextures[snapshotEntryCount] = null;
+                snapshotUniformSizes[snapshotEntryCount] = glUniform.getSizeInBytes();
+                snapshotUniformOffsets[snapshotEntryCount] = dataOffset;
+                snapshotEntryCount++;
+            }
+        }
+
+        return snapshotEntryCount - snapshotStart;
+    }
+
+    private int appendUniformSnapshot(OpenGLUniform uniform) {
+        int reusedOffset = uniform.getSnapshotOffsetForFrame(frameSequence);
+        if (reusedOffset >= 0) {
+            return reusedOffset;
+        }
+
+        int sizeInBytes = uniform.getSizeInBytes();
+        int alignedOffset = align(uniformRingWriteOffset, uniformBufferOffsetAlignment);
+        ensureUniformRingCapacity(alignedOffset + sizeInBytes);
+        uniform.copyCurrentValueTo(uniformRingBuffer, alignedOffset);
+        uniformRingWriteOffset = alignedOffset + sizeInBytes;
+        uniformRingUploadDirty = true;
+        uniform.setSnapshotOffsetForFrame(frameSequence, alignedOffset);
+        return alignedOffset;
+    }
+
+    private void bindDescriptorSnapshot(PipelineLayout layout, int snapshotStart, int snapshotCount) {
+        if (layout.getBindings().isEmpty()) {
+            return;
+        }
+        for (int i = snapshotStart; i < snapshotStart + snapshotCount; i++) {
+            int kind = snapshotKinds[i];
+            int binding = snapshotBindings[i];
+
+            if (kind == SNAPSHOT_KIND_TEXTURE) {
+                bindTextureUnit(binding, snapshotTextures[i]);
+                continue;
+            }
+            if (kind == SNAPSHOT_KIND_UNIFORM) {
+                int sizeInBytes = snapshotUniformSizes[i];
+                if (sizeInBytes <= 0) {
+                    throw new IllegalStateException("Recorded uniform snapshot has invalid size for binding " + binding);
+                }
+                ensureUniformBindingCacheCapacity(binding + 1);
+                int offset = snapshotUniformOffsets[i];
+                if (boundUniformBufferIdsByBinding[binding] == uniformRingGpuBufferId
+                        && boundUniformOffsetsByBinding[binding] == offset
+                        && boundUniformSizesByBinding[binding] == sizeInBytes) {
+                    continue;
+                }
+
+                glBindBufferRange(GL_UNIFORM_BUFFER, binding, uniformRingGpuBufferId, offset, sizeInBytes);
+                boundUniformBufferIdsByBinding[binding] = uniformRingGpuBufferId;
+                boundUniformOffsetsByBinding[binding] = offset;
+                boundUniformSizesByBinding[binding] = sizeInBytes;
+                continue;
+            }
+            throw new IllegalStateException("Unknown snapshot entry kind: " + kind);
+        }
+    }
+
+    private void uploadUniformRingIfNeeded() {
+        if (!uniformRingUploadDirty || uniformRingWriteOffset <= 0) {
+            return;
+        }
+        ensureUniformRingGpuCapacity(uniformRingWriteOffset);
+
+        glBindBuffer(GL_UNIFORM_BUFFER, uniformRingGpuBufferId);
+        uniformRingBuffer.position(0);
+        uniformRingBuffer.limit(uniformRingWriteOffset);
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, uniformRingBuffer);
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+        uniformRingUploadDirty = false;
+    }
+
+    private void executeSetViewport(int x, int y, int width, int height) {
+        glViewport(x, y, width, height);
+    }
+
+    private void executeBeginRenderPass(RenderPassAttachments attachments, int x, int y, int width, int height) {
+        executeSetViewport(x, y, width, height);
 
         int clearBits = 0;
         RenderPassAttachments.ColorAttachment colorAttachment = attachments.getColorAttachment();
@@ -100,29 +484,18 @@ final class OpenGLCommandBuffer implements CommandBuffer {
         if (clearBits != 0) {
             glClear(clearBits);
         }
-        insideRenderPass = true;
     }
 
-    @Override
-    public void endRenderPass() {
-        if (!insideRenderPass) {
-            throw new IllegalStateException("endRenderPass called without an active render pass");
-        }
-        insideRenderPass = false;
-    }
-
-    @Override
-    public void draw(PrimitiveType type, VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int start, int count) {
-        Objects.requireNonNull(vertexBuffer, "Vertex buffer cannot be null");
-        Objects.requireNonNull(currentPipeline, "No pipeline set");
-        if (!insideRenderPass) {
-            throw new IllegalStateException("draw called without an active render pass");
-        }
-
-        setupVertexAttributes(vertexBuffer, currentPipeline.getVertexFormat());
+    private void executeDraw(PrimitiveType type,
+                             VertexBuffer vertexBuffer,
+                             IndexBuffer indexBuffer,
+                             int start,
+                             int count,
+                             VertexBuffer.VertexFormat vertexFormat) {
+        setupVertexAttributes(vertexBuffer, vertexFormat);
 
         if (indexBuffer != null) {
-            long indexOffset = start * 4L; // 4 bytes per int
+            long indexOffset = start * 4L;
             bindIndexBuffer(indexBuffer);
             if (indexBuffer instanceof OpenGLPooledIndexBuffer) {
                 indexOffset += ((OpenGLPooledIndexBuffer) indexBuffer).getOffset();
@@ -135,39 +508,120 @@ final class OpenGLCommandBuffer implements CommandBuffer {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
-    @Override
-    public void bindDescriptorSet(DescriptorSet descriptorSet) {
-        Objects.requireNonNull(descriptorSet, "descriptorSet cannot be null");
-        Objects.requireNonNull(currentPipeline, "No pipeline set");
+    private void applyPipelineState(Pipeline pipeline) {
+        validatePipelineForRecord(pipeline);
+        bindProgram(pipeline.getProgram());
+        applyBlendState(pipeline.getBlendState());
+        applyDepthState(pipeline.getDepthState());
+        applyRasterizerState(pipeline.getRasterizerState());
+    }
 
-        if (descriptorSet.isDisposed()) {
-            throw new IllegalStateException("Cannot bind a disposed descriptor set");
+    private void validatePipelineForRecord(Pipeline pipeline) {
+        if (!(pipeline instanceof OpenGLPipeline)) {
+            throw new IllegalArgumentException("Not an OpenGL pipeline");
         }
-        if (descriptorSet.getLayout() != currentPipeline.getLayout()) {
-            throw new IllegalStateException(
-                    "Descriptor set layout '" + descriptorSet.getLayout().getDebugName()
-                            + "' does not match current pipeline layout '" + currentPipeline.getLayout().getDebugName() + "'"
-            );
+        if (pipeline.isDisposed()) {
+            throw new IllegalStateException("Cannot bind a disposed pipeline");
         }
+    }
 
-        for (PipelineLayout.Binding declaredBinding : descriptorSet.getLayout().getBindings()) {
-            int binding = declaredBinding.getBinding();
-            if (isTextureResourceType(declaredBinding.getResourceType())) {
-                Texture texture = descriptorSet.getTexture(binding);
-                bindTextureUnit(binding, texture);
-                continue;
-            }
-            if (isUniformResourceType(declaredBinding.getResourceType())) {
-                Uniform uniform = descriptorSet.getUniform(binding);
-                if (uniform == null) {
-                    throw new IllegalStateException(
-                            "Descriptor set '" + descriptorSet.getLayout().getDebugName()
-                                    + "' is missing required uniform binding " + binding
-                    );
-                }
-                bindUniformBuffer(binding, uniform);
-            }
+    private int appendCommand(int commandKind) {
+        ensureCommandCapacity(1);
+        int commandIndex = commandCount++;
+        commandKinds[commandIndex] = commandKind;
+        return commandIndex;
+    }
+
+    private void ensureCommandCapacity(int additional) {
+        int required = commandCount + additional;
+        if (required <= commandKinds.length) {
+            return;
         }
+        int newCapacity = Math.max(commandKinds.length * 2, required);
+
+        commandKinds = Arrays.copyOf(commandKinds, newCapacity);
+        commandRenderPassAttachments = Arrays.copyOf(commandRenderPassAttachments, newCapacity);
+        commandX = Arrays.copyOf(commandX, newCapacity);
+        commandY = Arrays.copyOf(commandY, newCapacity);
+        commandWidth = Arrays.copyOf(commandWidth, newCapacity);
+        commandHeight = Arrays.copyOf(commandHeight, newCapacity);
+
+        drawPipelines = Arrays.copyOf(drawPipelines, newCapacity);
+        drawPrimitiveTypes = Arrays.copyOf(drawPrimitiveTypes, newCapacity);
+        drawVertexBuffers = Arrays.copyOf(drawVertexBuffers, newCapacity);
+        drawIndexBuffers = Arrays.copyOf(drawIndexBuffers, newCapacity);
+        drawStarts = Arrays.copyOf(drawStarts, newCapacity);
+        drawCounts = Arrays.copyOf(drawCounts, newCapacity);
+        drawSnapshotStarts = Arrays.copyOf(drawSnapshotStarts, newCapacity);
+        drawSnapshotCounts = Arrays.copyOf(drawSnapshotCounts, newCapacity);
+    }
+
+    private void ensureSnapshotCapacity(int additional) {
+        int required = snapshotEntryCount + additional;
+        if (required <= snapshotKinds.length) {
+            return;
+        }
+        int newCapacity = Math.max(snapshotKinds.length * 2, required);
+        snapshotKinds = Arrays.copyOf(snapshotKinds, newCapacity);
+        snapshotBindings = Arrays.copyOf(snapshotBindings, newCapacity);
+        snapshotTextures = Arrays.copyOf(snapshotTextures, newCapacity);
+        snapshotUniformSizes = Arrays.copyOf(snapshotUniformSizes, newCapacity);
+        snapshotUniformOffsets = Arrays.copyOf(snapshotUniformOffsets, newCapacity);
+    }
+
+    private void ensureUniformRingCapacity(int requiredBytes) {
+        if (requiredBytes <= uniformRingBuffer.capacity()) {
+            return;
+        }
+        int newCapacity = Math.max(uniformRingBuffer.capacity() * 2, requiredBytes);
+        uniformRingBuffer = MemoryUtil.memRealloc(uniformRingBuffer, newCapacity);
+        ensureUniformRingGpuCapacity(newCapacity);
+    }
+
+    private void ensureUniformRingGpuCapacity(int requiredBytes) {
+        if (requiredBytes <= uniformRingGpuCapacity) {
+            return;
+        }
+        int newCapacity = Math.max(uniformRingGpuCapacity * 2, requiredBytes);
+        if (uniformRingGpuBufferId == 0) {
+            uniformRingGpuCapacity = newCapacity;
+            return;
+        }
+        glBindBuffer(GL_UNIFORM_BUFFER, uniformRingGpuBufferId);
+        glBufferData(GL_UNIFORM_BUFFER, (long) newCapacity, GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+        uniformRingGpuCapacity = newCapacity;
+    }
+
+    private void resetUniformBindingCache() {
+        Arrays.fill(boundUniformBufferIdsByBinding, -1);
+        Arrays.fill(boundUniformOffsetsByBinding, -1);
+        Arrays.fill(boundUniformSizesByBinding, -1);
+    }
+
+    private void ensureUniformBindingCacheCapacity(int required) {
+        if (required <= boundUniformBufferIdsByBinding.length) {
+            return;
+        }
+        int oldCapacity = boundUniformBufferIdsByBinding.length;
+        int newCapacity = Math.max(oldCapacity * 2, required);
+        boundUniformBufferIdsByBinding = Arrays.copyOf(boundUniformBufferIdsByBinding, newCapacity);
+        boundUniformOffsetsByBinding = Arrays.copyOf(boundUniformOffsetsByBinding, newCapacity);
+        boundUniformSizesByBinding = Arrays.copyOf(boundUniformSizesByBinding, newCapacity);
+        Arrays.fill(boundUniformBufferIdsByBinding, oldCapacity, newCapacity, -1);
+        Arrays.fill(boundUniformOffsetsByBinding, oldCapacity, newCapacity, -1);
+        Arrays.fill(boundUniformSizesByBinding, oldCapacity, newCapacity, -1);
+    }
+
+    private void ensureGpuResourcesInitialized() {
+        if (uniformRingGpuBufferId == 0) {
+            initializeResources();
+        }
+    }
+
+    private static int align(int value, int alignment) {
+        int mask = alignment - 1;
+        return (value + mask) & ~mask;
     }
 
     private void bindProgram(ShaderProgram program) {
@@ -176,20 +630,6 @@ final class OpenGLCommandBuffer implements CommandBuffer {
         }
         OpenGLShaderProgram shader = (OpenGLShaderProgram) program;
         glUseProgram(shader.getProgramId());
-    }
-
-    private static void bindUniformBuffer(int binding, Uniform uniform) {
-        if (!(uniform instanceof OpenGLUniform)) {
-            throw new IllegalArgumentException("Uniform must be an OpenGL uniform");
-        }
-        OpenGLUniform glUniform = (OpenGLUniform) uniform;
-        if (glUniform.getBinding() != binding) {
-            throw new IllegalStateException(
-                    "Descriptor binding " + binding + " does not match uniform binding " + glUniform.getBinding()
-            );
-        }
-        glUniform.uploadIfDirty();
-        glBindBufferBase(GL_UNIFORM_BUFFER, binding, glUniform.getBufferId());
     }
 
     private static void bindTextureUnit(int binding, Texture texture) {
