@@ -21,6 +21,7 @@ import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
+import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
 import com.mojang.minecraft.renderer.shader.ShaderRegistry;
 import com.mojang.minecraft.renderer.shader.impl.*;
@@ -53,6 +54,15 @@ public class GameRenderer implements Disposable {
     private final HudShader hudShader;
     private final HudNoTexShader hudNoTexShader;
     private final OutlineShader outlineShader;
+    private final Pipeline worldPipeline;
+    private final Pipeline worldOverlayPipeline;
+    private final Pipeline particlePipeline;
+    private final Pipeline entityPipeline;
+    private final Pipeline hudPipeline;
+    private final Pipeline hudNoCullPipeline;
+    private final Pipeline hudItemPipeline;
+    private final Pipeline hudNoTexPipeline;
+    private final Pipeline outlinePipeline;
     private final Level level;
 
     // Font renderer
@@ -104,7 +114,7 @@ public class GameRenderer implements Disposable {
         this.player = player;
         this.width = width;
         this.height = height;
-        this.heldItemRenderer = new HeldItemRenderer(textureManager.itemsTexture);
+        this.heldItemRenderer = new HeldItemRenderer(textureManager, textureManager.itemsTexture);
 
         // Create game resources
         this.font = new Font("/default.gif", textureManager);
@@ -128,6 +138,15 @@ public class GameRenderer implements Disposable {
         this.hudShader = shaderRegistry.getHudShader();
         this.hudNoTexShader = shaderRegistry.getHudNoTexShader();
         this.outlineShader = shaderRegistry.getOutlineShader();
+        this.worldPipeline = shaderRegistry.getWorldPipeline();
+        this.worldOverlayPipeline = shaderRegistry.getWorldOverlayPipeline();
+        this.particlePipeline = shaderRegistry.getParticlePipeline();
+        this.entityPipeline = shaderRegistry.getEntityPipeline();
+        this.hudPipeline = shaderRegistry.getHudPipeline();
+        this.hudNoCullPipeline = shaderRegistry.getHudNoCullPipeline();
+        this.hudItemPipeline = shaderRegistry.getHudItemPipeline();
+        this.hudNoTexPipeline = shaderRegistry.getHudNoTexPipeline();
+        this.outlinePipeline = shaderRegistry.getOutlinePipeline();
 
         this.versionStringLabel = new TextLabel(font, 0xFFFFFF, true);
         this.fpsStringLabel = new TextLabel(font, 0xFFFFFF, true);
@@ -241,10 +260,6 @@ public class GameRenderer implements Disposable {
         // Set up the 3D camera
         this.setupCamera(partialTicks);
 
-        // Enable face culling for performance
-        graphics.setRasterizerState(GraphicsEnums.CullMode.BACK, GraphicsEnums.FillMode.SOLID);
-        graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS_EQUAL);
-
         // Update chunks that have changed
         this.levelRenderer.updateDirtyChunks(this.player);
 
@@ -281,7 +296,7 @@ public class GameRenderer implements Disposable {
         }
 
         // Calculate aspect ratio
-        graphics.setShader(worldShader);
+        graphics.setPipeline(worldPipeline);
 
         float handFov = 70.0F * player.getInterpolatedFOV(partialTicks);
         graphics.setPerspectiveProjection(handFov, aspectRatio, 0.05F, 4096.0F);
@@ -292,9 +307,6 @@ public class GameRenderer implements Disposable {
 
             // clear depth test because items shouldn't intersect with world geometry such as blocks
             graphics.clear(false, true, 0.0F, 0.0F, 0.0F, 0.0F);
-
-            // re-enable depth testing for the hand/item
-            graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS_EQUAL);
 
             // In vanilla the hurt tilt is applied before bobbing. The clone currently has no hurt tilt data.
             bobView(player, partialTicks);
@@ -327,6 +339,7 @@ public class GameRenderer implements Disposable {
             try {
                 Item item = itemStack.getItem();
                 if (item instanceof BlockItem) {
+                    graphics.setPipeline(worldPipeline);
                     graphics.setTexture(textureManager.terrainTexture);
                     applyBlockFirstPersonTransform(handSign);
                     graphics.updateShaderMatrices();
@@ -334,10 +347,8 @@ public class GameRenderer implements Disposable {
                     Block block = blockItem.getBlock();
                     BlockRenderer.getBlockMesh(block).draw(graphics);
                 } else if (item instanceof HeldItem) {
-                    // Disable face culling so both sides of thin item pixels render.
-                    graphics.setRasterizerState(GraphicsEnums.CullMode.NONE, GraphicsEnums.FillMode.SOLID);
+                    graphics.setPipeline(hudItemPipeline);
                     graphics.setTexture(textureManager.itemsTexture);
-                    graphics.setShader(hudShader);
                     applyHeldItemFirstPersonTransform(handSign);
                     graphics.updateShaderMatrices();
                     heldItemRenderer.renderHeldItemModel(graphics, (HeldItem) item, 1);
@@ -345,12 +356,9 @@ public class GameRenderer implements Disposable {
             } finally {
                 graphics.popMatrix();
             }
-            // Restore default culling so subsequent 2D inventory rendering is unaffected.
-            graphics.setRasterizerState(GraphicsEnums.CullMode.BACK, GraphicsEnums.FillMode.SOLID);
         } finally {
             graphics.popMatrix();
         }
-        graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS_EQUAL);
     }
 
     private void applyBlockFirstPersonTransform(float handSign) {
@@ -408,7 +416,7 @@ public class GameRenderer implements Disposable {
 
         // render level
         {
-            graphics.setShader(worldShader);
+            graphics.setPipeline(worldPipeline);
             graphics.updateShaderMatrices();
             setupFog(worldShader);
 
@@ -417,7 +425,7 @@ public class GameRenderer implements Disposable {
 
         // render entities
         {
-            graphics.setShader(entityShader);
+            graphics.setPipeline(entityPipeline);
             // cannot set matrices "globally" because entities transform themselves
             setupFog(entityShader);
 
@@ -426,7 +434,7 @@ public class GameRenderer implements Disposable {
 
         // render particles
         {
-            graphics.setShader(particleShader);
+            graphics.setPipeline(particlePipeline);
             graphics.updateShaderMatrices();
             this.particleEngine.render(this.graphics, this.player, partialTicks);
         }
@@ -527,18 +535,10 @@ public class GameRenderer implements Disposable {
         graphics.pushMatrix();
         graphics.translate(hitResult.x, hitResult.y, hitResult.z);
 
-        graphics.setShader(outlineShader);
+        graphics.setPipeline(outlinePipeline);
         graphics.updateShaderMatrices();
 
-        graphics.setRasterizerState(GraphicsEnums.CullMode.NONE, GraphicsEnums.FillMode.SOLID);
-        graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS_EQUAL);
-
-        graphics.setBlendState(true, GraphicsEnums.BlendFactor.SRC_ALPHA,
-                GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
-
         blockOutlineMesh.draw(graphics, GraphicsEnums.PrimitiveType.TRIANGLES);
-
-        graphics.setRasterizerState(GraphicsEnums.CullMode.BACK, GraphicsEnums.FillMode.SOLID);
 
         graphics.popMatrix();
     }
@@ -564,21 +564,12 @@ public class GameRenderer implements Disposable {
         graphics.pushMatrix();
         graphics.translate(player.breakingBlockX, player.breakingBlockY, player.breakingBlockZ);
 
-        graphics.setShader(worldShader);
+        graphics.setPipeline(worldOverlayPipeline);
         setupFog(worldShader);
         graphics.setTexture(textureManager.terrainTexture);
-        graphics.setRasterizerState(GraphicsEnums.CullMode.NONE, GraphicsEnums.FillMode.SOLID);
-        graphics.setDepthState(true, false, GraphicsEnums.CompareFunc.LESS_EQUAL);
-
-        // Vanilla classic: modulate destination by crack texture (no alpha test)
-        graphics.setBlendState(true, GraphicsEnums.BlendFactor.DST_COLOR, GraphicsEnums.BlendFactor.SRC_COLOR);
         graphics.updateShaderMatrices();
 
         breakingMesh.draw(graphics);
-
-        graphics.setBlendState(false, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
-        graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS_EQUAL);
-        graphics.setRasterizerState(GraphicsEnums.CullMode.BACK, GraphicsEnums.FillMode.SOLID);
 
         graphics.popMatrix();
     }
@@ -657,10 +648,7 @@ public class GameRenderer implements Disposable {
      * @param partialTicks The partial ticks for animation
      */
     private void drawUI(GraphicsAPI graphics, String[] debugStrings, float partialTicks) {
-        graphics.setShader(hudShader);
-
-        // disable depth test
-        graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
+        graphics.setPipeline(hudNoCullPipeline);
 
         float scaledWidth = ScaledResolution.getScaledWidth(this.width, this.height);
         float scaledHeight = ScaledResolution.getScaledHeight(this.height);
@@ -672,23 +660,18 @@ public class GameRenderer implements Disposable {
         graphics.loadIdentity();
         graphics.translate(0.0F, 0.0F, -200.0F);
 
-        // Render debug string
-        graphics.setBlendState(true, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
-
         drawDebugText(graphics, debugStrings);
 
         // Draw hotbar
         drawHotbar(graphics, scaledWidth, scaledHeight, player.hotbarSlotIndex);
 
-        graphics.setBlendState(false, GraphicsEnums.BlendFactor.SRC_ALPHA, GraphicsEnums.BlendFactor.ONE_MINUS_SRC_ALPHA);
-
-        graphics.setShader(hudNoTexShader);
+        graphics.setPipeline(hudNoTexPipeline);
         graphics.updateShaderMatrices();
 
         // Draw cross-hair
         drawCrosshair(graphics, scaledWidth, scaledHeight);
 
-        graphics.setShader(hudShader);
+        graphics.setPipeline(hudPipeline);
         graphics.updateShaderMatrices();
 
         // Draw current screen if it exists
@@ -761,7 +744,7 @@ public class GameRenderer implements Disposable {
 
         // draw hot-bar blocks
         graphics.setTexture(textureManager.terrainTexture);
-        graphics.setShader(worldShader);
+        graphics.setPipeline(worldPipeline);
         worldShader.setFogUniforms(0.0F, 0.0F, 10.0F,
                 0.5F, 0.8F, 1.0F, 1.0F);
 
@@ -787,7 +770,7 @@ public class GameRenderer implements Disposable {
 
         // draw hot-bar items
         graphics.setTexture(textureManager.itemsTexture);
-        graphics.setShader(hudShader);
+        graphics.setPipeline(hudPipeline);
 
         for (int i = 0; i < hotBarSize; i++) {
             ItemStack itemStack = player.getInventory().getHotbarItem(i);
@@ -809,7 +792,7 @@ public class GameRenderer implements Disposable {
         }
 
         // draw selector (selector is drawn before stack sizes)
-        graphics.setShader(hudShader);
+        graphics.setPipeline(hudPipeline);
         {
             graphics.pushMatrix();
             graphics.translate(centerX - HOTBAR_WIDTH / 2f + hotbarSlotIndex * HOTBAR_SLOT_WIDTH - 1, screenHeight - HOTBAR_SELECTOR_SIZE + 1, 0.0F);

@@ -12,9 +12,9 @@ import com.mojang.minecraft.optim.pools.StackCountStringPool;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.block.BlockRenderer;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
 import com.mojang.minecraft.renderer.shader.ShaderRegistry;
-import com.mojang.minecraft.renderer.shader.impl.HudShader;
 import com.mojang.minecraft.renderer.shader.impl.WorldShader;
 
 import static com.mojang.minecraft.gui.screen.AbstractInventoryScreen.ITEM_SLOT_SIZE;
@@ -24,12 +24,14 @@ import static com.mojang.minecraft.gui.screen.InventoryScreen.HELD_ITEM_SCALE_FA
 public class InventoryItemRenderer {
 
     private static final WorldShader WORLD_SHADER = ShaderRegistry.getInstance().getWorldShader();
-    private static final HudShader HUD_SHADER = ShaderRegistry.getInstance().getHudShader();
+    private static final Pipeline WORLD_PIPELINE = ShaderRegistry.getInstance().getWorldPipeline();
+    private static final Pipeline HUD_PIPELINE = ShaderRegistry.getInstance().getHudPipeline();
+    private static final Pipeline HUD_NO_CULL_PIPELINE = ShaderRegistry.getInstance().getHudNoCullPipeline();
 
     public static void renderInventoryItems(GraphicsAPI graphics, TextureManager textureManager, HeldItemRenderer heldItemRenderer, AbstractInventoryScreen inventoryScreen, float centerX, float centerY) {
 
         // set world shader
-        graphics.setShader(WORLD_SHADER);
+        graphics.setPipeline(WORLD_PIPELINE);
         WORLD_SHADER.setFogUniforms(0f, 0f, 0f, 0f, 0f, 0f, 0f);
 
         // set terrain texture
@@ -53,7 +55,7 @@ public class InventoryItemRenderer {
 
         // set items texture
         graphics.setTexture(textureManager.itemsTexture);
-        graphics.setShader(HUD_SHADER);
+        graphics.setPipeline(HUD_NO_CULL_PIPELINE);
 
         for (InventoryScreen.Slot slot : inventoryScreen.slots) {
             ItemStack itemStack = slot.getItemStack();
@@ -72,7 +74,7 @@ public class InventoryItemRenderer {
 
         // draw stack size labels
         {
-            graphics.setShader(HUD_SHADER);
+            graphics.setPipeline(HUD_PIPELINE);
 
             for (InventoryScreen.Slot slot : inventoryScreen.slots) {
                 ItemStack itemStack = slot.getItemStack();
@@ -96,7 +98,7 @@ public class InventoryItemRenderer {
             if (selectedItem != null) {
                 Item item = selectedItem.getItem();
                 if (item instanceof BlockItem) {
-                    graphics.setShader(WORLD_SHADER);
+                    graphics.setPipeline(WORLD_PIPELINE);
                     graphics.setTexture(textureManager.terrainTexture);
                     BlockItem blockItem = (BlockItem) item;
                     graphics.pushMatrix();
@@ -104,7 +106,7 @@ public class InventoryItemRenderer {
                     BlockRenderer.renderBlockPreview(graphics, blockItem.getBlock(), BLOCK_ITEM_SCALE_FACTOR);
                     graphics.popMatrix();
                 } else if (item instanceof HeldItem) {
-                    graphics.setShader(HUD_SHADER);
+                    graphics.setPipeline(HUD_NO_CULL_PIPELINE);
                     graphics.setTexture(textureManager.itemsTexture);
                     HeldItem heldItem = (HeldItem) item;
                     graphics.pushMatrix();
@@ -116,7 +118,7 @@ public class InventoryItemRenderer {
 
             // draw selected item stack size label
             if (selectedItem != null) {
-                graphics.setShader(HUD_SHADER);
+                graphics.setPipeline(HUD_PIPELINE);
                 int count = selectedItem.getCount();
                 if (count > 1) {
                     stackSizeSelectedItemLabel.setText(StackCountStringPool.valueOf(count));

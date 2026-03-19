@@ -1,8 +1,6 @@
 package com.mojang.minecraft.renderer.graphics;
 
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.*;
-import com.mojang.minecraft.renderer.shader.IShader;
-
 import java.nio.ByteBuffer;
 
 /**
@@ -78,41 +76,27 @@ public interface GraphicsAPI {
     Texture createTexture(int width, int height, TextureFormat format, ByteBuffer data);
 
     /**
-     * Creates a texture and retains a host-side RGBA8 copy of the provided data.
+     * Creates a pipeline layout.
      *
-     * @param width        The texture width
-     * @param height       The texture height
-     * @param format       The texture format
-     * @param data         The raw image data
-     * @return A new host-accessible texture
+     * @param descriptor Layout descriptor
+     * @return A new pipeline layout
      */
-    Texture createTextureHostAccessible(int width, int height, TextureFormat format, ByteBuffer data);
+    PipelineLayout createPipelineLayout(PipelineLayout.Descriptor descriptor);
 
     /**
-     * Sets the blend state.
+     * Creates a graphics pipeline.
      *
-     * @param enabled   Whether blending is enabled
-     * @param srcFactor The source blend factor
-     * @param dstFactor The destination blend factor
+     * @param descriptor Pipeline descriptor
+     * @return A new pipeline
      */
-    void setBlendState(boolean enabled, BlendFactor srcFactor, BlendFactor dstFactor);
+    Pipeline createPipeline(Pipeline.Descriptor descriptor);
 
     /**
-     * Sets the depth state.
+     * Binds a graphics pipeline.
      *
-     * @param depthTest Whether depth testing is enabled
-     * @param depthMask Whether depth writing is enabled
-     * @param depthFunc The depth compare function
+     * @param pipeline Pipeline to bind, or null to unbind
      */
-    void setDepthState(boolean depthTest, boolean depthMask, CompareFunc depthFunc);
-
-    /**
-     * Sets the rasterizer state.
-     *
-     * @param cullMode The face culling mode
-     * @param fillMode The polygon fill mode
-     */
-    void setRasterizerState(CullMode cullMode, FillMode fillMode);
+    void setPipeline(Pipeline pipeline);
 
     /**
      * Sets the viewport.
@@ -238,13 +222,6 @@ public interface GraphicsAPI {
     void setTexture(Texture texture);
 
     /**
-     * Sets the active shader program.
-     *
-     * @param shader The shader to use
-     */
-    void setShader(IShader shader);
-
-    /**
      * Gets the matrix stack.
      *
      * @return The matrix stack
@@ -263,11 +240,4 @@ public interface GraphicsAPI {
         MODELVIEW,
         PROJECTION
     }
-
-    /**
-     * Fog modes for the graphics API.
-     */
-    enum FogMode {
-        EXP
-    }
-} 
+}

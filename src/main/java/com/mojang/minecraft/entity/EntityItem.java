@@ -8,13 +8,13 @@ import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.block.BlockRenderer;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
+import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.shader.ShaderRegistry;
-import com.mojang.minecraft.renderer.shader.impl.WorldShader;
 import com.mojang.minecraft.util.math.CollisionUtils;
 
 public class EntityItem extends Entity {
 
-    private static final WorldShader WORLD_SHADER = ShaderRegistry.getInstance().getWorldShader();
+    private static final Pipeline WORLD_PIPELINE = ShaderRegistry.getInstance().getWorldPipeline();
 
     private final ItemStack itemStack;
 
@@ -90,7 +90,7 @@ public class EntityItem extends Entity {
     private void renderBlockItem(BlockItem blockItem, GraphicsAPI graphics, TextureManager textureManager, float partialTicks) {
         IndexedMesh mesh = BlockRenderer.getBlockMesh(blockItem.getBlock());
         graphics.setTexture(textureManager.terrainTexture);
-        graphics.setShader(WORLD_SHADER);
+        graphics.setPipeline(WORLD_PIPELINE);
 
         graphics.pushMatrix();
 

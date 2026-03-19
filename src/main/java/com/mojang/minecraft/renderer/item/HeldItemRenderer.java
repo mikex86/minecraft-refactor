@@ -2,6 +2,7 @@ package com.mojang.minecraft.renderer.item;
 
 import com.mojang.minecraft.item.HeldItem;
 import com.mojang.minecraft.renderer.Tesselator;
+import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
@@ -22,11 +23,9 @@ public class HeldItemRenderer {
     private final int itemsTextureWidth;
     private final int itemsTextureHeight;
 
-    public HeldItemRenderer(Texture itemsTexture) {
-        ByteBuffer hostData = itemsTexture.getHostRgbaData();
-        if (hostData == null) {
-            throw new IllegalStateException("Items texture is not CPU-accessible");
-        }
+    public HeldItemRenderer(TextureManager textureManager, Texture itemsTexture) {
+        ByteBuffer hostData = textureManager.getRetainedTextureData(itemsTexture)
+                .orElseThrow(() -> new IllegalStateException("Items texture does not have retained CPU data"));
         this.itemsTextureWidth = itemsTexture.getWidth();
         this.itemsTextureHeight = itemsTexture.getHeight();
         this.itemsTextureData = hostData;
@@ -64,12 +63,9 @@ public class HeldItemRenderer {
     public void renderHeldItemModel(GraphicsAPI graphics, HeldItem heldItem, int itemSize) {
         IndexedMesh itemQuadMesh = getItemQuadMesh(heldItem);
 
-        // Render double-sided to avoid missing pixels on thin layers.
-        graphics.setRasterizerState(GraphicsEnums.CullMode.NONE, GraphicsEnums.FillMode.SOLID);
         graphics.scale(itemSize, itemSize, itemSize);
         graphics.updateShaderMatrices();
         itemQuadMesh.draw(graphics);
-        graphics.setRasterizerState(GraphicsEnums.CullMode.BACK, GraphicsEnums.FillMode.SOLID);
     }
 
     private IndexedMesh getItemQuadMesh(HeldItem heldItem) {

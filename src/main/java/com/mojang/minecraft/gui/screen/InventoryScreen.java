@@ -5,7 +5,7 @@ import com.mojang.minecraft.gui.screen.renderer.InventoryItemRenderer;
 import com.mojang.minecraft.item.inventory.Inventory;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
-import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
+import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
 import com.mojang.minecraft.renderer.shader.ShaderRegistry;
 import com.mojang.minecraft.renderer.shader.impl.EntityShader;
@@ -15,6 +15,8 @@ import static com.mojang.minecraft.entity.EntityPlayer.PLAYER_MODEL;
 public class InventoryScreen extends AbstractInventoryScreen {
 
     private static final EntityShader ENTITY_SHADER = ShaderRegistry.getInstance().getEntityShader();
+    private static final Pipeline ENTITY_PIPELINE = ShaderRegistry.getInstance().getEntityPipeline();
+    private static final Pipeline HUD_PIPELINE = ShaderRegistry.getInstance().getHudPipeline();
 
     public InventoryScreen(TextureManager textureManager, HeldItemRenderer heldItemRenderer, Font font, Inventory inventory) {
         super(textureManager, heldItemRenderer, font, inventory);
@@ -59,7 +61,7 @@ public class InventoryScreen extends AbstractInventoryScreen {
     }
 
     private void drawPlayerModel(GraphicsAPI graphics, float partialTicks, float centerX, float centerY) {
-        graphics.setShader(ENTITY_SHADER);
+        graphics.setPipeline(ENTITY_PIPELINE);
         ENTITY_SHADER.setFogUniforms(0f, 0f, 0f, 0f, 0f, 0f, 0f);
         graphics.setTexture(textureManager.charTexture);
         graphics.pushMatrix();
@@ -88,9 +90,8 @@ public class InventoryScreen extends AbstractInventoryScreen {
         graphics.rotateX(-mousePitch);
 
         // Render the model
-        graphics.setDepthState(true, true, GraphicsEnums.CompareFunc.LESS_EQUAL);
         PLAYER_MODEL.render(graphics, this.player, partialTicks);
-        graphics.setDepthState(false, true, GraphicsEnums.CompareFunc.ALWAYS);
+        graphics.setPipeline(HUD_PIPELINE);
 
         graphics.popMatrix();
     }

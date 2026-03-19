@@ -9,6 +9,8 @@ import com.mojang.minecraft.renderer.graphics.GraphicsEnums.CullMode;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.FillMode;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.PrimitiveType;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
+import com.mojang.minecraft.renderer.graphics.Pipeline;
+import com.mojang.minecraft.renderer.graphics.PipelineLayout;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 import com.mojang.minecraft.renderer.shader.Shader;
 import org.junit.jupiter.api.AfterAll;
@@ -24,6 +26,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.nio.ByteBuffer;
+import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.lwjgl.opengl.GL11.GL_RGBA;
@@ -69,16 +72,19 @@ class HeadlessTriangleRenderTest {
     void rendersGradientTriangleAtExpectedPixels() throws Exception {
         Shader shader = null;
         VertexBuffer vertexBuffer = null;
+        PipelineLayout pipelineLayout = null;
+        Pipeline pipeline = null;
 
         try {
             graphics.setViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-            graphics.setDepthState(false, false, CompareFunc.ALWAYS);
-            graphics.setBlendState(false, BlendFactor.ONE, BlendFactor.ZERO);
-            graphics.setRasterizerState(CullMode.NONE, FillMode.SOLID);
             graphics.clear(true, true, 0.0f, 0.0f, 0.0f, 1.0f);
 
             shader = Shader.fromPrecompiledBinaries("/shaders/test_triangle.vert.spv", "/shaders/test_triangle.frag.spv");
-            graphics.setShader(shader);
+            pipelineLayout = graphics.createPipelineLayout(
+                    new PipelineLayout.Descriptor("test-triangle-layout", Collections.<PipelineLayout.Binding>emptyList())
+            );
+            pipeline = createTestPipeline("test-triangle-pipeline", pipelineLayout, shader);
+            graphics.setPipeline(pipeline);
 
             VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
                     DataType.FLOAT,
@@ -115,6 +121,12 @@ class HeadlessTriangleRenderTest {
 
             maybeExportPng(SCREEN_WIDTH, SCREEN_HEIGHT, "triangle-frame.png");
         } finally {
+            if (pipeline != null) {
+                pipeline.dispose();
+            }
+            if (pipelineLayout != null) {
+                pipelineLayout.dispose();
+            }
             if (vertexBuffer != null) {
                 vertexBuffer.dispose();
             }
@@ -136,16 +148,19 @@ class HeadlessTriangleRenderTest {
 
         Shader shader = null;
         VertexBuffer vertexBuffer = null;
+        PipelineLayout pipelineLayout = null;
+        Pipeline pipeline = null;
 
         try {
             graphics.setViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-            graphics.setDepthState(false, false, CompareFunc.ALWAYS);
-            graphics.setBlendState(false, BlendFactor.ONE, BlendFactor.ZERO);
-            graphics.setRasterizerState(CullMode.NONE, FillMode.SOLID);
             graphics.clear(true, true, 0.0f, 0.0f, 0.0f, 1.0f);
 
             shader = Shader.fromPrecompiledBinaries("/shaders/test_triangle_matrix.vert.spv", "/shaders/test_triangle.frag.spv");
-            graphics.setShader(shader);
+            pipelineLayout = graphics.createPipelineLayout(
+                    new PipelineLayout.Descriptor("test-triangle-matrix-layout", Collections.<PipelineLayout.Binding>emptyList())
+            );
+            pipeline = createTestPipeline("test-triangle-matrix-pipeline", pipelineLayout, shader);
+            graphics.setPipeline(pipeline);
 
             graphics.setMatrixMode(GraphicsAPI.MatrixMode.PROJECTION);
             graphics.loadIdentity();
@@ -190,6 +205,12 @@ class HeadlessTriangleRenderTest {
 
             maybeExportPng(SCREEN_WIDTH, SCREEN_HEIGHT, "triangle-frame-transformed.png");
         } finally {
+            if (pipeline != null) {
+                pipeline.dispose();
+            }
+            if (pipelineLayout != null) {
+                pipelineLayout.dispose();
+            }
             if (vertexBuffer != null) {
                 vertexBuffer.dispose();
             }
@@ -220,16 +241,19 @@ class HeadlessTriangleRenderTest {
 
         Shader shader = null;
         VertexBuffer vertexBuffer = null;
+        PipelineLayout pipelineLayout = null;
+        Pipeline pipeline = null;
 
         try {
             graphics.setViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-            graphics.setDepthState(false, false, CompareFunc.ALWAYS);
-            graphics.setBlendState(false, BlendFactor.ONE, BlendFactor.ZERO);
-            graphics.setRasterizerState(CullMode.NONE, FillMode.SOLID);
             graphics.clear(true, true, 0.0f, 0.0f, 0.0f, 1.0f);
 
             shader = Shader.fromPrecompiledBinaries("/shaders/test_triangle_matrix.vert.spv", "/shaders/test_triangle.frag.spv");
-            graphics.setShader(shader);
+            pipelineLayout = graphics.createPipelineLayout(
+                    new PipelineLayout.Descriptor("test-triangle-stack-layout", Collections.<PipelineLayout.Binding>emptyList())
+            );
+            pipeline = createTestPipeline("test-triangle-stack-pipeline", pipelineLayout, shader);
+            graphics.setPipeline(pipeline);
 
             graphics.setMatrixMode(GraphicsAPI.MatrixMode.PROJECTION);
             graphics.loadIdentity();
@@ -286,6 +310,12 @@ class HeadlessTriangleRenderTest {
 
             maybeExportPng(SCREEN_WIDTH, SCREEN_HEIGHT, "triangle-frame-stack-pop.png");
         } finally {
+            if (pipeline != null) {
+                pipeline.dispose();
+            }
+            if (pipelineLayout != null) {
+                pipelineLayout.dispose();
+            }
             if (vertexBuffer != null) {
                 vertexBuffer.dispose();
             }
@@ -336,6 +366,17 @@ class HeadlessTriangleRenderTest {
     private static void putVertex(ByteBuffer buffer, float r, float g, float b, float x, float y, float z) {
         buffer.putFloat(r).putFloat(g).putFloat(b);
         buffer.putFloat(x).putFloat(y).putFloat(z);
+    }
+
+    private static Pipeline createTestPipeline(String debugName, PipelineLayout layout, Shader shader) {
+        return graphics.createPipeline(new Pipeline.Descriptor(
+                debugName,
+                layout,
+                shader,
+                new Pipeline.BlendState(false, BlendFactor.ONE, BlendFactor.ZERO),
+                new Pipeline.DepthState(false, false, CompareFunc.ALWAYS),
+                new Pipeline.RasterizerState(CullMode.NONE, FillMode.SOLID)
+        ));
     }
 
     private static float[] readPixelRgbaNormalized(int x, int y) {

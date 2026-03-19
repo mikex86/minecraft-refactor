@@ -14,6 +14,7 @@ import java.nio.IntBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import static org.lwjgl.stb.STBImage.*;
 
@@ -24,6 +25,7 @@ public class TextureManager implements Disposable {
 
     private final GraphicsAPI graphics = GraphicsFactory.getGraphicsAPI();
     private final Map<String, Texture> textureCache = new HashMap<>();
+    private final Map<Texture, RetainedTextureData> retainedTextureData = new HashMap<>();
 
     public Texture charTexture;
     public Texture terrainTexture;
@@ -34,20 +36,33 @@ public class TextureManager implements Disposable {
     public Texture craftingTexture;
 
     public void loadTextures() {
-        charTexture = loadTexture("/char.png", Texture.FilterMode.NEAREST);
-        terrainTexture = loadTexture("/terrain.png", Texture.FilterMode.NEAREST);
-        itemsTexture = loadTexture("/items.png", Texture.FilterMode.NEAREST);
-        fontTexture = loadTexture("/default.gif", Texture.FilterMode.NEAREST);
-        guiTexture = loadTexture("/gui.png", Texture.FilterMode.NEAREST);
-        inventoryTexture = loadTexture("/inventory.png", Texture.FilterMode.NEAREST);
-        craftingTexture = loadTexture("/crafting.png", Texture.FilterMode.NEAREST);
+        charTexture = loadTexture("/char.png", Texture.FilterMode.NEAREST, false);
+        terrainTexture = loadTexture("/terrain.png", Texture.FilterMode.NEAREST, false);
+        itemsTexture = loadTexture("/items.png", Texture.FilterMode.NEAREST, true);
+        fontTexture = loadTexture("/default.gif", Texture.FilterMode.NEAREST, false);
+        guiTexture = loadTexture("/gui.png", Texture.FilterMode.NEAREST, false);
+        inventoryTexture = loadTexture("/inventory.png", Texture.FilterMode.NEAREST, false);
+        craftingTexture = loadTexture("/crafting.png", Texture.FilterMode.NEAREST, false);
     }
 
-    private Texture loadTexture(String resourcePath, Texture.FilterMode filterMode) {
+    public Optional<ByteBuffer> getRetainedTextureData(Texture texture) {
+        RetainedTextureData retainedData = retainedTextureData.get(texture);
+        if (retainedData == null) {
+            return Optional.empty();
+        }
+        return Optional.of(retainedData.readOnlyView());
+    }
+
+    private Texture loadTexture(String resourcePath, Texture.FilterMode filterMode, boolean retainTextureDataCopy) {
         Objects.requireNonNull(graphics, "GraphicsAPI not initialized");
 
-        if (textureCache.containsKey(resourcePath))
-            return textureCache.get(resourcePath);
+        Texture cachedTexture = textureCache.get(resourcePath);
+        if (cachedTexture != null) {
+            if (retainTextureDataCopy && !retainedTextureData.containsKey(cachedTexture)) {
+                throw new IllegalStateException("Texture '" + resourcePath + "' was requested with retained CPU data, but no retained copy exists.");
+            }
+            return cachedTexture;
+        }
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer w = stack.mallocInt(1);
@@ -73,13 +88,17 @@ public class TextureManager implements Disposable {
                     int width = w.get(0);
                     int height = h.get(0);
 
-                    Texture texture = graphics.createTextureHostAccessible(
+                    Texture texture = graphics.createTexture(
                             width,
                             height,
                             GraphicsEnums.TextureFormat.RGBA8,
                             decoded
                     );
                     texture.setFiltering(filterMode, filterMode);
+
+                    if (retainTextureDataCopy) {
+                        retainedTextureData.put(texture, copyRetainedTextureData(decoded));
+                    }
 
                     textureCache.put(resourcePath, texture);
                     System.out.println("Loaded texture: " + resourcePath +
@@ -100,7 +119,47 @@ public class TextureManager implements Disposable {
 
     @Override
     public void dispose() {
+        for (RetainedTextureData data : retainedTextureData.values()) {
+            data.dispose();
+        }
+        retainedTextureData.clear();
         textureCache.values().forEach(Texture::dispose);
         textureCache.clear();
+    }
+
+    private static RetainedTextureData copyRetainedTextureData(ByteBuffer srcDecoded) {
+        ByteBuffer src = srcDecoded.duplicate();
+        src.clear();
+        int byteSize = src.remaining();
+        long ptr = JEmalloc.nje_calloc(byteSize, 1);
+        if (ptr == 0L) {
+            throw new OutOfMemoryError("Failed to allocate retained texture copy of " + byteSize + " bytes");
+        }
+        ByteBuffer dst = org.lwjgl.system.MemoryUtil.memByteBuffer(ptr, byteSize);
+        dst.clear();
+        dst.put(src);
+        dst.clear();
+        return new RetainedTextureData(dst);
+    }
+
+    private static final class RetainedTextureData {
+        private ByteBuffer buffer;
+
+        private RetainedTextureData(ByteBuffer buffer) {
+            this.buffer = buffer;
+        }
+
+        private ByteBuffer readOnlyView() {
+            ByteBuffer view = buffer.asReadOnlyBuffer();
+            view.clear();
+            return view;
+        }
+
+        private void dispose() {
+            if (buffer != null) {
+                JEmalloc.je_free(buffer);
+                buffer = null;
+            }
+        }
     }
 }

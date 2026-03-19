@@ -3,6 +3,8 @@ package com.mojang.minecraft.renderer.graphics.opengl;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.*;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
+import com.mojang.minecraft.renderer.graphics.Pipeline;
+import com.mojang.minecraft.renderer.graphics.PipelineLayout;
 import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
 import com.mojang.minecraft.renderer.graphics.IndexBuffer;
@@ -30,6 +32,7 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
 
     // Current shader
     private IShader currentShader = null;
+    private Pipeline currentPipeline = null;
 
     // Default VAO (required for OpenGL core profile)
     private int defaultVaoId;
@@ -146,52 +149,73 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
 
     @Override
     public Texture createTexture(int width, int height, TextureFormat format, ByteBuffer data) {
-        OpenGLTexture texture = new OpenGLTexture(width, height, format, false);
+        OpenGLTexture texture = new OpenGLTexture(width, height, format);
         texture.update(0, 0, width, height, data);
         return texture;
     }
 
     @Override
-    public Texture createTextureHostAccessible(int width, int height, TextureFormat format, ByteBuffer data) {
-        OpenGLTexture texture = new OpenGLTexture(width, height, format, true);
-        texture.update(0, 0, width, height, data);
-        texture.initializeHostCopy(data);
-        return texture;
+    public PipelineLayout createPipelineLayout(PipelineLayout.Descriptor descriptor) {
+        return new OpenGLPipelineLayout(descriptor);
     }
 
     @Override
-    public void setBlendState(boolean enabled, BlendFactor srcFactor, BlendFactor dstFactor) {
-        if (enabled) {
+    public Pipeline createPipeline(Pipeline.Descriptor descriptor) {
+        return new OpenGLPipeline(descriptor);
+    }
+
+    @Override
+    public void setPipeline(Pipeline pipeline) {
+        if (pipeline == null) {
+            bindShader(null);
+            currentPipeline = null;
+            return;
+        }
+        if (!(pipeline instanceof OpenGLPipeline)) {
+            throw new IllegalArgumentException("Not an OpenGL pipeline");
+        }
+        if (pipeline.isDisposed()) {
+            throw new IllegalStateException("Cannot bind a disposed pipeline");
+        }
+
+        bindShader(pipeline.getShader());
+        applyBlendState(pipeline.getBlendState());
+        applyDepthState(pipeline.getDepthState());
+        applyRasterizerState(pipeline.getRasterizerState());
+
+        currentPipeline = pipeline;
+    }
+
+    private void applyBlendState(Pipeline.BlendState state) {
+        if (state.isEnabled()) {
             glEnable(GL_BLEND);
-            glBlendFunc(translateBlendFactor(srcFactor), translateBlendFactor(dstFactor));
+            glBlendFunc(translateBlendFactor(state.getSrcFactor()), translateBlendFactor(state.getDstFactor()));
         } else {
             glDisable(GL_BLEND);
         }
     }
 
-    @Override
-    public void setDepthState(boolean depthTest, boolean depthMask, CompareFunc depthFunc) {
-        if (depthTest) {
+    private void applyDepthState(Pipeline.DepthState state) {
+        if (state.isDepthTest()) {
             glEnable(GL_DEPTH_TEST);
         } else {
             glDisable(GL_DEPTH_TEST);
         }
-        glDepthFunc(translateCompareFunc(depthFunc));
-        glDepthMask(depthMask);
+        glDepthFunc(translateCompareFunc(state.getCompareFunc()));
+        glDepthMask(state.isDepthMask());
     }
 
-    @Override
-    public void setRasterizerState(CullMode cullMode, FillMode fillMode) {
+    private void applyRasterizerState(Pipeline.RasterizerState state) {
         // Set face culling
-        if (cullMode == CullMode.NONE) {
+        if (state.getCullMode() == CullMode.NONE) {
             glDisable(GL_CULL_FACE);
         } else {
             glEnable(GL_CULL_FACE);
-            glCullFace(translateCullMode(cullMode));
+            glCullFace(translateCullMode(state.getCullMode()));
         }
 
         // Set fill mode
-        glPolygonMode(GL_FRONT_AND_BACK, translateFillMode(fillMode));
+        glPolygonMode(GL_FRONT_AND_BACK, translateFillMode(state.getFillMode()));
     }
 
     @Override
@@ -305,8 +329,7 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
         }
     }
 
-    @Override
-    public void setShader(IShader shader) {
+    private void bindShader(IShader shader) {
         if (shader != null) {
             shader.use();
             currentShader = shader;
@@ -316,6 +339,7 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
                 currentShader = null;
             }
         }
+        currentPipeline = null;
     }
 
     /**

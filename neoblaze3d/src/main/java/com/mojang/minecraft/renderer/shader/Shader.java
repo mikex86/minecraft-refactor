@@ -57,12 +57,12 @@ public class Shader implements IShader {
             vertexSpirv = ResourceBufferLoader.loadResourceRequired(
                     Shader.class,
                     vertexBinaryPath,
-                    size -> JEmalloc.je_malloc((long) size)
+                    JEmalloc::je_malloc
             );
             fragmentSpirv = ResourceBufferLoader.loadResourceRequired(
                     Shader.class,
                     fragmentBinaryPath,
-                    size -> JEmalloc.je_malloc((long) size)
+                    JEmalloc::je_malloc
             );
 
             vertex = compileShaderFromSpirv(GL_VERTEX_SHADER, vertexSpirv, vertexBinaryPath);
