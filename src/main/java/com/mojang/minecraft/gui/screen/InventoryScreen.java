@@ -4,19 +4,20 @@ import com.mojang.minecraft.gui.Font;
 import com.mojang.minecraft.gui.screen.renderer.InventoryItemRenderer;
 import com.mojang.minecraft.item.inventory.Inventory;
 import com.mojang.minecraft.renderer.TextureManager;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
-import com.mojang.minecraft.renderer.shader.ShaderRegistry;
+import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 import com.mojang.minecraft.renderer.shader.impl.EntityShader;
 
 import static com.mojang.minecraft.entity.EntityPlayer.PLAYER_MODEL;
 
 public class InventoryScreen extends AbstractInventoryScreen {
 
-    private static final EntityShader ENTITY_SHADER = ShaderRegistry.getInstance().getEntityShader();
-    private static final Pipeline ENTITY_PIPELINE = ShaderRegistry.getInstance().getEntityPipeline();
-    private static final Pipeline HUD_PIPELINE = ShaderRegistry.getInstance().getHudPipeline();
+    private static final EntityShader ENTITY_SHADER = PipelineRegistry.getInstance().getEntityShader();
+    private static final Pipeline ENTITY_PIPELINE = PipelineRegistry.getInstance().getEntityPipeline();
+    private static final Pipeline HUD_PIPELINE = PipelineRegistry.getInstance().getHudPipeline();
 
     public InventoryScreen(TextureManager textureManager, HeldItemRenderer heldItemRenderer, Font font, Inventory inventory) {
         super(textureManager, heldItemRenderer, font, inventory);
@@ -31,7 +32,7 @@ public class InventoryScreen extends AbstractInventoryScreen {
     }
 
     @Override
-    public void drawScreen(GraphicsAPI graphics, float screenWidth, float screenHeight, float partialTicks) {
+    public void drawScreen(CommandBuffer graphics, MatrixStack matrixStack, float screenWidth, float screenHeight, float partialTicks) {
         float centerX = (float) (int) screenWidth / 2;
         float centerY = (float) (int) screenHeight / 2;
 
@@ -45,11 +46,11 @@ public class InventoryScreen extends AbstractInventoryScreen {
         drawInventoryScreenBackground(graphics, centerX, centerY, textureManager.inventoryTexture);
 
         // draw items
-        InventoryItemRenderer.renderInventoryItems(graphics, textureManager, heldItemRenderer, this, centerX, centerY);
+        InventoryItemRenderer.renderInventoryItems(graphics, matrixStack, textureManager, heldItemRenderer, this, centerX, centerY);
 
-        drawPlayerModel(graphics, partialTicks, centerX, centerY);
+        drawPlayerModel(graphics, matrixStack, partialTicks, centerX, centerY);
 
-        InventoryItemRenderer.drawSelectedItem(graphics, textureManager, heldItemRenderer, inventory, mouseX, mouseY, stackSizeSelectedItemLabel);
+        InventoryItemRenderer.drawSelectedItem(graphics, matrixStack, textureManager, heldItemRenderer, inventory, mouseX, mouseY, stackSizeSelectedItemLabel);
 
         this.screenWidth = screenWidth;
         this.screenHeight = screenHeight;
@@ -60,15 +61,15 @@ public class InventoryScreen extends AbstractInventoryScreen {
         inventory.resetCrafting(Inventory.CraftingKind.PORTABLE);
     }
 
-    private void drawPlayerModel(GraphicsAPI graphics, float partialTicks, float centerX, float centerY) {
+    private void drawPlayerModel(CommandBuffer graphics, MatrixStack matrixStack, float partialTicks, float centerX, float centerY) {
         graphics.setPipeline(ENTITY_PIPELINE);
         ENTITY_SHADER.setFogUniforms(0f, 0f, 0f, 0f, 0f, 0f, 0f);
         graphics.setTexture(textureManager.charTexture);
-        graphics.pushMatrix();
+        matrixStack.pushMatrix();
 
         // Apply scaling and orientation
-        graphics.translate(centerX - INVENTORY_UI_WIDTH / 2f + 42 + 10, centerY - INVENTORY_UI_HEIGHT / 2f + 24 + 4, 0);
-        graphics.scale(1.85f, 1.85f, 1.85f);
+        matrixStack.translate(centerX - INVENTORY_UI_WIDTH / 2f + 42 + 10, centerY - INVENTORY_UI_HEIGHT / 2f + 24 + 4, 0);
+        matrixStack.scale(1.85f, 1.85f, 1.85f);
 
         // calculate angle to look at mouse position
         float mouseYaw;
@@ -87,13 +88,13 @@ public class InventoryScreen extends AbstractInventoryScreen {
             this.player.pitch = this.player.prevPitch = mousePitch;
         }
 
-        graphics.rotateX(-mousePitch);
+        matrixStack.rotateX(-mousePitch);
 
         // Render the model
-        PLAYER_MODEL.render(graphics, this.player, partialTicks);
+        PLAYER_MODEL.render(graphics, matrixStack, this.player, partialTicks);
         graphics.setPipeline(HUD_PIPELINE);
 
-        graphics.popMatrix();
+        matrixStack.popMatrix();
     }
 
     protected void addPortableCraftingSlots() {

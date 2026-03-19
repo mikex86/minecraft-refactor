@@ -41,7 +41,7 @@ public class IndexedMesh implements Disposable {
      * @deprecated Use {@link #IndexedMesh(VertexBuffer, IndexBuffer, int, int)} instead
      */
     @Deprecated
-    public IndexedMesh(GraphicsAPI graphics, VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int vertexCount, int indexCount) {
+    public IndexedMesh(CommandBuffer graphics, VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int vertexCount, int indexCount) {
         this(vertexBuffer, indexBuffer, vertexCount, indexCount);
     }
 
@@ -51,12 +51,12 @@ public class IndexedMesh implements Disposable {
      * @param graphics      The graphics API
      * @param primitiveType The primitive type to draw (e.g., triangles, lines)
      */
-    public void draw(GraphicsAPI graphics, PrimitiveType primitiveType) {
+    public void draw(CommandBuffer graphics, PrimitiveType primitiveType) {
         int elementCount = indexBuffer != null ? indexCount : vertexCount;
         graphics.draw(primitiveType, vertexBuffer, indexBuffer, 0, elementCount);
     }
 
-    public void draw(GraphicsAPI graphics) {
+    public void draw(CommandBuffer graphics) {
         draw(graphics, PrimitiveType.TRIANGLES);
     }
 

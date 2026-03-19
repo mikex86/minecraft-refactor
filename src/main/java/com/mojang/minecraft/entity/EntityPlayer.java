@@ -7,7 +7,8 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.level.chunk.Chunk;
 import com.mojang.minecraft.renderer.TextureManager;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.model.Model;
 import com.mojang.minecraft.renderer.model.ModelRegistry;
 import com.mojang.minecraft.renderer.model.impl.PlayerModel;
@@ -484,26 +485,26 @@ public class EntityPlayer extends EntityLiving {
      * @param partialTicks Partial tick time for smooth animation
      */
     @Override
-    public void render(GraphicsAPI graphics, TextureManager textureManager, float partialTicks) {
+    public void render(CommandBuffer graphics, MatrixStack matrixStack, TextureManager textureManager, float partialTicks) {
         graphics.setTexture(textureManager.charTexture);
 
-        graphics.pushMatrix();
+        matrixStack.pushMatrix();
 
         // Position at interpolated location
-        graphics.translate(
+        matrixStack.translate(
                 this.xo + (this.x - this.xo) * partialTicks,
                 this.yo + (this.y - this.yo) * partialTicks,
                 this.zo + (this.z - this.zo) * partialTicks
         );
 
         // Apply scaling and orientation
-        graphics.scale(-MODEL_SIZE, -MODEL_SIZE, -MODEL_SIZE);
-        graphics.translate(0.0F, MODEL_Y_OFFSET, 0.0F);
+        matrixStack.scale(-MODEL_SIZE, -MODEL_SIZE, -MODEL_SIZE);
+        matrixStack.translate(0.0F, MODEL_Y_OFFSET, 0.0F);
 
         // Render the model
-        PLAYER_MODEL.render(graphics, this, partialTicks);
+        PLAYER_MODEL.render(graphics, matrixStack, this, partialTicks);
 
-        graphics.popMatrix();
+        matrixStack.popMatrix();
     }
 
     private float lastGeneratedPosX = 0;
@@ -565,16 +566,7 @@ public class EntityPlayer extends EntityLiving {
 
         // Load the chunks
         if (!toGenerate.isEmpty()) {
-            toGenerate.sort((c1, c2) -> {
-                // compare by sq distance to the player
-                int dx1 = c1.x - chunkX;
-                int dz1 = c1.z - chunkZ;
-                int dx2 = c2.x - chunkX;
-                int dz2 = c2.z - chunkZ;
-                int dist1 = dx1 * dx1 + dz1 * dz1;
-                int dist2 = dx2 * dx2 + dz2 * dz2;
-                return Integer.compare(dist1, dist2);
-            });
+            sortChunkPositionsByDistance(toGenerate, chunkX, chunkZ);
             for (ChunkPos pos : toGenerate) {
                 this.level.loadChunk(pos.x, pos.z);
             }
@@ -598,6 +590,32 @@ public class EntityPlayer extends EntityLiving {
         this.lastGeneratedPosX = this.x;
         this.lastGeneratedPosZ = this.z;
         this.generateDelay = random.nextInt(10) + 5; // Random delay for chunk generation
+    }
+
+    private static void sortChunkPositionsByDistance(List<ChunkPos> positions, int centerChunkX, int centerChunkZ) {
+        // Selection sort to avoid per-call comparator/lambda allocations.
+        for (int i = 0; i < positions.size() - 1; i++) {
+            int bestIndex = i;
+            int bestDist = squaredChunkDistance(positions.get(i), centerChunkX, centerChunkZ);
+            for (int j = i + 1; j < positions.size(); j++) {
+                int dist = squaredChunkDistance(positions.get(j), centerChunkX, centerChunkZ);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestIndex = j;
+                }
+            }
+            if (bestIndex != i) {
+                ChunkPos tmp = positions.get(i);
+                positions.set(i, positions.get(bestIndex));
+                positions.set(bestIndex, tmp);
+            }
+        }
+    }
+
+    private static int squaredChunkDistance(ChunkPos pos, int centerChunkX, int centerChunkZ) {
+        int dx = pos.x - centerChunkX;
+        int dz = pos.z - centerChunkZ;
+        return dx * dx + dz * dz;
     }
 
     /**

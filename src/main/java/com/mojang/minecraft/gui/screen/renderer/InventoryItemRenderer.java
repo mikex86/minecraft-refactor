@@ -11,10 +11,11 @@ import com.mojang.minecraft.item.inventory.Inventory;
 import com.mojang.minecraft.optim.pools.StackCountStringPool;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.block.BlockRenderer;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
-import com.mojang.minecraft.renderer.shader.ShaderRegistry;
+import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 import com.mojang.minecraft.renderer.shader.impl.WorldShader;
 
 import static com.mojang.minecraft.gui.screen.AbstractInventoryScreen.ITEM_SLOT_SIZE;
@@ -23,12 +24,12 @@ import static com.mojang.minecraft.gui.screen.InventoryScreen.HELD_ITEM_SCALE_FA
 
 public class InventoryItemRenderer {
 
-    private static final WorldShader WORLD_SHADER = ShaderRegistry.getInstance().getWorldShader();
-    private static final Pipeline WORLD_PIPELINE = ShaderRegistry.getInstance().getWorldPipeline();
-    private static final Pipeline HUD_PIPELINE = ShaderRegistry.getInstance().getHudPipeline();
-    private static final Pipeline HUD_NO_CULL_PIPELINE = ShaderRegistry.getInstance().getHudNoCullPipeline();
+    private static final WorldShader WORLD_SHADER = PipelineRegistry.getInstance().getWorldShader();
+    private static final Pipeline WORLD_PIPELINE = PipelineRegistry.getInstance().getWorldPipeline();
+    private static final Pipeline HUD_PIPELINE = PipelineRegistry.getInstance().getHudPipeline();
+    private static final Pipeline HUD_NO_CULL_PIPELINE = PipelineRegistry.getInstance().getHudNoCullPipeline();
 
-    public static void renderInventoryItems(GraphicsAPI graphics, TextureManager textureManager, HeldItemRenderer heldItemRenderer, AbstractInventoryScreen inventoryScreen, float centerX, float centerY) {
+    public static void renderInventoryItems(CommandBuffer graphics, MatrixStack matrixStack, TextureManager textureManager, HeldItemRenderer heldItemRenderer, AbstractInventoryScreen inventoryScreen, float centerX, float centerY) {
 
         // set world shader
         graphics.setPipeline(WORLD_PIPELINE);
@@ -43,14 +44,14 @@ public class InventoryItemRenderer {
                 continue;
             }
             Item item = itemStack.getItem();
-            graphics.pushMatrix();
-            graphics.translate(slot.getItemRenderX(centerX), slot.getItemRenderY(centerY), 0);
+            matrixStack.pushMatrix();
+            matrixStack.translate(slot.getItemRenderX(centerX), slot.getItemRenderY(centerY), 0);
             if (item instanceof BlockItem) {
                 BlockItem blockItem = (BlockItem) item;
-                BlockRenderer.renderBlockPreview(graphics, blockItem.getBlock(), BLOCK_ITEM_SCALE_FACTOR
+                BlockRenderer.renderBlockPreview(graphics, matrixStack, blockItem.getBlock(), BLOCK_ITEM_SCALE_FACTOR
                 );
             }
-            graphics.popMatrix();
+            matrixStack.popMatrix();
         }
 
         // set items texture
@@ -63,13 +64,13 @@ public class InventoryItemRenderer {
                 continue;
             }
             Item item = itemStack.getItem();
-            graphics.pushMatrix();
-            graphics.translate(slot.getItemRenderX(centerX) - HELD_ITEM_SCALE_FACTOR / 2f, slot.getItemRenderY(centerY) - HELD_ITEM_SCALE_FACTOR, 0);
+            matrixStack.pushMatrix();
+            matrixStack.translate(slot.getItemRenderX(centerX) - HELD_ITEM_SCALE_FACTOR / 2f, slot.getItemRenderY(centerY) - HELD_ITEM_SCALE_FACTOR, 0);
             if (item instanceof HeldItem) {
                 HeldItem blockItem = (HeldItem) item;
-                heldItemRenderer.renderHeldItemPreview(graphics, blockItem, HELD_ITEM_SCALE_FACTOR);
+                heldItemRenderer.renderHeldItemPreview(graphics, matrixStack, blockItem, HELD_ITEM_SCALE_FACTOR);
             }
-            graphics.popMatrix();
+            matrixStack.popMatrix();
         }
 
         // draw stack size labels
@@ -83,13 +84,13 @@ public class InventoryItemRenderer {
                 }
                 int count = itemStack.getCount();
                 if (count > 1) {
-                    slot.renderStackSize(graphics, centerX, centerY, count);
+                    slot.renderStackSize(graphics, matrixStack, centerX, centerY, count);
                 }
             }
         }
     }
 
-    public static void drawSelectedItem(GraphicsAPI graphics, TextureManager textureManager, HeldItemRenderer heldItemRenderer, Inventory inventory, float mouseX, float mouseY, TextLabel stackSizeSelectedItemLabel) {
+    public static void drawSelectedItem(CommandBuffer graphics, MatrixStack matrixStack, TextureManager textureManager, HeldItemRenderer heldItemRenderer, Inventory inventory, float mouseX, float mouseY, TextLabel stackSizeSelectedItemLabel) {
         // draw selected item at cursor position
         {
             // set terrain texture again after drawing labels and the player
@@ -101,18 +102,18 @@ public class InventoryItemRenderer {
                     graphics.setPipeline(WORLD_PIPELINE);
                     graphics.setTexture(textureManager.terrainTexture);
                     BlockItem blockItem = (BlockItem) item;
-                    graphics.pushMatrix();
-                    graphics.translate(mouseX, mouseY + ITEM_SLOT_SIZE / 2f, 0);
-                    BlockRenderer.renderBlockPreview(graphics, blockItem.getBlock(), BLOCK_ITEM_SCALE_FACTOR);
-                    graphics.popMatrix();
+                    matrixStack.pushMatrix();
+                    matrixStack.translate(mouseX, mouseY + ITEM_SLOT_SIZE / 2f, 0);
+                    BlockRenderer.renderBlockPreview(graphics, matrixStack, blockItem.getBlock(), BLOCK_ITEM_SCALE_FACTOR);
+                    matrixStack.popMatrix();
                 } else if (item instanceof HeldItem) {
                     graphics.setPipeline(HUD_NO_CULL_PIPELINE);
                     graphics.setTexture(textureManager.itemsTexture);
                     HeldItem heldItem = (HeldItem) item;
-                    graphics.pushMatrix();
-                    graphics.translate(mouseX - HELD_ITEM_SCALE_FACTOR / 2f, mouseY - HELD_ITEM_SCALE_FACTOR / 2f, 0);
-                    heldItemRenderer.renderHeldItemPreview(graphics, heldItem, HELD_ITEM_SCALE_FACTOR);
-                    graphics.popMatrix();
+                    matrixStack.pushMatrix();
+                    matrixStack.translate(mouseX - HELD_ITEM_SCALE_FACTOR / 2f, mouseY - HELD_ITEM_SCALE_FACTOR / 2f, 0);
+                    heldItemRenderer.renderHeldItemPreview(graphics, matrixStack, heldItem, HELD_ITEM_SCALE_FACTOR);
+                    matrixStack.popMatrix();
                 }
             }
 
@@ -122,7 +123,7 @@ public class InventoryItemRenderer {
                 int count = selectedItem.getCount();
                 if (count > 1) {
                     stackSizeSelectedItemLabel.setText(StackCountStringPool.valueOf(count));
-                    stackSizeSelectedItemLabel.render(graphics, mouseX + 9 - stackSizeSelectedItemLabel.getWidth(), mouseY + 2);
+                    stackSizeSelectedItemLabel.render(graphics, matrixStack, mouseX + 9 - stackSizeSelectedItemLabel.getWidth(), mouseY + 2);
                 }
             }
         }

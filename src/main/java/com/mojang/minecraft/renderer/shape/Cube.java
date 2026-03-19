@@ -1,6 +1,8 @@
 package com.mojang.minecraft.renderer.shape;
 
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
+import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.model.ModelMesh;
 
 /**
@@ -176,23 +178,23 @@ public class Cube {
      *
      * @param graphics the graphics API to render with
      */
-    public void render(GraphicsAPI graphics) {
+    public void render(CommandBuffer graphics, MatrixStack matrixStack) {
         // Build the mesh if needed
         if (this.dirty) {
             buildMesh();
         }
 
-        graphics.pushMatrix();
-        graphics.translate(this.x, this.y, this.z);
-        graphics.rotateZ(this.zRot * RADIANS_TO_DEGREES);
-        graphics.rotateY(this.yRot * RADIANS_TO_DEGREES);
-        graphics.rotateX(this.xRot * RADIANS_TO_DEGREES);
+        matrixStack.pushMatrix();
+        matrixStack.translate(this.x, this.y, this.z);
+        matrixStack.rotateZ(this.zRot * RADIANS_TO_DEGREES);
+        matrixStack.rotateY(this.yRot * RADIANS_TO_DEGREES);
+        matrixStack.rotateX(this.xRot * RADIANS_TO_DEGREES);
 
         // Render the mesh
-        graphics.updateShaderMatrices();
-        this.mesh.render();
+        GraphicsFactory.getGraphicsAPI().bindCurrentMatrices(matrixStack);
+        this.mesh.render(graphics);
 
-        graphics.popMatrix();
+        matrixStack.popMatrix();
     }
 
     /**

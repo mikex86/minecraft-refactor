@@ -1,103 +1,96 @@
 package com.mojang.minecraft.renderer.graphics.opengl;
 
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
-import com.mojang.minecraft.renderer.graphics.GraphicsEnums.*;
+import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BufferUsage;
+import com.mojang.minecraft.renderer.graphics.GraphicsEnums.TextureFormat;
+import com.mojang.minecraft.renderer.graphics.IndexBuffer;
 import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.graphics.PipelineLayout;
 import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
-import com.mojang.minecraft.renderer.graphics.IndexBuffer;
-import com.mojang.minecraft.renderer.graphics.DataType;
+import com.mojang.minecraft.renderer.graphics.allocator.BufferAllocation;
 import com.mojang.minecraft.renderer.graphics.allocator.BufferAllocator;
-import com.mojang.minecraft.renderer.shader.IShader;
 
 import java.nio.ByteBuffer;
-import java.util.Objects;
-import java.util.logging.Logger;
+import java.util.ArrayList;
+import java.util.List;
 
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL15.*;
-import static org.lwjgl.opengl.GL30.*;
+import static org.lwjgl.opengl.GL11.GL_LEQUAL;
+import static org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA;
+import static org.lwjgl.opengl.GL11.GL_SRC_ALPHA;
+import static org.lwjgl.opengl.GL11.glBlendFunc;
+import static org.lwjgl.opengl.GL11.glClearDepth;
+import static org.lwjgl.opengl.GL11.glDepthFunc;
+import static org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER;
+import static org.lwjgl.opengl.GL15.GL_DYNAMIC_DRAW;
+import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
+import static org.lwjgl.opengl.GL15.GL_STATIC_DRAW;
+import static org.lwjgl.opengl.GL15.GL_STREAM_DRAW;
+import static org.lwjgl.opengl.GL30.glBindVertexArray;
+import static org.lwjgl.opengl.GL30.glDeleteVertexArrays;
+import static org.lwjgl.opengl.GL30.glGenVertexArrays;
 
 /**
  * OpenGL implementation of the GraphicsAPI interface.
- * This implementation uses LWJGL to interact with OpenGL.
+ * This class owns device/resource lifecycle; draw commands are recorded via {@link OpenGLCommandBuffer}.
  */
 public class OpenGLGraphicsAPI implements GraphicsAPI {
-    private static final Logger LOGGER = Logger.getLogger(OpenGLGraphicsAPI.class.getName());
+    private static final long DEFAULT_POOL_SIZE = 128L * 1024L * 1024L; // 128 MB
 
-    // Matrix stack for emulating OpenGL's matrix functionality
-    private final MatrixStack matrixStack;
-
-    // Current shader
-    private IShader currentShader = null;
-    private Pipeline currentPipeline = null;
+    private final OpenGLCommandBuffer frameCommandBuffer = new OpenGLCommandBuffer();
+    private final List<BufferAllocator<? extends BufferAllocation>> managedAllocators = new ArrayList<>();
 
     // Default VAO (required for OpenGL core profile)
     private int defaultVaoId;
 
-    // Buffer pools for vertex and index buffers
-    private static final long DEFAULT_POOL_SIZE = 128L * 1024L * 1024L; // 128 MB starting size
+    @Override
+    public CommandBuffer beginFrame() {
+        frameCommandBuffer.reset();
+        return frameCommandBuffer;
+    }
 
-    private BufferAllocator<OpenGLBufferAllocation> vertexBufferAllocator;
-    private BufferAllocator<OpenGLBufferAllocation> indexBufferAllocator;
-    
-    // Logging intervals
-    private static final long LOG_INTERVAL_MS = 10000; // Log every 10 seconds
-    private long lastLogTime = 0;
-    private int allocCount = 0;
-
-    /**
-     * Creates a new OpenGL graphics API implementation.
-     */
-    public OpenGLGraphicsAPI() {
-        this.matrixStack = new MatrixStack();
+    @Override
+    public void endFrame() {
+        // No-op for immediate mode OpenGL backend.
     }
 
     @Override
     public void initialize() {
-        // Create and bind a default VAO
-        // This is required when using an OpenGL core profile
         defaultVaoId = glGenVertexArrays();
         glBindVertexArray(defaultVaoId);
 
-        // Set up blending
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-        // Set up depth testing
         glClearDepth(1.0f);
         glDepthFunc(GL_LEQUAL);
 
-        setMatrixMode(MatrixMode.PROJECTION);
-        loadIdentity();
-        setMatrixMode(MatrixMode.MODELVIEW);
-        loadIdentity();
-
-        // Initialize buffer pools
-        vertexBufferAllocator = new OpenGLPooledAllocator(GL_ARRAY_BUFFER, DEFAULT_POOL_SIZE);
-        indexBufferAllocator = new OpenGLPooledAllocator(GL_ELEMENT_ARRAY_BUFFER, DEFAULT_POOL_SIZE);
-        
-        LOGGER.info("Initialized buffer pools with " + (DEFAULT_POOL_SIZE / (1024 * 1024)) + " MB each");
+        frameCommandBuffer.reset();
     }
 
     @Override
     public void shutdown() {
-        // Clean up the default VAO
+        for (BufferAllocator<? extends BufferAllocation> allocator : managedAllocators) {
+            if (allocator != null && !allocator.isDisposed()) {
+                allocator.dispose();
+            }
+        }
+        managedAllocators.clear();
+
         glDeleteVertexArrays(defaultVaoId);
+    }
 
-        // Clean up buffer pools
-        if (vertexBufferAllocator != null) {
-            LOGGER.info("Disposing vertex buffer allocator: " + vertexBufferAllocator.getStats());
-            vertexBufferAllocator.dispose();
-            vertexBufferAllocator = null;
+    @Override
+    public BufferAllocator<? extends BufferAllocation> createAllocator(BufferBinding binding, BufferAllocatorHint hint) {
+        int bufferType = bufferTypeFor(binding);
+        BufferAllocator<? extends BufferAllocation> allocator;
+        if (hint == BufferAllocatorHint.POOLED) {
+            allocator = new OpenGLPooledAllocator(bufferType, DEFAULT_POOL_SIZE);
+        } else {
+            allocator = new OpenGLDedicatedAllocator(bufferType);
         }
-
-        if (indexBufferAllocator != null) {
-            LOGGER.info("Disposing index buffer allocator: " + indexBufferAllocator.getStats());
-            indexBufferAllocator.dispose();
-            indexBufferAllocator = null;
-        }
+        managedAllocators.add(allocator);
+        return allocator;
     }
 
     @Override
@@ -106,23 +99,30 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     }
 
     @Override
-    public VertexBuffer createPooledVertexBuffer(int sizeInBytes) {
-        allocCount++;
-        
-        // Periodically log stats
-        long now = System.currentTimeMillis();
-        if (now - lastLogTime > LOG_INTERVAL_MS) {
-            LOGGER.info("VBO Allocator: " + vertexBufferAllocator.getStats());
-            LOGGER.info("IBO Allocator: " + indexBufferAllocator.getStats());
-            lastLogTime = now;
+    public VertexBuffer createVertexBuffer(BufferUsage usage, BufferAllocator<? extends BufferAllocation> allocator, int sizeInBytes) {
+        if (allocator == null) {
+            throw new IllegalArgumentException("allocator cannot be null");
         }
-        
-        OpenGLBufferAllocation allocation = vertexBufferAllocator.allocate(sizeInBytes);
+        if (sizeInBytes <= 0) {
+            throw new IllegalArgumentException("sizeInBytes must be > 0");
+        }
+
+        BufferAllocation allocation = allocator.allocate(sizeInBytes);
         if (allocation == null) {
-            LOGGER.warning("Failed to allocate pooled vertex buffer of size " + sizeInBytes + " bytes");
             return null;
         }
-        return new OpenGLPooledVertexBuffer(allocation);
+        if (!(allocation instanceof OpenGLBufferAllocation)) {
+            allocation.free();
+            throw new IllegalArgumentException("Allocator does not provide OpenGL buffer allocations");
+        }
+
+        OpenGLBufferAllocation glAllocation = (OpenGLBufferAllocation) allocation;
+        if (glAllocation.getBufferType() != GL_ARRAY_BUFFER) {
+            glAllocation.free();
+            throw new IllegalArgumentException("Allocator buffer type is not GL_ARRAY_BUFFER");
+        }
+
+        return new OpenGLPooledVertexBuffer(glAllocation);
     }
 
     @Override
@@ -131,15 +131,30 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     }
 
     @Override
-    public IndexBuffer createPooledIndexBuffer(int sizeInBytes) {
-        allocCount++;
-        // Only log stats in createPooledVertexBuffer to avoid duplicate logs
-        OpenGLBufferAllocation allocation = indexBufferAllocator.allocate(sizeInBytes);
+    public IndexBuffer createIndexBuffer(BufferUsage usage, BufferAllocator<? extends BufferAllocation> allocator, int sizeInBytes) {
+        if (allocator == null) {
+            throw new IllegalArgumentException("allocator cannot be null");
+        }
+        if (sizeInBytes <= 0) {
+            throw new IllegalArgumentException("sizeInBytes must be > 0");
+        }
+
+        BufferAllocation allocation = allocator.allocate(sizeInBytes);
         if (allocation == null) {
-            LOGGER.warning("Failed to allocate pooled index buffer of size " + sizeInBytes + " bytes");
             return null;
         }
-        return new OpenGLPooledIndexBuffer(allocation);
+        if (!(allocation instanceof OpenGLBufferAllocation)) {
+            allocation.free();
+            throw new IllegalArgumentException("Allocator does not provide OpenGL buffer allocations");
+        }
+
+        OpenGLBufferAllocation glAllocation = (OpenGLBufferAllocation) allocation;
+        if (glAllocation.getBufferType() != GL_ELEMENT_ARRAY_BUFFER) {
+            glAllocation.free();
+            throw new IllegalArgumentException("Allocator buffer type is not GL_ELEMENT_ARRAY_BUFFER");
+        }
+
+        return new OpenGLPooledIndexBuffer(glAllocation);
     }
 
     @Override
@@ -165,216 +180,18 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     }
 
     @Override
-    public void setPipeline(Pipeline pipeline) {
-        if (pipeline == null) {
-            bindShader(null);
-            currentPipeline = null;
-            return;
+    public void bindCurrentMatrices(MatrixStack matrixStack) {
+        frameCommandBuffer.bindCurrentMatrices(matrixStack);
+    }
+
+    private static int bufferTypeFor(BufferBinding binding) {
+        if (binding == BufferBinding.VERTEX) {
+            return GL_ARRAY_BUFFER;
         }
-        if (!(pipeline instanceof OpenGLPipeline)) {
-            throw new IllegalArgumentException("Not an OpenGL pipeline");
-        }
-        if (pipeline.isDisposed()) {
-            throw new IllegalStateException("Cannot bind a disposed pipeline");
-        }
-
-        bindShader(pipeline.getShader());
-        applyBlendState(pipeline.getBlendState());
-        applyDepthState(pipeline.getDepthState());
-        applyRasterizerState(pipeline.getRasterizerState());
-
-        currentPipeline = pipeline;
+        return GL_ELEMENT_ARRAY_BUFFER;
     }
 
-    private void applyBlendState(Pipeline.BlendState state) {
-        if (state.isEnabled()) {
-            glEnable(GL_BLEND);
-            glBlendFunc(translateBlendFactor(state.getSrcFactor()), translateBlendFactor(state.getDstFactor()));
-        } else {
-            glDisable(GL_BLEND);
-        }
-    }
-
-    private void applyDepthState(Pipeline.DepthState state) {
-        if (state.isDepthTest()) {
-            glEnable(GL_DEPTH_TEST);
-        } else {
-            glDisable(GL_DEPTH_TEST);
-        }
-        glDepthFunc(translateCompareFunc(state.getCompareFunc()));
-        glDepthMask(state.isDepthMask());
-    }
-
-    private void applyRasterizerState(Pipeline.RasterizerState state) {
-        // Set face culling
-        if (state.getCullMode() == CullMode.NONE) {
-            glDisable(GL_CULL_FACE);
-        } else {
-            glEnable(GL_CULL_FACE);
-            glCullFace(translateCullMode(state.getCullMode()));
-        }
-
-        // Set fill mode
-        glPolygonMode(GL_FRONT_AND_BACK, translateFillMode(state.getFillMode()));
-    }
-
-    @Override
-    public void setViewport(int x, int y, int width, int height) {
-        glViewport(x, y, width, height);
-    }
-
-    @Override
-    public void clear(boolean clearColor, boolean clearDepth, float r, float g, float b, float a) {
-        int bits = 0;
-
-        if (clearColor) {
-            bits |= GL_COLOR_BUFFER_BIT;
-            glClearColor(r, g, b, a);
-        }
-
-        if (clearDepth) {
-            bits |= GL_DEPTH_BUFFER_BIT;
-        }
-
-        glClear(bits);
-    }
-
-    @Override
-    public void setPerspectiveProjection(float fov, float aspect, float nearPlane, float farPlane) {
-        matrixStack.setMatrixMode(MatrixMode.PROJECTION);
-        matrixStack.loadIdentity();
-        matrixStack.setPerspective(fov, aspect, nearPlane, farPlane);
-    }
-
-    @Override
-    public void setOrthographicProjection(float left, float right, float bottom, float top, float near, float far) {
-        matrixStack.setMatrixMode(MatrixMode.PROJECTION);
-        matrixStack.loadIdentity();
-        matrixStack.setOrthographic(left, right, bottom, top, near, far);
-    }
-
-    @Override
-    public void pushMatrix() {
-        matrixStack.pushMatrix();
-    }
-
-    @Override
-    public void popMatrix() {
-        matrixStack.popMatrix();
-    }
-
-    @Override
-    public void loadIdentity() {
-        matrixStack.loadIdentity();
-    }
-
-    @Override
-    public void translate(float x, float y, float z) {
-        matrixStack.translate(x, y, z);
-    }
-
-    @Override
-    public void rotateX(float angle) {
-        matrixStack.rotateX(angle);
-    }
-
-    @Override
-    public void rotateY(float angle) {
-        matrixStack.rotateY(angle);
-    }
-
-    @Override
-    public void rotateZ(float angle) {
-        matrixStack.rotateZ(angle);
-    }
-
-    @Override
-    public void scale(float x, float y, float z) {
-        matrixStack.scale(x, y, z);
-    }
-
-    @Override
-    public void setMatrixMode(MatrixMode mode) {
-        matrixStack.setMatrixMode(mode);
-    }
-
-    @Override
-    public void draw(PrimitiveType type, VertexBuffer vertexBuffer, IndexBuffer indexBuffer, int start, int count) {
-        Objects.requireNonNull(vertexBuffer, "Vertex buffer cannot be null");
-
-        setupVertexAttributes(vertexBuffer);
-
-        if (indexBuffer != null) {
-            long indexOffset = start * 4L; // 4 bytes per int
-            bindIndexBuffer(indexBuffer);
-            if (indexBuffer instanceof OpenGLPooledIndexBuffer) {
-                indexOffset += ((OpenGLPooledIndexBuffer) indexBuffer).getOffset();
-            }
-            glDrawElements(translatePrimitiveType(type), count, GL_UNSIGNED_INT, indexOffset);
-        } else {
-            glDrawArrays(translatePrimitiveType(type), start, count);
-        }
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-    }
-
-    @Override
-    public void setTexture(Texture texture) {
-        if (texture == null) {
-            glBindTexture(GL_TEXTURE_2D, 0);
-        } else if (texture instanceof OpenGLTexture) {
-            ((OpenGLTexture) texture).bind();
-        } else {
-            throw new IllegalArgumentException("Not an OpenGL texture");
-        }
-    }
-
-    private void bindShader(IShader shader) {
-        if (shader != null) {
-            shader.use();
-            currentShader = shader;
-        } else {
-            if (currentShader != null) {
-                currentShader.detach();
-                currentShader = null;
-            }
-        }
-        currentPipeline = null;
-    }
-
-    /**
-     * Updates the shader uniforms with the current matrices.
-     * This is used to provide the matrices to the shader program.
-     */
-    @Override
-    public void updateShaderMatrices() {
-        Objects.requireNonNull(currentShader, "No shader set");
-
-        // Set modelview matrix uniform if the shader supports it
-        try {
-            currentShader.setUniformMatrix4fv("modelViewMatrix", matrixStack.getModelViewBuffer());
-        } catch (IllegalArgumentException e) {
-            // Ignore if uniform doesn't exist
-        }
-
-        // Set projection matrix uniform if the shader supports it
-        try {
-            currentShader.setUniformMatrix4fv("projectionMatrix", matrixStack.getProjectionBuffer());
-        } catch (IllegalArgumentException e) {
-            // Ignore if uniform doesn't exist
-        }
-    }
-
-    @Override
-    public MatrixStack getMatrixStack() {
-        return matrixStack;
-    }
-
-    //--------------------------------------------------
-    // Helper methods to translate enums to OpenGL constants
-    //--------------------------------------------------
-
-    private int translateBufferUsage(BufferUsage usage) {
+    private static int translateBufferUsage(BufferUsage usage) {
         switch (usage) {
             case STATIC:
                 return GL_STATIC_DRAW;
@@ -384,199 +201,6 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
                 return GL_STREAM_DRAW;
             default:
                 return GL_STATIC_DRAW;
-        }
-    }
-
-    private int translateBlendFactor(BlendFactor factor) {
-        switch (factor) {
-            case ZERO:
-                return GL_ZERO;
-            case ONE:
-                return GL_ONE;
-            case SRC_COLOR:
-                return GL_SRC_COLOR;
-            case ONE_MINUS_SRC_COLOR:
-                return GL_ONE_MINUS_SRC_COLOR;
-            case DST_COLOR:
-                return GL_DST_COLOR;
-            case ONE_MINUS_DST_COLOR:
-                return GL_ONE_MINUS_DST_COLOR;
-            case SRC_ALPHA:
-                return GL_SRC_ALPHA;
-            case ONE_MINUS_SRC_ALPHA:
-                return GL_ONE_MINUS_SRC_ALPHA;
-            case DST_ALPHA:
-                return GL_DST_ALPHA;
-            case ONE_MINUS_DST_ALPHA:
-                return GL_ONE_MINUS_DST_ALPHA;
-            case CONSTANT_COLOR:
-                return GL_CONSTANT_COLOR;
-            case ONE_MINUS_CONSTANT_COLOR:
-                return GL_ONE_MINUS_CONSTANT_COLOR;
-            case CONSTANT_ALPHA:
-                return GL_CONSTANT_ALPHA;
-            case ONE_MINUS_CONSTANT_ALPHA:
-                return GL_ONE_MINUS_CONSTANT_ALPHA;
-            case SRC_ALPHA_SATURATE:
-                return GL_SRC_ALPHA_SATURATE;
-            default:
-                return GL_ONE;
-        }
-    }
-
-    private int translateCompareFunc(CompareFunc func) {
-        switch (func) {
-            case NEVER:
-                return GL_NEVER;
-            case LESS:
-                return GL_LESS;
-            case EQUAL:
-                return GL_EQUAL;
-            case LESS_EQUAL:
-                return GL_LEQUAL;
-            case GREATER:
-                return GL_GREATER;
-            case NOT_EQUAL:
-                return GL_NOTEQUAL;
-            case GREATER_EQUAL:
-                return GL_GEQUAL;
-            case ALWAYS:
-                return GL_ALWAYS;
-            default:
-                return GL_LESS;
-        }
-    }
-
-    private int translateCullMode(CullMode mode) {
-        switch (mode) {
-            case FRONT:
-                return GL_FRONT;
-            case BACK:
-                return GL_BACK;
-            default:
-                return GL_BACK;
-        }
-    }
-
-    private int translateFillMode(FillMode mode) {
-        switch (mode) {
-            case POINT:
-                return GL_POINT;
-            case WIREFRAME:
-                return GL_LINE;
-            case SOLID:
-                return GL_FILL;
-            default:
-                return GL_FILL;
-        }
-    }
-
-    private int translatePrimitiveType(PrimitiveType type) {
-        switch (type) {
-            case POINTS:
-                return GL_POINTS;
-            case LINES:
-                return GL_LINES;
-            case LINE_STRIP:
-                return GL_LINE_STRIP;
-            case TRIANGLES:
-                return GL_TRIANGLES;
-            case TRIANGLE_STRIP:
-                return GL_TRIANGLE_STRIP;
-            case TRIANGLE_FAN:
-                return GL_TRIANGLE_FAN;
-            default:
-                return GL_TRIANGLES;
-        }
-    }
-
-    private void setupVertexAttributes(VertexBuffer vertexBuffer) {
-        if (!(vertexBuffer instanceof OpenGLVertexBuffer) && !(vertexBuffer instanceof OpenGLPooledVertexBuffer)) {
-            throw new IllegalArgumentException("VertexBuffer must be an OpenGL buffer");
-        }
-
-        VertexBuffer.VertexFormat format = vertexBuffer.getFormat();
-        Objects.requireNonNull(format, "Vertex buffer format must be set before drawing");
-
-        long bufferOffset = 0L;
-        if (vertexBuffer instanceof OpenGLVertexBuffer) {
-            ((OpenGLVertexBuffer) vertexBuffer).bind();
-        } else {
-            OpenGLPooledVertexBuffer pooledVertexBuffer = (OpenGLPooledVertexBuffer) vertexBuffer;
-            pooledVertexBuffer.bind();
-            bufferOffset = pooledVertexBuffer.getOffset();
-        }
-
-        disableVertexAttributes();
-
-        int stride = format.getStrideInBytes();
-        long offset = bufferOffset;
-
-        if (format.hasTexCoords()) {
-            glEnableVertexAttribArray(2);
-            glVertexAttribPointer(2, 2, mapDataType(format.getTexCoordDataType()), false, stride, offset);
-            offset += 2L * format.getTexCoordDataType().getSize();
-        }
-
-        if (format.hasColors()) {
-            glEnableVertexAttribArray(1);
-            glVertexAttribPointer(1, 3, mapDataType(format.getColorDataType()), false, stride, offset);
-            offset += 3L * format.getColorDataType().getSize();
-        } else if (format.hasGrayScale()) {
-            glEnableVertexAttribArray(1);
-            glVertexAttribIPointer(1, 1, mapDataType(format.getGrayScaleDataType()), stride, offset);
-            offset += format.getGrayScaleDataType().getSize();
-        }
-
-        if (format.hasNormals()) {
-            glEnableVertexAttribArray(3);
-            glVertexAttribPointer(3, 3, mapDataType(format.getNormalDataType()), false, stride, offset);
-            offset += 3L * format.getNormalDataType().getSize();
-        }
-
-        if (format.hasPositions()) {
-            glEnableVertexAttribArray(0);
-            glVertexAttribPointer(0, 3, mapDataType(format.getPositionDataType()), false, stride, offset);
-        }
-    }
-
-    private void bindIndexBuffer(IndexBuffer indexBuffer) {
-        if (indexBuffer instanceof OpenGLIndexBuffer) {
-            ((OpenGLIndexBuffer) indexBuffer).bind();
-            return;
-        }
-        if (indexBuffer instanceof OpenGLPooledIndexBuffer) {
-            ((OpenGLPooledIndexBuffer) indexBuffer).bind();
-            return;
-        }
-        throw new IllegalArgumentException("IndexBuffer must be an OpenGL buffer");
-    }
-
-    private void disableVertexAttributes() {
-        glDisableVertexAttribArray(0);
-        glDisableVertexAttribArray(1);
-        glDisableVertexAttribArray(2);
-        glDisableVertexAttribArray(3);
-    }
-
-    private int mapDataType(DataType type) {
-        switch (type) {
-            case UNSIGNED_BYTE:
-                return GL_UNSIGNED_BYTE;
-            case BYTE:
-                return GL_BYTE;
-            case UNSIGNED_SHORT:
-                return GL_UNSIGNED_SHORT;
-            case SHORT:
-                return GL_SHORT;
-            case FLOAT:
-                return GL_FLOAT;
-            case HALF_FLOAT:
-                return GL_HALF_FLOAT;
-            case INT:
-                return GL_INT;
-            default:
-                throw new IllegalArgumentException("Unsupported data type: " + type);
         }
     }
 }

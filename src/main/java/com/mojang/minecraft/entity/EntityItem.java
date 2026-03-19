@@ -6,15 +6,17 @@ import com.mojang.minecraft.item.ItemStack;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.renderer.TextureManager;
 import com.mojang.minecraft.renderer.block.BlockRenderer;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
+import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
-import com.mojang.minecraft.renderer.shader.ShaderRegistry;
+import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 import com.mojang.minecraft.util.math.CollisionUtils;
 
 public class EntityItem extends Entity {
 
-    private static final Pipeline WORLD_PIPELINE = ShaderRegistry.getInstance().getWorldPipeline();
+    private static final Pipeline WORLD_PIPELINE = PipelineRegistry.getInstance().getWorldPipeline();
 
     private final ItemStack itemStack;
 
@@ -80,22 +82,22 @@ public class EntityItem extends Entity {
     }
 
     @Override
-    public void render(GraphicsAPI graphics, TextureManager textureManager, float partialTick) {
+    public void render(CommandBuffer graphics, MatrixStack matrixStack, TextureManager textureManager, float partialTick) {
         Item item = itemStack.getItem(); // TODO: RENDER > STACK SIZE AS ITEM BUNDLE
         if (item instanceof BlockItem) {
-            renderBlockItem((BlockItem) item, graphics, textureManager, partialTick);
+            renderBlockItem((BlockItem) item, graphics, matrixStack, textureManager, partialTick);
         }
     }
 
-    private void renderBlockItem(BlockItem blockItem, GraphicsAPI graphics, TextureManager textureManager, float partialTicks) {
+    private void renderBlockItem(BlockItem blockItem, CommandBuffer graphics, MatrixStack matrixStack, TextureManager textureManager, float partialTicks) {
         IndexedMesh mesh = BlockRenderer.getBlockMesh(blockItem.getBlock());
         graphics.setTexture(textureManager.terrainTexture);
         graphics.setPipeline(WORLD_PIPELINE);
 
-        graphics.pushMatrix();
+        matrixStack.pushMatrix();
 
         // Position at interpolated location
-        graphics.translate(
+        matrixStack.translate(
                 this.xo + (this.x - this.xo) * partialTicks,
                 this.yo + (this.y - this.yo) * partialTicks,
                 this.zo + (this.z - this.zo) * partialTicks
@@ -103,21 +105,21 @@ public class EntityItem extends Entity {
 
         float f = (ticksPerformed + partialTicks) / 10.0F + hoverPhase;
         float bobOffset = (float) (Math.sin(f) * 0.1F);
-        graphics.translate(0, bobOffset + (3f / 16f), 0);
-        graphics.scale(0.25f, 0.25f, 0.25f);
+        matrixStack.translate(0, bobOffset + (3f / 16f), 0);
+        matrixStack.scale(0.25f, 0.25f, 0.25f);
 
         float rot = ((ticksPerformed + partialTicks) / 20f + hoverPhase) * (180f / (float) Math.PI);
 
         // Pivot around model center for correct rotation
-        graphics.translate(0.5f, 0.0f, 0.5f);
-        graphics.rotateY(rot);
-        graphics.translate(-0.5f, -0.0f, -0.5f);
+        matrixStack.translate(0.5f, 0.0f, 0.5f);
+        matrixStack.rotateY(rot);
+        matrixStack.translate(-0.5f, -0.0f, -0.5f);
 
-        graphics.updateShaderMatrices();
+        GraphicsFactory.getGraphicsAPI().bindCurrentMatrices(matrixStack);
 
         mesh.draw(graphics);
 
-        graphics.popMatrix();
+        matrixStack.popMatrix();
     }
 
     @Override

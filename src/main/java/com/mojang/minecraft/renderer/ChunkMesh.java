@@ -1,6 +1,6 @@
 package com.mojang.minecraft.renderer;
 
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 
@@ -45,7 +45,7 @@ public class ChunkMesh implements Disposable {
      *
      * @param graphics the graphics API
      */
-    public int draw(GraphicsAPI graphics) {
+    public int draw(CommandBuffer graphics) {
         if (mesh != null) {
             mesh.draw(graphics);
             return 1;

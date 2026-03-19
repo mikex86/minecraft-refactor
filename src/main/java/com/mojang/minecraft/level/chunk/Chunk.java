@@ -12,7 +12,7 @@ import com.mojang.minecraft.renderer.Disposable;
 import com.mojang.minecraft.renderer.Frustum;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.graphics.DataType;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.util.math.MathUtils;
 import com.mojang.minecraft.util.nio.NativeByteArray;
 
@@ -252,7 +252,7 @@ public final class Chunk implements Disposable {
     /**
      * Renders the given chunk
      */
-    public int render(GraphicsAPI graphics, Frustum frustum) {
+    public int render(CommandBuffer graphics, Frustum frustum) {
         int numSectionDrawCalls = 0;
         for (ChunkSection section : sections) {
             if (section.hasMesh() && frustum.isVisible(section.getAABB())) {
@@ -633,7 +633,7 @@ public final class Chunk implements Disposable {
          *
          * @param graphics the graphics API
          */
-        public int render(GraphicsAPI graphics) {
+        public int render(CommandBuffer graphics) {
             if (!empty) {
                 return chunkMesh.draw(graphics);
             }

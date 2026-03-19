@@ -4,9 +4,11 @@ import com.mojang.minecraft.level.block.Block;
 import com.mojang.minecraft.level.block.EnumFacing;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.graphics.DataType;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
+import com.mojang.minecraft.renderer.graphics.MatrixStack;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -15,13 +17,13 @@ public class BlockRenderer {
 
     private static final Map<Block, IndexedMesh> blockMeshes = new HashMap<>();
 
-    public static void renderBlockPreview(GraphicsAPI graphics, Block block, float scale) {
-        graphics.scale(scale, scale, scale);
-        graphics.rotateX(30.0F);
-        graphics.rotateY(45.0F);
-        graphics.scale(-1.0F, -1.0F, 1.0F);
+    public static void renderBlockPreview(CommandBuffer graphics, MatrixStack matrixStack, Block block, float scale) {
+        matrixStack.scale(scale, scale, scale);
+        matrixStack.rotateX(30.0F);
+        matrixStack.rotateY(45.0F);
+        matrixStack.scale(-1.0F, -1.0F, 1.0F);
 
-        graphics.updateShaderMatrices();
+        GraphicsFactory.getGraphicsAPI().bindCurrentMatrices(matrixStack);
         getBlockMesh(block).draw(graphics);
     }
 

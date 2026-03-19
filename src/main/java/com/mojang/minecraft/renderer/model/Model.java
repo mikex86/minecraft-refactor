@@ -1,7 +1,8 @@
 package com.mojang.minecraft.renderer.model;
 
 import com.mojang.minecraft.renderer.Disposable;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.MatrixStack;
 
 /**
  * Interface for all 3D models in the game.
@@ -16,5 +17,5 @@ public interface Model<T> extends Disposable {
      * @param drawable     The drawable object to render
      * @param partialTicks The partial ticks for animation smoothing
      */
-    void render(GraphicsAPI graphics, T drawable, float partialTicks);
-} 
+    void render(CommandBuffer graphics, MatrixStack matrixStack, T drawable, float partialTicks);
+}

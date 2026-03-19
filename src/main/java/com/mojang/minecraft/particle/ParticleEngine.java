@@ -4,7 +4,7 @@ import com.mojang.minecraft.entity.EntityPlayer;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.Texture;
 
 import java.util.ArrayList;
@@ -64,7 +64,7 @@ public class ParticleEngine {
      * @param player      The player (for camera-relative positioning)
      * @param partialTick Partial tick time
      */
-    public void render(GraphicsAPI graphics, EntityPlayer player, float partialTick) {
+    public void render(CommandBuffer graphics, EntityPlayer player, float partialTick) {
         if (this.particles.isEmpty()) {
             return;
         }
@@ -91,7 +91,7 @@ public class ParticleEngine {
         }
 
         // Finish rendering
-        tesselator.flush();
+        tesselator.flush(graphics);
 
     }
 }

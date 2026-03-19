@@ -2,6 +2,8 @@ package com.mojang.minecraft.renderer;
 
 import com.mojang.minecraft.profiler.NativeMemoryTracker;
 import com.mojang.minecraft.renderer.graphics.*;
+import com.mojang.minecraft.renderer.graphics.allocator.BufferAllocation;
+import com.mojang.minecraft.renderer.graphics.allocator.BufferAllocator;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BufferUsage;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.PrimitiveType;
 import com.mojang.minecraft.util.Fp16Util;
@@ -11,13 +13,6 @@ import org.lwjgl.system.jemalloc.JEmalloc;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 
-/**
- * Tesselator implementation that uses the GraphicsAPI.
- * This provides the same functionality as the original Tesselator, but
- * uses the abstracted graphics API instead of direct OpenGL calls.
- * <p>
- * This version uses indexed triangles instead of direct quads for modern GPU compatibility.
- */
 public final class Tesselator implements Disposable {
     private static final int MAX_BYTES = 1048576;
     private static final int MAX_INDICES = 262144;
@@ -59,6 +54,10 @@ public final class Tesselator implements Disposable {
     private IndexBuffer indexBuffer;
     private VertexBuffer.VertexFormat format;
 
+    // Shared pooled allocators must outlive transient tesselator instances.
+    private static BufferAllocator<? extends BufferAllocation> sharedPooledVertexAllocator = null;
+    private static BufferAllocator<? extends BufferAllocation> sharedPooledIndexAllocator = null;
+
     /**
      * Tesselator to use for everything else.
      */
@@ -74,6 +73,18 @@ public final class Tesselator implements Disposable {
         this.vertexBuffer = null;
         this.indexBuffer = null;
         clear();
+        
+        // Initialize both allocators together once for the active GraphicsAPI instance.  
+        if (sharedPooledVertexAllocator == null && sharedPooledIndexAllocator == null) {
+            sharedPooledVertexAllocator = graphics.createAllocator(
+                    GraphicsAPI.BufferBinding.VERTEX,
+                    GraphicsAPI.BufferAllocatorHint.POOLED
+            );
+            sharedPooledIndexAllocator = graphics.createAllocator(
+                    GraphicsAPI.BufferBinding.INDEX,
+                    GraphicsAPI.BufferAllocatorHint.POOLED
+            );
+        }
     }
 
     private void ensureGpuBuffersInitialized() {
@@ -143,7 +154,7 @@ public final class Tesselator implements Disposable {
     /**
      * Sends all accumulated vertices to the GPU and renders them directly
      */
-    public void flush() {
+    public void flush(CommandBuffer commandBuffer) {
         if (this.vertexCount > 0) {
             ensureGpuBuffersInitialized();
 
@@ -171,7 +182,7 @@ public final class Tesselator implements Disposable {
             indexBuffer.setData(getIndexBuffer(), elementCount * Integer.BYTES); // 4 bytes per int
 
             // Draw the vertices
-            graphics.draw(PrimitiveType.TRIANGLES, vertexBuffer, indexBuffer, 0, elementCount);
+            commandBuffer.draw(PrimitiveType.TRIANGLES, vertexBuffer, indexBuffer, 0, elementCount);
         }
 
         // Reset state
@@ -222,14 +233,14 @@ public final class Tesselator implements Disposable {
         int indexDataSizeInBytes = indexCount * Integer.BYTES; // 4 bytes per int
 
         if (pooled) {
-            vertexBuffer = graphics.createPooledVertexBuffer(vertexDataSizeInBytes);
+            vertexBuffer = graphics.createVertexBuffer(bufferUsage, sharedPooledVertexAllocator, vertexDataSizeInBytes);
             if (vertexBuffer == null) {
                 System.out.println("Failed to create pooled vertex buffer, falling back to dynamic allocation");
                 vertexBuffer = graphics.createVertexBuffer(bufferUsage);
             }
 
             if (useIndexBuffer) {
-                indexBuffer = graphics.createPooledIndexBuffer(indexDataSizeInBytes);
+                indexBuffer = graphics.createIndexBuffer(bufferUsage, sharedPooledIndexAllocator, indexDataSizeInBytes);
                 if (indexBuffer == null) {
                     System.out.println("Failed to create pooled index buffer, falling back to dynamic allocation");
                     indexBuffer = graphics.createIndexBuffer(bufferUsage);

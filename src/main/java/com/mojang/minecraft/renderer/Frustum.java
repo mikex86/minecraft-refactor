@@ -1,7 +1,7 @@
 package com.mojang.minecraft.renderer;
 
 import com.mojang.minecraft.phys.AABB;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.MatrixStack;
 
 import java.nio.FloatBuffer;
 
@@ -45,8 +45,8 @@ public class Frustum {
      *
      * @return Updated frustum instance
      */
-    public static Frustum getFrustum(GraphicsAPI graphics) {
-        instance.calculateFrustum(graphics);
+    public static Frustum getFrustum(MatrixStack matrixStack) {
+        instance.calculateFrustum(matrixStack);
         return instance;
     }
 
@@ -72,10 +72,10 @@ public class Frustum {
     /**
      * Calculate the frustum planes from current OpenGL matrices
      */
-    private void calculateFrustum(GraphicsAPI graphics) {
+    private void calculateFrustum(MatrixStack matrixStack) {
         // Read matrices into arrays
-        FloatBuffer projectionBuffer = graphics.getMatrixStack().getProjectionBuffer();
-        FloatBuffer modelViewBuffer = graphics.getMatrixStack().getModelViewBuffer();
+        FloatBuffer projectionBuffer = matrixStack.getProjectionBuffer();
+        FloatBuffer modelViewBuffer = matrixStack.getModelViewBuffer();
 
         projectionBuffer.get(this.projection);
         modelViewBuffer.get(this.modelview);

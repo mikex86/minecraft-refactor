@@ -8,6 +8,10 @@ import java.nio.FloatBuffer;
  * Each matrix mode (MODELVIEW, PROJECTION) has its own stack with pre-allocated matrices.
  */
 public class MatrixStack {
+    public enum MatrixMode {
+        MODELVIEW,
+        PROJECTION
+    }
 
     /**
      * Constant for the stack depth
@@ -64,7 +68,7 @@ public class MatrixStack {
      * 
      * @param mode The matrix mode to set
      */
-    public void setMatrixMode(GraphicsAPI.MatrixMode mode) {
+    public void setMatrixMode(MatrixMode mode) {
         switch (mode) {
             case MODELVIEW:
                 currentStack = modelViewMatrices;

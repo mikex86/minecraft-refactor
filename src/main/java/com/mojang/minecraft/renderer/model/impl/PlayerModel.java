@@ -1,7 +1,8 @@
 package com.mojang.minecraft.renderer.model.impl;
 
 import com.mojang.minecraft.entity.EntityPlayer;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.model.Model;
 import com.mojang.minecraft.renderer.shape.Cube;
 
@@ -58,7 +59,7 @@ public class PlayerModel implements Model<EntityPlayer> {
      * Renders the player model
      */
     @Override
-    public void render(GraphicsAPI graphics, EntityPlayer player, float partialTicks) {
+    public void render(CommandBuffer graphics, MatrixStack matrixStack, EntityPlayer player, float partialTicks) {
         float limbSwingAmount = player.prevLimbSwingAmount + (player.limbSwingAmount - player.prevLimbSwingAmount) * partialTicks;
         float limbSwing = player.limbSwing + (player.limbSwing - player.prevLimbSwing) * partialTicks;
 
@@ -72,14 +73,14 @@ public class PlayerModel implements Model<EntityPlayer> {
         setRotationAngles(limbSwing, limbSwingAmount, headYaw, headPitch);
 
         // Render all body parts
-        this.head.render(graphics);
+        this.head.render(graphics, matrixStack);
 
-        graphics.rotateY(bodyYaw);
-        this.body.render(graphics);
-        this.rightArm.render(graphics);
-        this.leftArm.render(graphics);
-        this.rightLeg.render(graphics);
-        this.leftLeg.render(graphics);
+        matrixStack.rotateY(bodyYaw);
+        this.body.render(graphics, matrixStack);
+        this.rightArm.render(graphics, matrixStack);
+        this.leftArm.render(graphics, matrixStack);
+        this.rightLeg.render(graphics, matrixStack);
+        this.leftLeg.render(graphics, matrixStack);
     }
 
     protected void setRotationAngles(float limbSwing, float limbSwingAmount, float netHeadYaw, float headPitch) {

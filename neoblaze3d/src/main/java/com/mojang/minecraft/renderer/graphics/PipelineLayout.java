@@ -20,6 +20,13 @@ public interface PipelineLayout extends GraphicsResource {
      */
     List<Binding> getBindings();
 
+    /**
+     * Looks up the numeric binding for a semantic.
+     *
+     * @return Binding index, or {@code -1} if not declared by this layout
+     */
+    int findBinding(BindingSemantic semantic);
+
     enum ResourceType {
         UNIFORM_BUFFER,
         STORAGE_BUFFER,
@@ -35,20 +42,36 @@ public interface PipelineLayout extends GraphicsResource {
     }
 
     /**
+     * Well-known semantics that a pipeline layout may expose.
+     * These are backend-neutral logical names that map to backend-specific slots.
+     */
+    enum BindingSemantic {
+        NONE,
+        MODEL_VIEW_MATRIX,
+        PROJECTION_MATRIX
+    }
+
+    /**
      * Single binding declaration in a layout.
      */
     final class Binding {
         private final int binding;
         private final ResourceType resourceType;
         private final ShaderStage stage;
+        private final BindingSemantic semantic;
 
         public Binding(int binding, ResourceType resourceType, ShaderStage stage) {
+            this(binding, resourceType, stage, BindingSemantic.NONE);
+        }
+
+        public Binding(int binding, ResourceType resourceType, ShaderStage stage, BindingSemantic semantic) {
             if (binding < 0) {
                 throw new IllegalArgumentException("binding must be >= 0");
             }
             this.binding = binding;
             this.resourceType = resourceType;
             this.stage = stage;
+            this.semantic = semantic == null ? BindingSemantic.NONE : semantic;
         }
 
         public int getBinding() {
@@ -61,6 +84,10 @@ public interface PipelineLayout extends GraphicsResource {
 
         public ShaderStage getStage() {
             return stage;
+        }
+
+        public BindingSemantic getSemantic() {
+            return semantic;
         }
     }
 
@@ -89,4 +116,3 @@ public interface PipelineLayout extends GraphicsResource {
         }
     }
 }
-

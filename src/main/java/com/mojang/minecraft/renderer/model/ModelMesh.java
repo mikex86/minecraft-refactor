@@ -2,9 +2,8 @@ package com.mojang.minecraft.renderer.model;
 
 import com.mojang.minecraft.renderer.Disposable;
 import com.mojang.minecraft.renderer.Tesselator;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums.BufferUsage;
-import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
 
 /**
@@ -17,7 +16,6 @@ public class ModelMesh implements Disposable {
     
     // Tesselator for building this mesh
     private final Tesselator tesselator;
-    private final GraphicsAPI graphics;
     
     // State tracking
     private boolean dirty = true;
@@ -27,7 +25,6 @@ public class ModelMesh implements Disposable {
      * Creates a new model mesh.
      */
     public ModelMesh() {
-        this.graphics = GraphicsFactory.getGraphicsAPI();
         this.tesselator = new Tesselator(); // Using a dedicated tesselator to avoid conflicts
         this.mesh = null;
     }
@@ -78,9 +75,9 @@ public class ModelMesh implements Disposable {
     /**
      * Renders the mesh.
      */
-    public void render() {
+    public void render(CommandBuffer commandBuffer) {
         if (this.mesh != null) {
-            this.mesh.draw(graphics);
+            this.mesh.draw(commandBuffer);
         }
     }
     

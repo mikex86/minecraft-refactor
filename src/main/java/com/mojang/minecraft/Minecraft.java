@@ -12,7 +12,7 @@ import com.mojang.minecraft.profiler.GpuMemoryTracker;
 import com.mojang.minecraft.profiler.NativeMemoryTracker;
 import com.mojang.minecraft.renderer.GameRenderer;
 import com.mojang.minecraft.renderer.TextureManager;
-import com.mojang.minecraft.renderer.shader.ShaderRegistry;
+import com.mojang.minecraft.renderer.shader.PipelineRegistry;
 import com.mojang.minecraft.util.logging.LoggingUtils;
 import com.mojang.minecraft.util.math.MathUtils;
 import com.mojang.minecraft.world.HitResult;
@@ -27,7 +27,7 @@ public class Minecraft implements Runnable {
 
     // Core systems
     private final GameEngine engine;
-    private final ShaderRegistry shaderRegistry;
+    private final PipelineRegistry pipelineRegistry;
     private GameInputHandler gameInputHandler;
     private GameRenderer renderer;
     private ScreenManager screenManager;
@@ -53,7 +53,7 @@ public class Minecraft implements Runnable {
     public Minecraft(int width, int height, boolean fullscreen) {
         this.engine = new GameEngine(width, height, fullscreen, MINECRAFT_VERSION_STRING);
         this.textureManager = new TextureManager();
-        this.shaderRegistry = ShaderRegistry.getInstance();
+        this.pipelineRegistry = PipelineRegistry.getInstance();
     }
 
     /**
@@ -67,7 +67,7 @@ public class Minecraft implements Runnable {
             engine.initialize();
 
             // Initialize the shader manager
-            shaderRegistry.initialize();
+            pipelineRegistry.initialize();
 
             // Initialize texture manager
             textureManager.loadTextures();
@@ -79,7 +79,7 @@ public class Minecraft implements Runnable {
             // Create renderer
             this.renderer = new GameRenderer(
                     this.textureManager,
-                    this.shaderRegistry,
+                    this.pipelineRegistry,
                     this.gameState.getLevel(),
                     gameState.getLevelRenderer(),
                     gameState.getParticleEngine(),
@@ -117,7 +117,7 @@ public class Minecraft implements Runnable {
             }
             engine.shutdown();
             textureManager.dispose();
-            shaderRegistry.dispose();
+            pipelineRegistry.dispose();
         } catch (Exception e) {
             CrashReporter.handleError("Failed to clean up resources during shutdown", e);
         }

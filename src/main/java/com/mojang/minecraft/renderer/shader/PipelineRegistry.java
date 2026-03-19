@@ -11,17 +11,14 @@ import com.mojang.minecraft.renderer.graphics.PipelineLayout;
 import com.mojang.minecraft.renderer.shader.impl.*;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-/**
- * Manages shader programs.
- * Provides a central place to load, cache, and retrieve shaders.
- */
-public class ShaderRegistry implements Disposable {
+public class PipelineRegistry implements Disposable {
 
-    private static ShaderRegistry instance;
+    private static PipelineRegistry instance;
 
     // Cache of loaded shaders
     private final Map<String, Shader> shaders = new HashMap<>();
@@ -33,7 +30,10 @@ public class ShaderRegistry implements Disposable {
     private HudShader hudShader;
     private HudNoTexShader hudNoTexShader;
     private OutlineShader outlineShader;
+
     private PipelineLayout sharedPipelineLayout;
+
+    // Core pipelines
     private Pipeline worldPipeline;
     private Pipeline particlePipeline;
     private Pipeline entityPipeline;
@@ -50,9 +50,9 @@ public class ShaderRegistry implements Disposable {
      *
      * @return The shader manager instance
      */
-    public static ShaderRegistry getInstance() {
+    public static PipelineRegistry getInstance() {
         if (instance == null) {
-            instance = new ShaderRegistry();
+            instance = new PipelineRegistry();
         }
         return instance;
     }
@@ -60,7 +60,7 @@ public class ShaderRegistry implements Disposable {
     /**
      * Private constructor to enforce singleton pattern.
      */
-    private ShaderRegistry() {
+    private PipelineRegistry() {
     }
 
     /**
@@ -78,7 +78,23 @@ public class ShaderRegistry implements Disposable {
         outlineShader = new OutlineShader();
 
         sharedPipelineLayout = GraphicsFactory.getGraphicsAPI().createPipelineLayout(
-                new PipelineLayout.Descriptor("legacy-shader-layout", Collections.<PipelineLayout.Binding>emptyList())
+                new PipelineLayout.Descriptor(
+                        "legacy-shader-layout",
+                        Arrays.asList(
+                                new PipelineLayout.Binding(
+                                        0,
+                                        PipelineLayout.ResourceType.UNIFORM_BUFFER,
+                                        PipelineLayout.ShaderStage.VERTEX,
+                                        PipelineLayout.BindingSemantic.MODEL_VIEW_MATRIX
+                                ),
+                                new PipelineLayout.Binding(
+                                        4,
+                                        PipelineLayout.ResourceType.UNIFORM_BUFFER,
+                                        PipelineLayout.ShaderStage.VERTEX,
+                                        PipelineLayout.BindingSemantic.PROJECTION_MATRIX
+                                )
+                        )
+                )
         );
 
         Pipeline.BlendState blendDisabled = new Pipeline.BlendState(false, BlendFactor.ONE, BlendFactor.ZERO);

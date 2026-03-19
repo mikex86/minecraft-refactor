@@ -1,9 +1,11 @@
 package com.mojang.minecraft.gui;
 
 import com.mojang.minecraft.renderer.Disposable;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
+import com.mojang.minecraft.renderer.graphics.MatrixStack;
 
 public class TextLabel implements Disposable {
 
@@ -22,7 +24,7 @@ public class TextLabel implements Disposable {
         this.shadow = shadow;
     }
 
-    public void render(GraphicsAPI graphics, float x, float y) {
+    public void render(CommandBuffer graphics, MatrixStack matrixStack, float x, float y) {
         if (this.meshes[0] == null) {
             if (this.shadow) {
                 this.font.draw(graphics, text, 1, 1, color, true, false);
@@ -36,13 +38,13 @@ public class TextLabel implements Disposable {
         }
 
         graphics.setTexture(this.font.getFontTexture());
-        graphics.pushMatrix();
-        graphics.translate(x, y, 0);
-        graphics.updateShaderMatrices();
+        matrixStack.pushMatrix();
+        matrixStack.translate(x, y, 0);
+        GraphicsFactory.getGraphicsAPI().bindCurrentMatrices(matrixStack);
         for (IndexedMesh mesh : this.meshes) {
             mesh.draw(graphics);
         }
-        graphics.popMatrix();
+        matrixStack.popMatrix();
     }
 
     public void setText(String text) {

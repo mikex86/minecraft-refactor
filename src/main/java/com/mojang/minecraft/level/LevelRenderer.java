@@ -7,8 +7,8 @@ import com.mojang.minecraft.level.chunk.Chunk;
 import com.mojang.minecraft.renderer.Disposable;
 import com.mojang.minecraft.renderer.Frustum;
 import com.mojang.minecraft.renderer.TextureManager;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
-import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Texture;
 
 import java.util.ArrayList;
@@ -24,7 +24,6 @@ public class LevelRenderer implements Disposable {
     private final Level level;
 
     // Graphics resources
-    private final GraphicsAPI graphics;
     private final TextureManager textureManager;
 
     // Number of chunk sections draw calls issued this frame
@@ -36,7 +35,6 @@ public class LevelRenderer implements Disposable {
     public LevelRenderer(Level level, TextureManager textureManager) {
         this.level = level;
         this.textureManager = textureManager;
-        this.graphics = GraphicsFactory.getGraphicsAPI();
     }
 
     /**
@@ -62,13 +60,13 @@ public class LevelRenderer implements Disposable {
     /**
      * Renders the level
      */
-    public void render(float partialTicks) {
+    public void render(CommandBuffer graphics, MatrixStack matrixStack, float partialTicks) {
         // Enable texturing and bind the terrain texture
         Texture texture = textureManager.terrainTexture;
         graphics.setTexture(texture);
 
         // Get the current view frustum
-        Frustum frustum = Frustum.getFrustum(graphics);
+        Frustum frustum = Frustum.getFrustum(matrixStack);
 
         // Render all visible chunks
         numSectionDrawCalls = 0;
@@ -79,9 +77,9 @@ public class LevelRenderer implements Disposable {
         }
     }
 
-    public void renderEntities(float partialTicks) {
+    public void renderEntities(CommandBuffer graphics, MatrixStack matrixStack, float partialTicks) {
         // Get the current view frustum
-        Frustum frustum = Frustum.getFrustum(graphics);
+        Frustum frustum = Frustum.getFrustum(matrixStack);
 
         // Render entities
         for (Entity entity : this.level.getEntities()) {
@@ -92,7 +90,7 @@ public class LevelRenderer implements Disposable {
                 }
             }
             if (frustum.isVisible(entity.boundingBox)) {
-                entity.render(graphics, textureManager, partialTicks);
+                entity.render(graphics, matrixStack, textureManager, partialTicks);
             }
         }
     }
@@ -146,8 +144,8 @@ public class LevelRenderer implements Disposable {
     /**
      * Update chunks that need to be rebuilt.
      */
-    public void updateDirtyChunks(EntityPlayer player) {
-        Frustum frustum = Frustum.getFrustum(graphics);
+    public void updateDirtyChunks(CommandBuffer graphics, MatrixStack matrixStack, EntityPlayer player) {
+        Frustum frustum = Frustum.getFrustum(matrixStack);
         if (rebuildQueue == null) {
             rebuildQueue = new PriorityBlockingQueue<>(512, new DirtyChunkSorter(player, frustum));
         }

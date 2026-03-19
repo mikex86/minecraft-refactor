@@ -4,7 +4,8 @@ import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.state.BlockState;
 import com.mojang.minecraft.phys.AABB;
 import com.mojang.minecraft.renderer.TextureManager;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.util.math.CollisionUtils;
 import com.mojang.minecraft.util.math.MathUtils;
 
@@ -428,7 +429,7 @@ public class Entity {
      * @param graphics    The graphics api
      * @param partialTick Partial tick time for smooth animation
      */
-    public void render(GraphicsAPI graphics, TextureManager textureManager, float partialTick) {
+    public void render(CommandBuffer graphics, MatrixStack matrixStack, TextureManager textureManager, float partialTick) {
         // Default implementation does nothing
     }
 }

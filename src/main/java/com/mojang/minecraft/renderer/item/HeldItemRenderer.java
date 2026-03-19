@@ -3,9 +3,11 @@ package com.mojang.minecraft.renderer.item;
 import com.mojang.minecraft.item.HeldItem;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
+import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Texture;
 
 import java.nio.ByteBuffer;
@@ -31,15 +33,15 @@ public class HeldItemRenderer {
         this.itemsTextureData = hostData;
     }
 
-    public void renderHeldItemPreview(GraphicsAPI graphics, HeldItem heldItem, int itemSize) {
-        graphics.pushMatrix();
+    public void renderHeldItemPreview(CommandBuffer graphics, MatrixStack matrixStack, HeldItem heldItem, int itemSize) {
+        matrixStack.pushMatrix();
         try {
             // GUI space has Y going down; flip to keep item upright.
-            graphics.translate(0.0F, itemSize, 0.0F);
-            graphics.scale(1.0F, -1.0F, 1.0F);
-            renderHeldItemModel(graphics, heldItem, itemSize);
+            matrixStack.translate(0.0F, itemSize, 0.0F);
+            matrixStack.scale(1.0F, -1.0F, 1.0F);
+            renderHeldItemModel(graphics, matrixStack, heldItem, itemSize);
         } finally {
-            graphics.popMatrix();
+            matrixStack.popMatrix();
         }
     }
 
@@ -60,11 +62,11 @@ public class HeldItemRenderer {
         return (itemsTextureData.get(alphaIndex) & 0xFF) == 0;
     }
 
-    public void renderHeldItemModel(GraphicsAPI graphics, HeldItem heldItem, int itemSize) {
+    public void renderHeldItemModel(CommandBuffer graphics, MatrixStack matrixStack, HeldItem heldItem, int itemSize) {
         IndexedMesh itemQuadMesh = getItemQuadMesh(heldItem);
 
-        graphics.scale(itemSize, itemSize, itemSize);
-        graphics.updateShaderMatrices();
+        matrixStack.scale(itemSize, itemSize, itemSize);
+        GraphicsFactory.getGraphicsAPI().bindCurrentMatrices(matrixStack);
         itemQuadMesh.draw(graphics);
     }
 

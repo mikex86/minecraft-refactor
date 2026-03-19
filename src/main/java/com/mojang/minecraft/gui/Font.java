@@ -2,7 +2,7 @@ package com.mojang.minecraft.gui;
 
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.Texture;
 
 import javax.imageio.ImageIO;
@@ -110,7 +110,7 @@ public class Font {
      * @param y               The y position
      * @param color           The color of the text (RGB format)
      */
-    public void drawShadow(GraphicsAPI graphics, String text, int x, int y, int color) {
+    public void drawShadow(CommandBuffer graphics, String text, int x, int y, int color) {
         this.draw(graphics, text, x + 1, y + 1, color, true, true);
         this.draw(graphics, text, x, y, color);
     }
@@ -123,7 +123,7 @@ public class Font {
      * @param y     The y position
      * @param color The color of the text (RGB format)
      */
-    public void draw(GraphicsAPI graphics, String text, int x, int y, int color) {
+    public void draw(CommandBuffer graphics, String text, int x, int y, int color) {
         this.draw(graphics, text, x, y, color, false, true);
     }
 
@@ -138,7 +138,7 @@ public class Font {
      * @param darken          Whether to darken the color (for shadow effect)
      * @param flushTesselator Whether to immediately render the text on screen or keep it buffered in the tesselator
      */
-    public void draw(GraphicsAPI graphics, String text, int x, int y, int color, boolean darken, boolean flushTesselator) {
+    public void draw(CommandBuffer graphics, String text, int x, int y, int color, boolean darken, boolean flushTesselator) {
         char[] chars = text.toCharArray();
         if (darken) {
             color = (color & COLOR_DARKEN_MASK) >> 2;
@@ -220,7 +220,7 @@ public class Font {
 
         // Render the text and clean up OpenGL state
         if (flushTesselator) {
-            tessellator.flush();
+            tessellator.flush(graphics);
         }
     }
 

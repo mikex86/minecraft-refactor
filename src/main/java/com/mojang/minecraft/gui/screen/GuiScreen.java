@@ -1,7 +1,8 @@
 package com.mojang.minecraft.gui.screen;
 
 import com.mojang.minecraft.renderer.Disposable;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.MatrixStack;
 
 public class GuiScreen implements Disposable {
 
@@ -12,7 +13,7 @@ public class GuiScreen implements Disposable {
     public void onInit() {
     }
 
-    public void drawScreen(GraphicsAPI graphics, float screenWidth, float screenHeight, float partialTicks) {
+    public void drawScreen(CommandBuffer graphics, MatrixStack matrixStack, float screenWidth, float screenHeight, float partialTicks) {
     }
 
     public void onResized(float screenWidth, float screenHeight) {

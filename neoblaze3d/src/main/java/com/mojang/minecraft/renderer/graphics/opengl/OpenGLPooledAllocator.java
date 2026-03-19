@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 import org.lwjgl.system.jemalloc.JEmalloc;
 
 import static org.lwjgl.opengl.GL15.*;
@@ -21,13 +20,25 @@ import static org.lwjgl.opengl.GL15.*;
  * A pool for OpenGL buffer objects that manages a single large buffer
  * and allocates regions from it to avoid creating many small buffer objects.
  */
-public class OpenGLPooledAllocator implements BufferAllocator<OpenGLBufferAllocation> {
+final class OpenGLPooledAllocator implements BufferAllocator<OpenGLBufferAllocation> {
     private static final Logger LOGGER = Logger.getLogger(OpenGLPooledAllocator.class.getName());
     
     // Growth settings
     private static final float GROWTH_THRESHOLD = 0.85f; // Start growing at 85% capacity
     private static final float GROWTH_FACTOR = 1.5f; // Grow by 50% each time
     private static final long MAX_SIZE = 4L * 1024L * 1024L * 1024L; // 4GB max size
+    private static final Comparator<Region> REGION_OFFSET_COMPARATOR = new Comparator<Region>() {
+        @Override
+        public int compare(Region a, Region b) {
+            return Long.compare(a.offset, b.offset);
+        }
+    };
+    private static final Comparator<BufferRegion> BUFFER_REGION_OFFSET_COMPARATOR = new Comparator<BufferRegion>() {
+        @Override
+        public int compare(BufferRegion a, BufferRegion b) {
+            return Long.compare(a.getOffset(), b.getOffset());
+        }
+    };
 
     // The OpenGL buffer ID
     private int bufferId;
@@ -103,7 +114,7 @@ public class OpenGLPooledAllocator implements BufferAllocator<OpenGLBufferAlloca
         }
 
         // Check total free space first
-        long totalFreeSpace = freeRegions.stream().mapToLong(r -> r.size).sum();
+        long totalFreeSpace = sumFreeRegionBytes();
         long totalUsed = totalSize - totalFreeSpace;
         
         // Check if we need to grow the buffer
@@ -119,7 +130,7 @@ public class OpenGLPooledAllocator implements BufferAllocator<OpenGLBufferAlloca
             defragmentMemory();
             
             // Recalculate free space after defragmentation
-            totalFreeSpace = freeRegions.stream().mapToLong(r -> r.size).sum();
+            totalFreeSpace = sumFreeRegionBytes();
             
             // If still not enough space after defragmentation, try growing
             if (totalFreeSpace < sizeInBytes && !growing && totalSize < MAX_SIZE) {
@@ -178,7 +189,7 @@ public class OpenGLPooledAllocator implements BufferAllocator<OpenGLBufferAlloca
             freeRegions.add(new Region(bestFit.offset + sizeInBytes, bestFit.size - sizeInBytes));
 
             // Sort the free list by offset to facilitate merging adjacent regions
-            freeRegions.sort(Comparator.comparingLong(r -> r.offset));
+            Collections.sort(freeRegions, REGION_OFFSET_COMPARATOR);
         }
 
         if (activeRegions.containsKey(bestFit.offset)) {
@@ -385,9 +396,8 @@ public class OpenGLPooledAllocator implements BufferAllocator<OpenGLBufferAlloca
             LOGGER.info("Starting buffer defragmentation");
 
             // Sort active regions by offset
-            List<BufferRegion> sortedRegions = activeRegions.values().stream()
-                    .sorted(Comparator.comparingLong(BufferRegion::getOffset))
-                    .collect(Collectors.toList());
+            List<BufferRegion> sortedRegions = new ArrayList<>(activeRegions.values());
+            Collections.sort(sortedRegions, BUFFER_REGION_OFFSET_COMPARATOR);
 
             // Calculate total fragmentation (sum of gaps between regions)
             long expectedOffset = 0;
@@ -475,7 +485,7 @@ public class OpenGLPooledAllocator implements BufferAllocator<OpenGLBufferAlloca
     @Override
     public String getStats() {
         long allocatedBytes = totalAllocated;
-        long freeBytes = freeRegions.stream().mapToLong(r -> r.size).sum();
+        long freeBytes = sumFreeRegionBytes();
         int numFreeRegions = freeRegions.size();
 
         return String.format("Buffer Pool Stats (type=%s):%n" +
@@ -567,7 +577,7 @@ public class OpenGLPooledAllocator implements BufferAllocator<OpenGLBufferAlloca
         }
 
         List<BufferRegion> sortedRegions = new ArrayList<>(activeRegions.values());
-        Collections.sort(sortedRegions, Comparator.comparingLong(BufferRegion::getOffset));
+        Collections.sort(sortedRegions, BUFFER_REGION_OFFSET_COMPARATOR);
 
         long cursor = 0;
         for (BufferRegion region : sortedRegions) {
@@ -583,6 +593,14 @@ public class OpenGLPooledAllocator implements BufferAllocator<OpenGLBufferAlloca
         if (cursor < totalSize) {
             freeRegions.add(new Region(cursor, totalSize - cursor));
         }
+    }
+
+    private long sumFreeRegionBytes() {
+        long total = 0;
+        for (Region freeRegion : freeRegions) {
+            total += freeRegion.size;
+        }
+        return total;
     }
 
     /**

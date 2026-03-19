@@ -123,7 +123,9 @@ public class TextureManager implements Disposable {
             data.dispose();
         }
         retainedTextureData.clear();
-        textureCache.values().forEach(Texture::dispose);
+        for (Texture texture : textureCache.values()) {
+            texture.dispose();
+        }
         textureCache.clear();
     }
 

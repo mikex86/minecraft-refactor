@@ -4,7 +4,8 @@ import com.mojang.minecraft.gui.Font;
 import com.mojang.minecraft.gui.screen.renderer.InventoryItemRenderer;
 import com.mojang.minecraft.item.inventory.Inventory;
 import com.mojang.minecraft.renderer.TextureManager;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
+import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
 
 public class CraftingScreen extends AbstractInventoryScreen {
@@ -29,7 +30,7 @@ public class CraftingScreen extends AbstractInventoryScreen {
     }
 
     @Override
-    public void drawScreen(GraphicsAPI graphics, float screenWidth, float screenHeight, float partialTicks) {
+    public void drawScreen(CommandBuffer graphics, MatrixStack matrixStack, float screenWidth, float screenHeight, float partialTicks) {
         float centerX = (float) (int) screenWidth / 2;
         float centerY = (float) (int) screenHeight / 2;
 
@@ -42,8 +43,8 @@ public class CraftingScreen extends AbstractInventoryScreen {
 
         drawInventoryScreenBackground(graphics, centerX, centerY, textureManager.craftingTexture);
 
-        InventoryItemRenderer.renderInventoryItems(graphics, textureManager, heldItemRenderer, this, centerX, centerY);
-        InventoryItemRenderer.drawSelectedItem(graphics, textureManager, heldItemRenderer, inventory, mouseX, mouseY, stackSizeSelectedItemLabel);
+        InventoryItemRenderer.renderInventoryItems(graphics, matrixStack, textureManager, heldItemRenderer, this, centerX, centerY);
+        InventoryItemRenderer.drawSelectedItem(graphics, matrixStack, textureManager, heldItemRenderer, inventory, mouseX, mouseY, stackSizeSelectedItemLabel);
 
         this.screenWidth = screenWidth;
         this.screenHeight = screenHeight;

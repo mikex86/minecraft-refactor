@@ -8,9 +8,10 @@ import com.mojang.minecraft.item.inventory.Inventory;
 import com.mojang.minecraft.optim.pools.StackCountStringPool;
 import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
-import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
+import com.mojang.minecraft.renderer.graphics.CommandBuffer;
 import com.mojang.minecraft.renderer.graphics.GraphicsEnums;
 import com.mojang.minecraft.renderer.graphics.IndexedMesh;
+import com.mojang.minecraft.renderer.graphics.MatrixStack;
 import com.mojang.minecraft.renderer.graphics.Texture;
 import com.mojang.minecraft.renderer.item.HeldItemRenderer;
 
@@ -133,7 +134,7 @@ public class AbstractInventoryScreen extends GuiScreen {
         }
     }
 
-    protected void drawInventoryScreenBackground(GraphicsAPI graphics, float centerX, float centerY, Texture texture) {
+    protected void drawInventoryScreenBackground(CommandBuffer graphics, float centerX, float centerY, Texture texture) {
         if (inventoryQuadMesh == null) {
             Tesselator t = Tesselator.instance;
             t.init();
@@ -231,9 +232,9 @@ public class AbstractInventoryScreen extends GuiScreen {
             clickAction.run();
         }
 
-        public void renderStackSize(GraphicsAPI graphics, float centerX, float centerY, int count) {
+        public void renderStackSize(CommandBuffer graphics, MatrixStack matrixStack, float centerX, float centerY, int count) {
             this.stackSizeLabel.setText(StackCountStringPool.valueOf(count));
-            this.stackSizeLabel.render(graphics, getLabelX(centerX), getLabelY(centerY));
+            this.stackSizeLabel.render(graphics, matrixStack, getLabelX(centerX), getLabelY(centerY));
         }
 
         void placeOne() {

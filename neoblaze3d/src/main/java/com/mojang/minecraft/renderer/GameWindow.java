@@ -252,14 +252,12 @@ public class GameWindow implements Disposable {
 
         if (swapchain.isOutOfDate()) {
             swapchain.recreate(width, height);
-            graphics.setViewport(0, 0, width, height);
         }
 
         // Acquire next frame image for upcoming rendering work.
         Swapchain.AcquireResult acquireResult = swapchain.acquireNextImage();
         if (acquireResult.getStatus() == Swapchain.AcquireStatus.OUT_OF_DATE) {
             swapchain.recreate(width, height);
-            graphics.setViewport(0, 0, width, height);
             acquireResult = swapchain.acquireNextImage();
         }
         if (acquireResult.getStatus() != Swapchain.AcquireStatus.OUT_OF_DATE) {
