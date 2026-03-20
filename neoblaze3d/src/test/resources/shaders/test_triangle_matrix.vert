@@ -12,7 +12,14 @@ layout(std140, binding = 4) uniform ProjectionUniform {
 
 layout (location = 0) out vec3 vColor;
 
+vec4 backendClipPosition(vec4 clipPos) {
+#ifdef VULKAN_BACKEND
+    clipPos.z = 0.5 * (clipPos.z + clipPos.w);
+#endif
+    return clipPos;
+}
+
 void main() {
     vColor = color;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    gl_Position = backendClipPosition(projectionMatrix * modelViewMatrix * vec4(position, 1.0));
 }

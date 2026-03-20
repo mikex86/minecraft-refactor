@@ -2,6 +2,7 @@ package com.mojang.minecraft.renderer;
 
 import com.mojang.minecraft.renderer.graphics.GraphicsAPI;
 import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
+import com.mojang.minecraft.renderer.graphics.vulkan.VulkanGraphicsAPI;
 import com.mojang.minecraft.renderer.swapchain.Swapchain;
 import com.mojang.minecraft.renderer.swapchain.opengl.OpenGLSwapchain;
 import org.lwjgl.glfw.*;
@@ -74,17 +75,26 @@ public class GameWindow implements Disposable {
             throw new IllegalStateException("Unable to initialize GLFW");
         }
 
+        // Feed runtime Vulkan support into backend selection before the first GraphicsAPI instance is created.
+        GraphicsFactory.setVulkanSupportHint(VulkanGraphicsAPI.isRuntimeSupported());
+        GraphicsAPI.Backend preferredBackend = GraphicsFactory.getPreferredBackend();
+
         // Configure GLFW window
         glfwDefaultWindowHints();
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
         glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_TRUE);
         
-        // Request OpenGL 3.2 core profile
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+        if (preferredBackend == GraphicsAPI.Backend.OPENGL) {
+            // Request OpenGL 3.2 core profile.
+            glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+            glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+            glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+            glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+        } else {
+            // Vulkan path: no OpenGL context.
+            glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        }
 
         // Create the window
         if (fullscreen) {
@@ -146,14 +156,16 @@ public class GameWindow implements Disposable {
             }
         }
 
-        // Make the OpenGL context current
-        glfwMakeContextCurrent(window);
+        if (preferredBackend == GraphicsAPI.Backend.OPENGL) {
+            // Make the OpenGL context current.
+            glfwMakeContextCurrent(window);
 
-        // Disable v-sync
-        glfwSwapInterval(0);
+            // Disable v-sync.
+            glfwSwapInterval(0);
 
-        // Initialize OpenGL capabilities (needed for LWJGL to work with OpenGL)
-        GL.createCapabilities();
+            // Initialize OpenGL capabilities (needed for LWJGL to work with OpenGL).
+            GL.createCapabilities();
+        }
 
         // get content scale factor
         try (MemoryStack stack = stackPush()) {
@@ -164,18 +176,28 @@ public class GameWindow implements Disposable {
             this.contentScaleY = pScaleY.get(0);
         }
 
+        // Provide the native window handle before backend creation (Vulkan needs this for surface creation).
+        GraphicsFactory.setWindowHandleHint(window);
+
         // Get the graphics API
         this.graphics = GraphicsFactory.getGraphicsAPI();
 
         // Initialize the graphics API
         graphics.initialize();
 
-        // Create swapchain abstraction for presentation.
-        this.swapchain = new OpenGLSwapchain(window, this.width, this.height);
-        this.swapchain.initialize();
-        Swapchain.AcquireResult acquireResult = this.swapchain.beginFrame();
-        this.currentSwapchainImageIndex = acquireResult.getImageIndex();
-        this.currentFrameInFlightIndex = acquireResult.getFrameInFlightIndex();
+        // OpenGL uses GLFW buffer swapping via swapchain abstraction.
+        // Vulkan performs acquire/present in the backend implementation.
+        if (graphics.getBackend() == GraphicsAPI.Backend.OPENGL) {
+            this.swapchain = new OpenGLSwapchain(window, this.width, this.height);
+            this.swapchain.initialize();
+            Swapchain.AcquireResult acquireResult = this.swapchain.beginFrame();
+            this.currentSwapchainImageIndex = acquireResult.getImageIndex();
+            this.currentFrameInFlightIndex = acquireResult.getFrameInFlightIndex();
+        } else {
+            this.swapchain = null;
+            this.currentSwapchainImageIndex = -1;
+            this.currentFrameInFlightIndex = -1;
+        }
     }
 
     public void show() {
@@ -207,6 +229,31 @@ public class GameWindow implements Disposable {
      * @return true if the window should remain open, false if it should close
      */
     public boolean update() {
+        if (swapchain == null) {
+            // Vulkan path: backend owns acquire/present lifecycle.
+            glfwPollEvents();
+
+            try (MemoryStack stack = stackPush()) {
+                IntBuffer pWidth = stack.mallocInt(1);
+                IntBuffer pHeight = stack.mallocInt(1);
+                IntBuffer pWindowWidth = stack.mallocInt(1);
+                IntBuffer pWindowHeight = stack.mallocInt(1);
+
+                glfwGetFramebufferSize(window, pWidth, pHeight);
+                glfwGetWindowSize(window, pWindowWidth, pWindowHeight);
+
+                width = pWidth.get(0);
+                height = pHeight.get(0);
+                windowWidth = pWindowWidth.get(0);
+                windowHeight = pWindowHeight.get(0);
+                updateMouseToFramebufferScale();
+            }
+
+            currentSwapchainImageIndex = -1;
+            currentFrameInFlightIndex = -1;
+            return !glfwWindowShouldClose(window);
+        }
+
         // Present the previously rendered frame when a valid image is available.
         if (currentSwapchainImageIndex >= 0) {
             Swapchain.PresentStatus presentStatus = swapchain.endFrame();
@@ -356,7 +403,9 @@ public class GameWindow implements Disposable {
             scrollCallback.free();
         }
         if (isStandalone) {
-            swapchain.dispose();
+            if (swapchain != null) {
+                swapchain.dispose();
+            }
 
             // Shutdown graphics while context is still alive.
             graphics.shutdown();

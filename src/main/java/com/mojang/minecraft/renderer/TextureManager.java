@@ -22,8 +22,6 @@ import static org.lwjgl.stb.STBImage.*;
  * Manages texture loading and caching for OpenGL rendering using STBImage
  */
 public class TextureManager implements Disposable {
-
-    private final GraphicsAPI graphics = GraphicsFactory.getGraphicsAPI();
     private final Map<String, Texture> textureCache = new HashMap<>();
     private final Map<Texture, RetainedTextureData> retainedTextureData = new HashMap<>();
 
@@ -54,6 +52,7 @@ public class TextureManager implements Disposable {
     }
 
     private Texture loadTexture(String resourcePath, Texture.FilterMode filterMode, boolean retainTextureDataCopy) {
+        GraphicsAPI graphics = GraphicsFactory.getGraphicsAPI();
         Objects.requireNonNull(graphics, "GraphicsAPI not initialized");
 
         Texture cachedTexture = textureCache.get(resourcePath);

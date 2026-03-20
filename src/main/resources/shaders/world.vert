@@ -22,7 +22,7 @@ layout(std140, binding = 11) uniform FogColorUniform {
 
 // Vertex attributes (replace gl_Vertex, gl_Color, etc.)
 layout (location = 0) in vec3 position;
-layout (location = 1) in uint color;
+layout (location = 1) in float color;
 layout (location = 2) in vec2 texCoord0;
 layout (location = 3) in vec3 normal;
 
@@ -31,14 +31,22 @@ layout (location = 0) out float vertexColor;
 layout (location = 1) out vec2 texCoord;
 layout (location = 2) out float fogFactor;
 
+vec4 backendClipPosition(vec4 clipPos) {
+#ifdef VULKAN_BACKEND
+    clipPos.y = -clipPos.y;
+    clipPos.z = 0.5 * (clipPos.z + clipPos.w);
+#endif
+    return clipPos;
+}
+
 void main() {
-    gl_Position = (projectionMatrix * modelViewMatrix) * vec4(position, 1.0);
+    gl_Position = backendClipPosition((projectionMatrix * modelViewMatrix) * vec4(position, 1.0));
 
     // Pass texture coordinates to fragment shader
     texCoord = texCoord0;
 
     // Pass color to fragment shader
-    vertexColor = color / 255.0f;
+    vertexColor = color;
 
     float eyeDistance = length(modelViewMatrix * vec4(position, 1.0));
 

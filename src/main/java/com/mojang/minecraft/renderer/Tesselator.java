@@ -41,6 +41,7 @@ public final class Tesselator implements Disposable {
 
     private DataType positionDataType;
     private DataType texCoordsDataType;
+    private DataType grayScaleDataType = DataType.FLOAT;
 
     // Feature flags
     private boolean hasColor = false;
@@ -55,6 +56,7 @@ public final class Tesselator implements Disposable {
     private IndexBuffer indexBuffer;
     private ResourceState.BufferAccess transientVertexBufferAccess = ResourceState.BufferAccess.UNDEFINED;
     private ResourceState.BufferAccess transientIndexBufferAccess = ResourceState.BufferAccess.UNDEFINED;
+    private boolean disposed;
 
     // Shared pooled allocators must outlive transient tesselator instances.
     private static BufferAllocator<? extends BufferAllocation> sharedPooledVertexAllocator = null;
@@ -86,6 +88,17 @@ public final class Tesselator implements Disposable {
                     GraphicsAPI.BufferBinding.INDEX,
                     GraphicsAPI.BufferAllocatorHint.POOLED
             );
+        }
+    }
+
+    public static synchronized void disposeSharedAllocators() {
+        if (sharedPooledVertexAllocator != null) {
+            sharedPooledVertexAllocator.dispose();
+            sharedPooledVertexAllocator = null;
+        }
+        if (sharedPooledIndexAllocator != null) {
+            sharedPooledIndexAllocator.dispose();
+            sharedPooledIndexAllocator = null;
         }
     }
 
@@ -211,7 +224,7 @@ public final class Tesselator implements Disposable {
         VertexBuffer.VertexFormat format = new VertexBuffer.VertexFormat(
                 this.positionDataType, // Position data type
                 DataType.FLOAT, // Color data type
-                DataType.UNSIGNED_BYTE, // Grayscale data type
+                this.grayScaleDataType, // Grayscale data type
                 this.texCoordsDataType, // Texture coordinate data type
                 DataType.FLOAT, // Normal data type
 
@@ -288,6 +301,7 @@ public final class Tesselator implements Disposable {
 
         this.positionDataType = positionDataType;
         this.texCoordsDataType = texCoordsDataType;
+        this.grayScaleDataType = DataType.FLOAT;
     }
 
     public void init() {
@@ -413,8 +427,26 @@ public final class Tesselator implements Disposable {
         }
         // Add grayscale if enabled
         else if (this.hasGrayScale) {
-            MemoryUtil.memPutByte(this.cpuVertexBuffer + currentIndex, (byte) (this.grayScale * 255));
-            currentIndex += Byte.BYTES;
+            switch (this.grayScaleDataType) {
+                case UNSIGNED_BYTE: {
+                    MemoryUtil.memPutByte(this.cpuVertexBuffer + currentIndex, (byte) (this.grayScale * 255.0f));
+                    currentIndex += Byte.BYTES;
+                    break;
+                }
+                case UNSIGNED_SHORT: {
+                    MemoryUtil.memPutShort(this.cpuVertexBuffer + currentIndex, (short) (this.grayScale * 65535.0f));
+                    currentIndex += Short.BYTES;
+                    break;
+                }
+                case FLOAT: {
+                    MemoryUtil.memPutFloat(this.cpuVertexBuffer + currentIndex, this.grayScale);
+                    currentIndex += Float.BYTES;
+                    break;
+                }
+                default: {
+                    throw new IllegalArgumentException("Unsupported grayscale data type: " + this.grayScaleDataType);
+                }
+            }
         }
 
         // Add position (always present)
@@ -482,6 +514,11 @@ public final class Tesselator implements Disposable {
      */
     @Override
     public void dispose() {
+        if (disposed) {
+            return;
+        }
+        disposed = true;
+
         // free the CPU-side buffers
         JEmalloc.nje_free(cpuVertexBuffer);
         JEmalloc.nje_free(cpuIndexBuffer);

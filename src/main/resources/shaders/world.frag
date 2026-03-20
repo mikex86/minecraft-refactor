@@ -18,7 +18,7 @@ layout (location = 0) out vec4 fragColor;
 void main() {
     // Sample the texture
     vec4 texColor = texture(textureSampler, texCoord);
-    
+
     // Apply vertex color
     vec4 finalColor = texColor * vec4(vertexColor, vertexColor, vertexColor, 1.0);
 

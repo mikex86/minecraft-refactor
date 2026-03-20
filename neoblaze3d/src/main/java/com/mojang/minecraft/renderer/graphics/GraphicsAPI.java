@@ -13,6 +13,11 @@ import java.nio.ByteBuffer;
  */
 public interface GraphicsAPI {
 
+    enum Backend {
+        OPENGL,
+        VULKAN
+    }
+
     enum BufferBinding {
         VERTEX,
         INDEX
@@ -22,6 +27,11 @@ public interface GraphicsAPI {
         POOLED,
         DEDICATED
     }
+
+    /**
+     * Returns the logical backend selected by the runtime.
+     */
+    Backend getBackend();
 
     /**
      * Initialize the graphics API.
@@ -45,6 +55,13 @@ public interface GraphicsAPI {
      * Ends frame command recording/submission.
      */
     void endFrame();
+
+    /**
+     * Blocks until the backend has finished processing outstanding GPU work.
+     * Default implementation is a no-op for backends that do not require explicit synchronization.
+     */
+    default void waitIdle() {
+    }
 
     /**
      * Creates a backend-managed allocator for a buffer binding point.

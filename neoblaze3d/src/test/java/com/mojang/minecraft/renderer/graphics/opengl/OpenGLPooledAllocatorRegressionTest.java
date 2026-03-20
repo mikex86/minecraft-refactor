@@ -1,8 +1,8 @@
 package com.mojang.minecraft.renderer.graphics.opengl;
 
 import com.mojang.minecraft.renderer.GameWindow;
+import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.BufferUtils;
@@ -21,9 +21,11 @@ class OpenGLPooledAllocatorRegressionTest {
     @BeforeAll
     static void initializeGraphicsContext() {
         try {
+            System.setProperty("neoblaze3d.backend", "OPENGL");
+            GraphicsFactory.reset();
             window = new GameWindow(64, 64, "buffer-pool-test", false);
         } catch (Throwable t) {
-            Assumptions.assumeTrue(false, "Skipping OpenGL pool tests. Could not initialize context: " + t.getMessage());
+            fail("Failed to initialize graphics context for OpenGLPooledAllocatorRegressionTest", t);
         }
     }
 
@@ -33,6 +35,7 @@ class OpenGLPooledAllocatorRegressionTest {
             window.dispose();
             window = null;
         }
+        System.clearProperty("neoblaze3d.backend");
     }
 
     @Test

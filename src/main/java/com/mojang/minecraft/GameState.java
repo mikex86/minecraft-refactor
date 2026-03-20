@@ -133,12 +133,17 @@ public class GameState {
      * Should be called when the game is shutting down.
      */
     public void dispose() {
-        // Save the level first
-        save();
-
-        // Clean up renderer resources
+        // Stop renderer worker threads and release render resources first.
         if (this.levelRenderer != null) {
             this.levelRenderer.dispose();
+            this.levelRenderer = null;
+        }
+
+        // Save the level after renderer shutdown to avoid races with chunk worker threads.
+        save();
+
+        if (this.level != null) {
+            this.level = null;
         }
 
         this.modelRegistry.disposeAll();

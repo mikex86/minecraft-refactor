@@ -183,5 +183,13 @@ public class HeldItemRenderer {
         return t.createIndexedMesh(GraphicsEnums.BufferUsage.STATIC);
     }
 
+    public void dispose() {
+        for (IndexedMesh mesh : itemQuadMeshes.values()) {
+            if (mesh != null) {
+                mesh.dispose();
+            }
+        }
+        itemQuadMeshes.clear();
+    }
 
 }

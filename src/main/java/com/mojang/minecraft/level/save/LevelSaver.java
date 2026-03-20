@@ -5,7 +5,7 @@ import com.mojang.minecraft.level.chunk.Chunk;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -45,6 +45,7 @@ public class LevelSaver {
      */
     public void saveChunks(List<Chunk> chunks, boolean blocking) {
         System.out.println("Saving chunks...");
+        List<ChunkSnapshot> chunkSnapshots = createChunkSnapshots(chunks);
         if (saveTask != null) {
             saveTask.join();
             saveTask = null;
@@ -52,7 +53,7 @@ public class LevelSaver {
         saveTask = CompletableFuture.runAsync(() -> {
             savingLevelMutex.acquireSaving();
             try {
-                writeChunks(chunks);
+                writeChunks(chunkSnapshots);
             } catch (Throwable e) {
                 CrashReporter.logException("Failed to save level", e);
             } finally {
@@ -65,15 +66,30 @@ public class LevelSaver {
         }
     }
 
-    private void writeChunks(List<Chunk> chunks) throws IOException {
-        System.out.println("Saving level...");
+    private List<ChunkSnapshot> createChunkSnapshots(List<Chunk> chunks) {
+        List<ChunkSnapshot> snapshots = new ArrayList<>(chunks.size());
         for (Chunk chunk : chunks) {
-            int chunkIndexX = chunk.x0 >> Chunk.CHUNK_SIZE_LG2;
-            int chunkIndexZ = chunk.z0 >> Chunk.CHUNK_SIZE_LG2;
+            if (chunk == null) {
+                continue;
+            }
+            ChunkSnapshot snapshot = new ChunkSnapshot(chunk.x0 >> Chunk.CHUNK_SIZE_LG2, chunk.z0 >> Chunk.CHUNK_SIZE_LG2);
+            for (int section = 0; section < Chunk.CHUNK_SECTION_COUNT; section++) {
+                snapshot.sectionData[section] = chunk.getBlockStateIds(section);
+            }
+            snapshots.add(snapshot);
+        }
+        return snapshots;
+    }
+
+    private void writeChunks(List<ChunkSnapshot> chunks) throws IOException {
+        System.out.println("Saving level...");
+        for (ChunkSnapshot chunk : chunks) {
+            int chunkIndexX = chunk.chunkIndexX;
+            int chunkIndexZ = chunk.chunkIndexZ;
             try (RegionFile regionFile = RegionFile.getRegionFile(levelFile, chunkIndexX, chunkIndexZ, true)) {
                 Objects.requireNonNull(regionFile, "Region file should not be null when createIfNotExists is true");
                 for (int section = 0; section < Chunk.CHUNK_SECTION_COUNT; section++) {
-                    byte[] blockStateIds = chunk.getBlockStateIds(section);
+                    byte[] blockStateIds = chunk.sectionData[section];
                     if (blockStateIds == null) {
                         continue;
                     }
@@ -86,5 +102,16 @@ public class LevelSaver {
 
     public SavingLevelMutex getSavingLevelMutex() {
         return savingLevelMutex;
+    }
+
+    private static final class ChunkSnapshot {
+        final int chunkIndexX;
+        final int chunkIndexZ;
+        final byte[][] sectionData = new byte[Chunk.CHUNK_SECTION_COUNT][];
+
+        private ChunkSnapshot(int chunkIndexX, int chunkIndexZ) {
+            this.chunkIndexX = chunkIndexX;
+            this.chunkIndexZ = chunkIndexZ;
+        }
     }
 }

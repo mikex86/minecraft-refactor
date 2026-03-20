@@ -27,4 +27,11 @@ public class ChunkBuildTesselatorPool {
         POOL.offer(tesselator);
     }
 
+    public static void disposeAll() {
+        Tesselator tesselator;
+        while ((tesselator = POOL.poll()) != null) {
+            tesselator.dispose();
+        }
+    }
+
 }

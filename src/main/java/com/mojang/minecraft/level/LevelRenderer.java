@@ -103,6 +103,8 @@ public class LevelRenderer implements Disposable {
 
     private PriorityBlockingQueue<Chunk> rebuildQueue;
     private PriorityBlockingQueue<Chunk> uploadQueue;
+    private volatile boolean running = true;
+    private volatile boolean disposed = false;
 
     private static final int REBUILD_THREADS = 16;
 
@@ -113,8 +115,11 @@ public class LevelRenderer implements Disposable {
             rebuildThreads[i] = new Thread("ChunkRebuildThread-" + i) {
                 @Override
                 public void run() {
-                    while (true) {
+                    while (running) {
                         if (rebuildQueue == null) {
+                            if (!running) {
+                                break;
+                            }
                             Thread.yield();
                             continue;
                         }
@@ -133,10 +138,13 @@ public class LevelRenderer implements Disposable {
                                 uploadQueue.add(chunk);
                             }
                         } catch (InterruptedException e) {
-                            // Handle interruption
-                            Thread.currentThread().interrupt();
-                            break;
+                            if (!running) {
+                                break;
+                            }
                         } catch (Exception e) {
+                            if (!running) {
+                                break;
+                            }
                             CrashReporter.logException("Failed to rebuild chunk", e);
                         }
                     }
@@ -152,6 +160,9 @@ public class LevelRenderer implements Disposable {
      */
     @RenderThreadOnly
     public void updateDirtyChunks(CommandBuffer commandBuffer, MatrixStack matrixStack, EntityPlayer player) {
+        if (!running || disposed) {
+            return;
+        }
         Frustum frustum = Frustum.getFrustum(matrixStack);
         if (rebuildQueue == null) {
             rebuildQueue = new PriorityBlockingQueue<>(512, new DirtyChunkSorter(player, frustum));
@@ -186,15 +197,40 @@ public class LevelRenderer implements Disposable {
     }
 
     /**
-     * Disposes all chunks and resources when the level is unloaded.
-     * This must be called when the level is no longer needed to prevent memory leaks.
+     * Stops chunk rebuild workers and clears pending renderer-side queues.
+     * Chunk data disposal is handled by level save/unload paths.
      */
     @Override
     public void dispose() {
-        for (Chunk chunk : this.level.getLoadedChunks()) {
-            if (chunk != null) {
-                chunk.dispose();
+        if (disposed) {
+            return;
+        }
+        disposed = true;
+        running = false;
+
+        for (Thread rebuildThread : rebuildThreads) {
+            if (rebuildThread != null) {
+                rebuildThread.interrupt();
             }
         }
+        for (Thread rebuildThread : rebuildThreads) {
+            if (rebuildThread != null) {
+                try {
+                    rebuildThread.join();
+                } catch (InterruptedException ignored) {
+                }
+            }
+        }
+
+        if (rebuildQueue != null) {
+            rebuildQueue.clear();
+        }
+        if (uploadQueue != null) {
+            uploadQueue.clear();
+        }
+
+        // Do not dispose chunks here: chunk disposal clears block section data,
+        // which Level.save() still needs to serialize on shutdown.
+        // Chunks are disposed by Level.batchUnloadChunks after save completes.
     }
 }

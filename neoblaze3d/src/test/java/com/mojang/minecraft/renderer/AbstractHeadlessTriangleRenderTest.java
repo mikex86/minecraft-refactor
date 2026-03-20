@@ -19,13 +19,12 @@ import com.mojang.minecraft.renderer.graphics.ShaderProgram;
 import com.mojang.minecraft.renderer.graphics.Uniform;
 import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.graphics.VertexBuffer;
+import com.mojang.minecraft.renderer.graphics.vulkan.VulkanGraphicsAPI;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.lwjgl.BufferUtils;
-import org.lwjgl.opengl.GL;
-import org.lwjgl.opengl.GLCapabilities;
 import org.lwjgl.system.MemoryStack;
 
 import javax.imageio.ImageIO;
@@ -36,12 +35,15 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.lwjgl.opengl.GL11.GL_RGBA;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
 import static org.lwjgl.opengl.GL11.glFinish;
 import static org.lwjgl.opengl.GL11.glReadPixels;
 
-class HeadlessTriangleRenderTest {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+abstract class AbstractHeadlessTriangleRenderTest {
 
     private static final int SCREEN_WIDTH = 128;
     private static final int SCREEN_HEIGHT = 128;
@@ -62,33 +64,39 @@ class HeadlessTriangleRenderTest {
                     1.0f
             )
     );
-    private static GameWindow window;
-    private static GraphicsAPI graphics;
+    private GameWindow window;
+    private GraphicsAPI graphics;
+    private ByteBuffer capturedFrame;
 
     @BeforeAll
-    static void initializeGraphicsContext() {
+    void initializeGraphicsContext() {
         try {
+            System.setProperty("neoblaze3d.backend", requestedBackend().name());
+            GraphicsFactory.reset();
             window = new GameWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "neoblaze3d-test", false);
             graphics = GraphicsFactory.getGraphicsAPI();
-            GLCapabilities capabilities = GL.getCapabilities();
-            boolean supportsSpirv = capabilities != null && (capabilities.OpenGL46 || capabilities.GL_ARB_gl_spirv);
-            Assumptions.assumeTrue(supportsSpirv, "Skipping OpenGL tests. ARB_gl_spirv/OpenGL 4.6 is not available.");
+            assertEquals(requestedBackend(), graphics.getBackend(), "Tests must run with selected backend: " + requestedBackend());
         } catch (Throwable t) {
-            Assumptions.assumeTrue(false, "Skipping OpenGL tests. Could not initialize hidden context: " + t.getMessage());
+            fail("Failed to initialize graphics context for " + getClass().getSimpleName(), t);
         }
     }
 
     @AfterAll
-    static void destroyGraphicsContext() {
+    void destroyGraphicsContext() {
         if (window != null) {
             window.dispose();
             window = null;
         }
+        System.clearProperty("neoblaze3d.backend");
         graphics = null;
+        capturedFrame = null;
     }
+
+    protected abstract GraphicsAPI.Backend requestedBackend();
 
     @Test
     void rendersGradientTriangleAtExpectedPixels() throws Exception {
+        capturedFrame = null;
         ShaderProgram shaderProgram = null;
         VertexBuffer vertexBuffer = null;
         PipelineLayout pipelineLayout = null;
@@ -149,15 +157,22 @@ class HeadlessTriangleRenderTest {
             commandBuffer.draw(PrimitiveType.TRIANGLES, vertexBuffer, null, 0, 3);
             commandBuffer.endRenderPass();
             renderPassActive = false;
+            if (isVulkanBackend()) {
+                ((VulkanGraphicsAPI) graphics).requestCurrentFrameCaptureRgba();
+            }
             graphics.endFrame();
             frameSubmitted = true;
-            glFinish();
+            if (isVulkanBackend()) {
+                capturedFrame = ((VulkanGraphicsAPI) graphics).consumeLastFrameCaptureRgba();
+            } else {
+                glFinish();
+            }
 
             verifyGradientAtNdcPoint(SCREEN_WIDTH, SCREEN_HEIGHT, -0.3f, -0.3f, V0, V1, V2, COLOR_TOLERANCE);
             verifyGradientAtNdcPoint(SCREEN_WIDTH, SCREEN_HEIGHT, 0.3f, -0.3f, V0, V1, V2, COLOR_TOLERANCE);
             verifyGradientAtNdcPoint(SCREEN_WIDTH, SCREEN_HEIGHT, 0.0f, 0.2f, V0, V1, V2, COLOR_TOLERANCE);
 
-            maybeExportPng(SCREEN_WIDTH, SCREEN_HEIGHT, "triangle-frame.png");
+            maybeExportPng(SCREEN_WIDTH, SCREEN_HEIGHT, backendArtifactName("triangle-frame.png"));
         } finally {
             if (!frameSubmitted) {
                 if (renderPassActive) {
@@ -182,6 +197,7 @@ class HeadlessTriangleRenderTest {
 
     @Test
     void transformsTriangleWithTranslateAndRotateAndMatchesExpectedPixels() throws Exception {
+        capturedFrame = null;
         final float translateX = 0.1f;
         final float translateY = 0.0f;
         final float rotateDegrees = 180.0f;
@@ -260,16 +276,23 @@ class HeadlessTriangleRenderTest {
             commandBuffer.draw(PrimitiveType.TRIANGLES, vertexBuffer, null, 0, 3);
             commandBuffer.endRenderPass();
             renderPassActive = false;
+            if (isVulkanBackend()) {
+                ((VulkanGraphicsAPI) graphics).requestCurrentFrameCaptureRgba();
+            }
             graphics.endFrame();
             frameSubmitted = true;
-            glFinish();
+            if (isVulkanBackend()) {
+                capturedFrame = ((VulkanGraphicsAPI) graphics).consumeLastFrameCaptureRgba();
+            } else {
+                glFinish();
+            }
 
             verifyGradientAtNdcPoint(SCREEN_WIDTH, SCREEN_HEIGHT, 0.5f, 0.4f, transformedV0, transformedV1, transformedV2, COLOR_TOLERANCE);
             verifyGradientAtNdcPoint(SCREEN_WIDTH, SCREEN_HEIGHT, -0.4f, 0.4f, transformedV0, transformedV1, transformedV2, COLOR_TOLERANCE);
             verifyGradientAtNdcPoint(SCREEN_WIDTH, SCREEN_HEIGHT, 0.1f, -0.3f, transformedV0, transformedV1, transformedV2, COLOR_TOLERANCE);
             verifyBackgroundAtNdcPoint(SCREEN_WIDTH, SCREEN_HEIGHT, -0.6f, -0.6f, BACKGROUND_TOLERANCE);
 
-            maybeExportPng(SCREEN_WIDTH, SCREEN_HEIGHT, "triangle-frame-transformed.png");
+            maybeExportPng(SCREEN_WIDTH, SCREEN_HEIGHT, backendArtifactName("triangle-frame-transformed.png"));
         } finally {
             if (!frameSubmitted) {
                 if (renderPassActive) {
@@ -297,6 +320,7 @@ class HeadlessTriangleRenderTest {
 
     @Test
     void poppedMatrixFrameDoesNotAffectLowerFrameDraw() throws Exception {
+        capturedFrame = null;
         final float lowerTranslateX = 0.2f;
         final float lowerTranslateY = -0.1f;
         final float poppedTranslateX = 0.8f;
@@ -392,9 +416,16 @@ class HeadlessTriangleRenderTest {
             commandBuffer.draw(PrimitiveType.TRIANGLES, vertexBuffer, null, 0, 3);
             commandBuffer.endRenderPass();
             renderPassActive = false;
+            if (isVulkanBackend()) {
+                ((VulkanGraphicsAPI) graphics).requestCurrentFrameCaptureRgba();
+            }
             graphics.endFrame();
             frameSubmitted = true;
-            glFinish();
+            if (isVulkanBackend()) {
+                capturedFrame = ((VulkanGraphicsAPI) graphics).consumeLastFrameCaptureRgba();
+            } else {
+                glFinish();
+            }
 
             verifyGradientAtNdcPoint(SCREEN_WIDTH, SCREEN_HEIGHT, -0.2f, -0.4f, expectedV0, expectedV1, expectedV2, COLOR_TOLERANCE);
             verifyGradientAtNdcPoint(SCREEN_WIDTH, SCREEN_HEIGHT, 0.3f, -0.4f, expectedV0, expectedV1, expectedV2, COLOR_TOLERANCE);
@@ -405,7 +436,7 @@ class HeadlessTriangleRenderTest {
             assertPointInsideTriangle(0.9f, 0.3f, leakedV0, leakedV1, leakedV2);
             verifyBackgroundAtNdcPoint(SCREEN_WIDTH, SCREEN_HEIGHT, 0.9f, 0.3f, BACKGROUND_TOLERANCE);
 
-            maybeExportPng(SCREEN_WIDTH, SCREEN_HEIGHT, "triangle-frame-stack-pop.png");
+            maybeExportPng(SCREEN_WIDTH, SCREEN_HEIGHT, backendArtifactName("triangle-frame-stack-pop.png"));
         } finally {
             if (!frameSubmitted) {
                 if (renderPassActive) {
@@ -431,7 +462,7 @@ class HeadlessTriangleRenderTest {
         }
     }
 
-    private static void verifyGradientAtNdcPoint(int width, int height, float ndcX, float ndcY,
+    private void verifyGradientAtNdcPoint(int width, int height, float ndcX, float ndcY,
                                                  float[] v0, float[] v1, float[] v2, float tolerance) {
         int x = ndcToPixel(ndcX, width);
         int y = ndcToPixel(ndcY, height);
@@ -454,7 +485,7 @@ class HeadlessTriangleRenderTest {
                 "Blue channel outside expected gradient range at (" + x + "," + y + ")");
     }
 
-    private static void verifyBackgroundAtNdcPoint(int width, int height, float ndcX, float ndcY, float tolerance) {
+    private void verifyBackgroundAtNdcPoint(int width, int height, float ndcX, float ndcY, float tolerance) {
         int x = ndcToPixel(ndcX, width);
         int y = ndcToPixel(ndcY, height);
         float[] actual = readPixelRgbaNormalized(x, y);
@@ -463,18 +494,18 @@ class HeadlessTriangleRenderTest {
         assertTrue(actual[2] <= tolerance, "Expected black blue channel at (" + x + "," + y + ")");
     }
 
-    private static void assertPointInsideTriangle(float ndcX, float ndcY, float[] v0, float[] v1, float[] v2) {
+    private void assertPointInsideTriangle(float ndcX, float ndcY, float[] v0, float[] v1, float[] v2) {
         float[] bary = barycentric(ndcX, ndcY, v0, v1, v2);
         assertTrue(bary[0] > 0.0f && bary[1] > 0.0f && bary[2] > 0.0f,
                 "Expected point (" + ndcX + "," + ndcY + ") to be inside reference triangle");
     }
 
-    private static void putVertex(ByteBuffer buffer, float r, float g, float b, float x, float y, float z) {
+    private void putVertex(ByteBuffer buffer, float r, float g, float b, float x, float y, float z) {
         buffer.putFloat(r).putFloat(g).putFloat(b);
         buffer.putFloat(x).putFloat(y).putFloat(z);
     }
 
-    private static void bindMatrixUniforms(CommandBuffer commandBuffer, MatrixStack matrixStack, ImmutableDescriptorSet descriptorSet) {
+    private void bindMatrixUniforms(CommandBuffer commandBuffer, MatrixStack matrixStack, ImmutableDescriptorSet descriptorSet) {
         Uniform modelViewUniform = descriptorSet.getRequired(PipelineLayout.BindingSemantic.MODEL_VIEW_MATRIX);
         Uniform projectionUniform = descriptorSet.getRequired(PipelineLayout.BindingSemantic.PROJECTION_MATRIX);
         modelViewUniform.setFloatBuffer(matrixStack.getModelViewBuffer());
@@ -482,7 +513,7 @@ class HeadlessTriangleRenderTest {
         commandBuffer.bindDescriptorSet(descriptorSet);
     }
 
-    private static Pipeline createTestPipeline(String debugName,
+    private Pipeline createTestPipeline(String debugName,
                                                PipelineLayout layout,
                                                ShaderProgram shaderProgram,
                                                VertexBuffer.VertexFormat vertexFormat) {
@@ -497,7 +528,7 @@ class HeadlessTriangleRenderTest {
         ));
     }
 
-    private static PipelineLayout.Descriptor createMatrixPipelineLayoutDescriptor(String debugName) {
+    private PipelineLayout.Descriptor createMatrixPipelineLayoutDescriptor(String debugName) {
         return new PipelineLayout.Descriptor(
                 debugName,
                 List.of(
@@ -517,7 +548,19 @@ class HeadlessTriangleRenderTest {
         );
     }
 
-    private static float[] readPixelRgbaNormalized(int x, int y) {
+    private float[] readPixelRgbaNormalized(int x, int y) {
+        if (isVulkanBackend()) {
+            if (capturedFrame == null) {
+                fail("No captured Vulkan frame data available");
+            }
+            int idx = ((y * SCREEN_WIDTH) + x) * 4;
+            return new float[]{
+                    (capturedFrame.get(idx) & 0xFF) / 255.0f,
+                    (capturedFrame.get(idx + 1) & 0xFF) / 255.0f,
+                    (capturedFrame.get(idx + 2) & 0xFF) / 255.0f,
+                    (capturedFrame.get(idx + 3) & 0xFF) / 255.0f
+            };
+        }
         try (MemoryStack stack = MemoryStack.stackPush()) {
             ByteBuffer pixel = stack.malloc(4);
             glReadPixels(x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
@@ -530,7 +573,7 @@ class HeadlessTriangleRenderTest {
         }
     }
 
-    private static int ndcToPixel(float ndc, int size) {
+    private int ndcToPixel(float ndc, int size) {
         float pixel = ((ndc + 1.0f) * 0.5f) * size;
         int result = (int) Math.floor(pixel);
         if (result < 0) {
@@ -539,13 +582,13 @@ class HeadlessTriangleRenderTest {
         return Math.min(result, size - 1);
     }
 
-    private static float[] pixelCenterToNdc(int x, int y, int width, int height) {
+    private float[] pixelCenterToNdc(int x, int y, int width, int height) {
         float ndcX = (((x + 0.5f) / width) * 2.0f) - 1.0f;
         float ndcY = (((y + 0.5f) / height) * 2.0f) - 1.0f;
         return new float[]{ndcX, ndcY};
     }
 
-    private static float[] barycentric(float px, float py, float[] a, float[] b, float[] c) {
+    private float[] barycentric(float px, float py, float[] a, float[] b, float[] c) {
         float denom = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
         float w0 = ((b[1] - c[1]) * (px - c[0]) + (c[0] - b[0]) * (py - c[1])) / denom;
         float w1 = ((c[1] - a[1]) * (px - c[0]) + (a[0] - c[0]) * (py - c[1])) / denom;
@@ -553,7 +596,7 @@ class HeadlessTriangleRenderTest {
         return new float[]{w0, w1, w2};
     }
 
-    private static float[] transformVertex(float[] vertex, float tx, float ty, float angleDegrees) {
+    private float[] transformVertex(float[] vertex, float tx, float ty, float angleDegrees) {
         float radians = (float) Math.toRadians(angleDegrees);
         float cos = (float) Math.cos(radians);
         float sin = (float) Math.sin(radians);
@@ -565,13 +608,21 @@ class HeadlessTriangleRenderTest {
         return new float[]{rotatedX + tx, rotatedY + ty};
     }
 
-    private static void maybeExportPng(int width, int height, String fileName) throws Exception {
+    private void maybeExportPng(int width, int height, String fileName) throws Exception {
         if (!isInspectionModeEnabled()) {
             return;
         }
 
-        ByteBuffer frame = BufferUtils.createByteBuffer(width * height * 4);
-        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, frame);
+        ByteBuffer frame;
+        if (isVulkanBackend()) {
+            if (capturedFrame == null) {
+                fail("No captured Vulkan frame data available for PNG export");
+            }
+            frame = capturedFrame;
+        } else {
+            frame = BufferUtils.createByteBuffer(width * height * 4);
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, frame);
+        }
 
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         for (int y = 0; y < height; y++) {
@@ -594,7 +645,7 @@ class HeadlessTriangleRenderTest {
         ImageIO.write(image, "png", outFile);
     }
 
-    private static boolean isInspectionModeEnabled() {
+    private boolean isInspectionModeEnabled() {
         if (Boolean.getBoolean("neoblaze3d.test.inspection")) {
             return true;
         }
@@ -603,5 +654,13 @@ class HeadlessTriangleRenderTest {
             return false;
         }
         return "1".equals(env) || "true".equalsIgnoreCase(env);
+    }
+
+    private String backendArtifactName(String fileName) {
+        return requestedBackend().name().toLowerCase() + "-" + fileName;
+    }
+
+    private boolean isVulkanBackend() {
+        return graphics != null && graphics.getBackend() == GraphicsAPI.Backend.VULKAN;
     }
 }

@@ -263,10 +263,15 @@ public class Block {
     public final void renderFace(Tesselator t, int x, int y, int z, int face, EnumFacing facing) {
         int tex = getTexture(face, facing);
         int rotation = getRotation(face, facing);
-        float u0 = (tex % 16) / 16.0F;
-        float u1 = u0 + 0.0624375F;
-        float v0 = (tex / 16) / 16.0F;
-        float v1 = v0 + 0.0624375F;
+        final float tileSize = 1.0F / 16.0F;
+        // Keep exact tile coverage; with float UVs we can sample atlas borders accurately.
+        final float edgeEpsilon = 0.0F;
+        float uBase = (tex % 16) * tileSize;
+        float vBase = (tex / 16) * tileSize;
+        float u0 = uBase + edgeEpsilon;
+        float u1 = uBase + tileSize - edgeEpsilon;
+        float v0 = vBase + edgeEpsilon;
+        float v1 = vBase + tileSize - edgeEpsilon;
 
         float tmp;
 

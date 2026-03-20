@@ -38,17 +38,21 @@ public final class ShaderBinaryCompiler {
             throw new IllegalStateException("Failed to initialize Shaderc compiler");
         }
 
-        long options = Shaderc.shaderc_compile_options_initialize();
-        if (options == 0L) {
+        long openGlOptions = Shaderc.shaderc_compile_options_initialize();
+        if (openGlOptions == 0L) {
             Shaderc.shaderc_compiler_release(compiler);
             throw new IllegalStateException("Failed to initialize Shaderc compile options");
         }
+        long vulkanOptions = Shaderc.shaderc_compile_options_initialize();
+        if (vulkanOptions == 0L) {
+            Shaderc.shaderc_compile_options_release(openGlOptions);
+            Shaderc.shaderc_compiler_release(compiler);
+            throw new IllegalStateException("Failed to initialize Vulkan Shaderc compile options");
+        }
 
         try {
-            Shaderc.shaderc_compile_options_set_source_language(options, Shaderc.shaderc_source_language_glsl);
-            Shaderc.shaderc_compile_options_set_target_env(options, Shaderc.shaderc_target_env_opengl, Shaderc.shaderc_env_version_opengl_4_5);
-            Shaderc.shaderc_compile_options_set_target_spirv(options, Shaderc.shaderc_spirv_version_1_0);
-            Shaderc.shaderc_compile_options_set_optimization_level(options, Shaderc.shaderc_optimization_level_performance);
+            configureOpenGlOptions(openGlOptions);
+            configureVulkanOptions(vulkanOptions);
 
             List<Path> shaderFiles = new ArrayList<>();
             try (Stream<Path> paths = Files.walk(inputRoot)) {
@@ -63,18 +67,35 @@ public final class ShaderBinaryCompiler {
                 if (kind == -1) {
                     continue;
                 }
-                compileOne(compiler, options, inputRoot, outputRoot, shaderFile, kind);
+                compileOne(compiler, openGlOptions, inputRoot, outputRoot, shaderFile, kind, ".spv");
+                compileOne(compiler, vulkanOptions, inputRoot, outputRoot, shaderFile, kind, ".vk.spv");
                 compiled++;
             }
 
-            System.out.println("Compiled " + compiled + " shader(s) to SPIR-V under " + outputRoot);
+            System.out.println("Compiled " + compiled + " shader(s) to OpenGL+Vulkan SPIR-V under " + outputRoot);
         } finally {
-            Shaderc.shaderc_compile_options_release(options);
+            Shaderc.shaderc_compile_options_release(vulkanOptions);
+            Shaderc.shaderc_compile_options_release(openGlOptions);
             Shaderc.shaderc_compiler_release(compiler);
         }
     }
 
-    private static void compileOne(long compiler, long options, Path inputRoot, Path outputRoot, Path shaderFile, int kind) throws IOException {
+    private static void configureOpenGlOptions(long options) {
+        Shaderc.shaderc_compile_options_set_source_language(options, Shaderc.shaderc_source_language_glsl);
+        Shaderc.shaderc_compile_options_set_target_env(options, Shaderc.shaderc_target_env_opengl, Shaderc.shaderc_env_version_opengl_4_5);
+        Shaderc.shaderc_compile_options_set_target_spirv(options, Shaderc.shaderc_spirv_version_1_0);
+        Shaderc.shaderc_compile_options_set_optimization_level(options, Shaderc.shaderc_optimization_level_performance);
+    }
+
+    private static void configureVulkanOptions(long options) {
+        Shaderc.shaderc_compile_options_set_source_language(options, Shaderc.shaderc_source_language_glsl);
+        Shaderc.shaderc_compile_options_set_target_env(options, Shaderc.shaderc_target_env_vulkan, Shaderc.shaderc_env_version_vulkan_1_0);
+        Shaderc.shaderc_compile_options_set_target_spirv(options, Shaderc.shaderc_spirv_version_1_0);
+        Shaderc.shaderc_compile_options_add_macro_definition(options, "VULKAN_BACKEND", "1");
+        Shaderc.shaderc_compile_options_set_optimization_level(options, Shaderc.shaderc_optimization_level_performance);
+    }
+
+    private static void compileOne(long compiler, long options, Path inputRoot, Path outputRoot, Path shaderFile, int kind, String suffix) throws IOException {
         String source = new String(Files.readAllBytes(shaderFile), StandardCharsets.UTF_8);
         String relativePath = toUnixPath(inputRoot.relativize(shaderFile));
 
@@ -98,7 +119,7 @@ public final class ShaderBinaryCompiler {
             byte[] output = new byte[bytes.remaining()];
             bytes.get(output);
 
-            Path outputFile = outputRoot.resolve(relativePath + ".spv");
+            Path outputFile = outputRoot.resolve(relativePath + suffix);
             Path parent = outputFile.getParent();
             if (parent != null) {
                 Files.createDirectories(parent);

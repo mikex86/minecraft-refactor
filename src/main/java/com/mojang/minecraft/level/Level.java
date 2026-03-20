@@ -72,6 +72,12 @@ public class Level {
         }
         levelSaver.saveChunks(chunkList, blocking);
 
+        for (Chunk chunk : chunkList) {
+            if (chunk != null) {
+                chunk.dispose();
+            }
+        }
+
         synchronized (this.chunkLoadMutex) {
             for (Chunk chunk : chunkList) {
                 this.chunkMap.remove(makeChunkKey(chunk.x0 >> Chunk.CHUNK_SIZE_LG2, chunk.z0 >> Chunk.CHUNK_SIZE_LG2));

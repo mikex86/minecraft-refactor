@@ -984,7 +984,11 @@ final class OpenGLCommandBuffer implements CommandBuffer {
             offset += 3L * format.getColorDataType().getSize();
         } else if (format.hasGrayScale()) {
             glEnableVertexAttribArray(1);
-            glVertexAttribIPointer(1, 1, mapDataType(format.getGrayScaleDataType()), stride, offset);
+            if (isIntegerInputDataType(format.getGrayScaleDataType())) {
+                glVertexAttribIPointer(1, 1, mapDataType(format.getGrayScaleDataType()), stride, offset);
+            } else {
+                glVertexAttribPointer(1, 1, mapDataType(format.getGrayScaleDataType()), false, stride, offset);
+            }
             offset += format.getGrayScaleDataType().getSize();
         }
 
@@ -1032,6 +1036,14 @@ final class OpenGLCommandBuffer implements CommandBuffer {
             return ((OpenGLPooledIndexBuffer) indexBuffer).getBufferId();
         }
         throw new IllegalArgumentException("IndexBuffer must be an OpenGL buffer");
+    }
+
+    private static boolean isIntegerInputDataType(DataType dataType) {
+        return dataType == DataType.UNSIGNED_BYTE
+                || dataType == DataType.BYTE
+                || dataType == DataType.UNSIGNED_SHORT
+                || dataType == DataType.SHORT
+                || dataType == DataType.INT;
     }
 
     private static long resolveIndexOffsetBytes(IndexBuffer indexBuffer) {

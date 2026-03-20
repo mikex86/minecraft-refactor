@@ -22,6 +22,65 @@ public class GpuMemoryTracker {
     // Memory used within pooled buffers
     public static long POOLED_USED_GPU_MEMORY = 0;
 
+    private static void addUploaded(long bytes) {
+        UPLOADED_GPU_MEMORY += bytes;
+        if (UPLOADED_GPU_MEMORY < 0) {
+            UPLOADED_GPU_MEMORY = 0;
+        }
+    }
+
+    private static void addTotal(long bytes) {
+        TOTAL_GPU_MEMORY += bytes;
+        if (TOTAL_GPU_MEMORY < 0) {
+            TOTAL_GPU_MEMORY = 0;
+        }
+    }
+
+    private static void addPooled(long bytes) {
+        POOLED_GPU_MEMORY += bytes;
+        if (POOLED_GPU_MEMORY < 0) {
+            POOLED_GPU_MEMORY = 0;
+        }
+    }
+
+    private static void addPooledUsed(long bytes) {
+        POOLED_USED_GPU_MEMORY += bytes;
+        if (POOLED_USED_GPU_MEMORY < 0) {
+            POOLED_USED_GPU_MEMORY = 0;
+        }
+    }
+
+    /**
+     * Tracks non-pooled buffer allocation memory (for backends that already
+     * know the final allocated byte size).
+     */
+    public static void trackBufferAllocation(long sizeInBytes, boolean dispose) {
+        addTotal(dispose ? -sizeInBytes : sizeInBytes);
+    }
+
+    /**
+     * Tracks non-pooled uploaded user data memory.
+     */
+    public static void trackBufferUpload(long sizeInBytes, boolean dispose) {
+        addUploaded(dispose ? -sizeInBytes : sizeInBytes);
+    }
+
+    /**
+     * Tracks pooled allocator backing memory (counts toward total GPU memory).
+     */
+    public static void trackPooledBufferBytes(long sizeInBytes, boolean dispose) {
+        addPooled(dispose ? -sizeInBytes : sizeInBytes);
+        addTotal(dispose ? -sizeInBytes : sizeInBytes);
+    }
+
+    /**
+     * Tracks pooled region usage (counts toward uploaded and pooled-used memory).
+     */
+    public static void trackPooledRegionBytes(long sizeInBytes, boolean dispose) {
+        addUploaded(dispose ? -sizeInBytes : sizeInBytes);
+        addPooledUsed(dispose ? -sizeInBytes : sizeInBytes);
+    }
+
     /**
      * Asserts the vbo is currently bound.
      * Tracks memory for a standard vertex buffer.
@@ -30,19 +89,11 @@ public class GpuMemoryTracker {
      * @param dispose     true if the buffer is being disposed, false if it is being created
      */
     public static void trackVbo(long sizeInBytes, boolean dispose) {
-        if (dispose) {
-            UPLOADED_GPU_MEMORY -= sizeInBytes;
-        } else {
-            UPLOADED_GPU_MEMORY += sizeInBytes;
-        }
+        trackBufferUpload(sizeInBytes, dispose);
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer buffer = stack.mallocInt(1);
             glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, buffer);
-            if (dispose) {
-                TOTAL_GPU_MEMORY -= buffer.get(0);
-            } else {
-                TOTAL_GPU_MEMORY += buffer.get(0);
-            }
+            trackBufferAllocation(buffer.get(0), dispose);
         }
     }
 
@@ -54,19 +105,11 @@ public class GpuMemoryTracker {
      * @param dispose     true if the buffer is being disposed, false if it is being created
      */
     public static void trackIbo(long sizeInBytes, boolean dispose) {
-        if (dispose) {
-            UPLOADED_GPU_MEMORY -= sizeInBytes;
-        } else {
-            UPLOADED_GPU_MEMORY += sizeInBytes;
-        }
+        trackBufferUpload(sizeInBytes, dispose);
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer buffer = stack.mallocInt(1);
             glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, buffer);
-            if (dispose) {
-                TOTAL_GPU_MEMORY -= buffer.get(0);
-            } else {
-                TOTAL_GPU_MEMORY += buffer.get(0);
-            }
+            trackBufferAllocation(buffer.get(0), dispose);
         }
     }
     
@@ -80,22 +123,11 @@ public class GpuMemoryTracker {
      * @param dispose     true if the pool is being disposed, false if it is being created
      */
     public static void trackPooledBuffer(int bufferType, long sizeInBytes, boolean dispose) {
-        if (dispose) {
-            POOLED_GPU_MEMORY -= sizeInBytes;
-        } else {
-            POOLED_GPU_MEMORY += sizeInBytes;
-        }
-        
         try (MemoryStack stack = MemoryStack.stackPush()) {
             LongBuffer buffer = stack.mallocLong(1);
             glGetBufferParameteri64v(bufferType, GL_BUFFER_SIZE, buffer);
             long actualSize = buffer.get(0);
-            
-            if (dispose) {
-                TOTAL_GPU_MEMORY -= actualSize;
-            } else {
-                TOTAL_GPU_MEMORY += actualSize;
-            }
+            trackPooledBufferBytes(actualSize, dispose);
         }
     }
     
@@ -108,12 +140,6 @@ public class GpuMemoryTracker {
      * @param dispose     true if the region is being freed, false if it is being allocated
      */
     public static void trackPooledRegion(long sizeInBytes, boolean dispose) {
-        if (dispose) {
-            UPLOADED_GPU_MEMORY -= sizeInBytes;
-            POOLED_USED_GPU_MEMORY -= sizeInBytes;
-        } else {
-            UPLOADED_GPU_MEMORY += sizeInBytes;
-            POOLED_USED_GPU_MEMORY += sizeInBytes;
-        }
+        trackPooledRegionBytes(sizeInBytes, dispose);
     }
 }

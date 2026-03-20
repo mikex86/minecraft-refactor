@@ -14,9 +14,17 @@ layout(location = 1) in vec3 color;
 // Output to fragment shader
 layout (location = 0) out vec4 vertexColor;
 
+vec4 backendClipPosition(vec4 clipPos) {
+#ifdef VULKAN_BACKEND
+    clipPos.y = -clipPos.y;
+    clipPos.z = 0.5 * (clipPos.z + clipPos.w);
+#endif
+    return clipPos;
+}
+
 void main() {
     // Pass vertex position through our custom MVP matrix
-    gl_Position = (projectionMatrix * modelViewMatrix) * vec4(position, 1.0);
+    gl_Position = backendClipPosition((projectionMatrix * modelViewMatrix) * vec4(position, 1.0));
     
     // Pass color to fragment shader
     vertexColor = vec4(color, 1.0);

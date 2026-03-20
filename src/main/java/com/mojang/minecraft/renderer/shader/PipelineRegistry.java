@@ -47,7 +47,7 @@ public class PipelineRegistry implements Disposable {
     private static final float NO_FOG_A = 1.0F;
 
     private static final VertexBuffer.VertexFormat WORLD_VERTEX_FORMAT = new VertexBuffer.VertexFormat(
-            DataType.SHORT, DataType.FLOAT, DataType.UNSIGNED_BYTE, DataType.HALF_FLOAT, DataType.FLOAT,
+            DataType.FLOAT, DataType.FLOAT, DataType.FLOAT, DataType.FLOAT, DataType.FLOAT,
             true, false, true, true, false
     );
     
@@ -67,7 +67,7 @@ public class PipelineRegistry implements Disposable {
     );
     
     private static final VertexBuffer.VertexFormat WORLD_OVERLAY_VERTEX_FORMAT = new VertexBuffer.VertexFormat(
-            DataType.FLOAT, DataType.FLOAT, DataType.UNSIGNED_BYTE, DataType.FLOAT, DataType.FLOAT,
+            DataType.FLOAT, DataType.FLOAT, DataType.FLOAT, DataType.FLOAT, DataType.FLOAT,
             true, false, true, true, false
     );
 
@@ -145,7 +145,7 @@ public class PipelineRegistry implements Disposable {
                                 new PipelineLayout.Binding(
                                         FOG_COLOR_BINDING,
                                         PipelineLayout.ResourceType.UNIFORM_BUFFER,
-                                        PipelineLayout.ShaderStage.VERTEX
+                                        PipelineLayout.ShaderStage.FRAGMENT
                                 )
                         )
                 )

@@ -172,26 +172,19 @@ public class GameRenderer implements Disposable {
      * @param height New window height
      */
     public void setScreenSize(int width, int height) {
+        if (this.width == width && this.height == height) {
+            return;
+        }
         this.width = width;
         this.height = height;
-
-        // cross-hair mesh needs to be recreated
-        if (this.crosshairMesh != null) {
-            this.crosshairMesh.dispose();
-            this.crosshairMesh = null;
-        }
-
-        // hotbar mesh needs to be recreated
-        if (this.hotbarMesh != null) {
-            this.hotbarMesh.dispose();
-            this.hotbarMesh = null;
-        }
-
-        // notify current screen of resize if it exists
-        if (this.currentScreen != null) {
+        // Resize-triggered UI mesh disposal can happen outside the render path.
+        // Synchronize first so we don't destroy resources referenced by in-flight GPU work.
+        device.waitIdle();
+        disposeScreenSpaceMeshes();
+        if (currentScreen != null && width > 0 && height > 0) {
             float scaledWidth = ScaledResolution.getScaledWidth(width, height);
             float scaledHeight = ScaledResolution.getScaledHeight(height);
-            this.currentScreen.onResized(scaledWidth, scaledHeight);
+            currentScreen.onResized(scaledWidth, scaledHeight);
         }
     }
 
@@ -307,6 +300,55 @@ public class GameRenderer implements Disposable {
         } finally {
             device.endFrame();
             commandBuffer = null;
+        }
+    }
+
+    private void disposeScreenSpaceMeshes() {
+        if (crosshairMesh != null) {
+            crosshairMesh.dispose();
+            crosshairMesh = null;
+        }
+        if (hotbarMesh != null) {
+            hotbarMesh.dispose();
+            hotbarMesh = null;
+        }
+        if (hotbarSelectorMesh != null) {
+            hotbarSelectorMesh.dispose();
+            hotbarSelectorMesh = null;
+        }
+    }
+
+    private void disposeBlockSelectionMeshes() {
+        if (blockOutlineMesh != null) {
+            blockOutlineMesh.dispose();
+            blockOutlineMesh = null;
+        }
+        if (blockBreakingMeshes != null) {
+            for (int i = 0; i < blockBreakingMeshes.length; i++) {
+                IndexedMesh mesh = blockBreakingMeshes[i];
+                if (mesh != null) {
+                    mesh.dispose();
+                    blockBreakingMeshes[i] = null;
+                }
+            }
+            blockBreakingMeshes = null;
+        }
+    }
+
+    private void disposeLabels() {
+        versionStringLabel.dispose();
+        fpsStringLabel.dispose();
+        positionStringLabel.dispose();
+        memoryStringLabel1.dispose();
+        memoryStringLabel2.dispose();
+        memoryStringLabel3.dispose();
+        if (stackSizeHotbarLabels != null) {
+            for (TextLabel label : stackSizeHotbarLabels) {
+                if (label != null) {
+                    label.dispose();
+                }
+            }
+            stackSizeHotbarLabels = null;
         }
     }
 
@@ -712,6 +754,9 @@ public class GameRenderer implements Disposable {
     public void closeScreen() {
         if (this.currentScreen != null) {
             this.currentScreen.onClose();
+            // Screen resources may have been used by the previous frame.
+            // Ensure GPU completion before disposing their meshes/buffers.
+            device.waitIdle();
             this.currentScreen.dispose();
             this.currentScreen = null;
         }
@@ -934,10 +979,14 @@ public class GameRenderer implements Disposable {
 
     @Override
     public void dispose() {
-        // Dispose of any resources if needed
-        if (crosshairMesh != null) {
-            crosshairMesh.dispose();
-            crosshairMesh = null;
+        device.waitIdle();
+        if (currentScreen != null) {
+            closeScreen();
         }
+        disposeBlockSelectionMeshes();
+        disposeScreenSpaceMeshes();
+        disposeLabels();
+        heldItemRenderer.dispose();
+        BlockRenderer.disposeAllCachedMeshes();
     }
 }

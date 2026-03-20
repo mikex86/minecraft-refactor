@@ -343,10 +343,17 @@ public final class Chunk implements Disposable {
      */
     @Override
     public void dispose() {
-        for (ChunkSection section : sections) {
-            section.dispose();
+        try {
+            dataMutex.writeLock().lock();
+            for (ChunkSection section : sections) {
+                if (section != null) {
+                    section.dispose();
+                }
+            }
+            Arrays.fill(sections, null);
+        } finally {
+            dataMutex.writeLock().unlock();
         }
-        Arrays.fill(sections, null);
     }
 
     public void load(int section, byte[] newBlocks) {
@@ -360,10 +367,17 @@ public final class Chunk implements Disposable {
     }
 
     public byte[] getBlockStateIds(int section) {
+        if (section < 0 || section >= CHUNK_SECTION_COUNT) {
+            return null;
+        }
         byte[] blockStateIdsCopy;
         try {
             dataMutex.readLock().lock();
-            byte[] bytes = sections[section].getAsBytes();
+            ChunkSection chunkSection = sections[section];
+            if (chunkSection == null) {
+                return null;
+            }
+            byte[] bytes = chunkSection.getAsBytes();
             if (bytes == null) {
                 return null;
             }
@@ -580,7 +594,7 @@ public final class Chunk implements Disposable {
             }
 
             this.currentTesselator = ChunkBuildTesselatorPool.obtain();
-            this.currentTesselator.init(DataType.SHORT, DataType.HALF_FLOAT, true);
+            this.currentTesselator.init(DataType.FLOAT, DataType.FLOAT, true);
 
             this.renderedTiles = 0;
 

@@ -7,11 +7,14 @@ import com.mojang.minecraft.gui.screen.ScreenManager;
 import com.mojang.minecraft.input.GameInputHandler;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.block.state.BlockState;
+import com.mojang.minecraft.optim.pools.ChunkBuildTesselatorPool;
 import com.mojang.minecraft.particle.ParticleEngine;
 import com.mojang.minecraft.profiler.GpuMemoryTracker;
 import com.mojang.minecraft.profiler.NativeMemoryTracker;
 import com.mojang.minecraft.renderer.GameRenderer;
+import com.mojang.minecraft.renderer.Tesselator;
 import com.mojang.minecraft.renderer.TextureManager;
+import com.mojang.minecraft.renderer.graphics.GraphicsFactory;
 import com.mojang.minecraft.renderer.graphics.ImmutableDescriptorSet;
 import com.mojang.minecraft.renderer.graphics.Pipeline;
 import com.mojang.minecraft.renderer.shader.PipelineRegistry;
@@ -25,7 +28,7 @@ public class Minecraft implements Runnable {
     // Constants
     public static final String VERSION_STRING = "0.0.1";
     public static final String MINECRAFT_VERSION_STRING = "reMinecraft " + VERSION_STRING;
-    public static final boolean DEBUG = false;
+    public static final boolean DEBUG = true;
 
     // Core systems
     private final GameEngine engine;
@@ -55,6 +58,7 @@ public class Minecraft implements Runnable {
      * @param fullscreen Whether to run in fullscreen mode
      */
     public Minecraft(int width, int height, boolean fullscreen) {
+        GraphicsFactory.setDebugModeHint(DEBUG);
         this.engine = new GameEngine(width, height, fullscreen, MINECRAFT_VERSION_STRING);
         this.textureManager = new TextureManager();
         this.pipelineRegistry = new PipelineRegistry();
@@ -118,15 +122,65 @@ public class Minecraft implements Runnable {
      * Cleans up resources and saves the level before shutting down.
      */
     public void destroy() {
+        Exception firstError = null;
+
+        try {
+            if (renderer != null) {
+                renderer.dispose();
+                renderer = null;
+            }
+        } catch (Exception e) {
+            firstError = firstError == null ? e : firstError;
+        }
+
         try {
             if (gameState != null) {
                 gameState.dispose();
+                gameState = null;
             }
-            engine.shutdown();
-            textureManager.dispose();
+        } catch (Exception e) {
+            firstError = firstError == null ? e : firstError;
+        }
+
+        try {
+            ChunkBuildTesselatorPool.disposeAll();
+        } catch (Exception e) {
+            firstError = firstError == null ? e : firstError;
+        }
+
+        try {
+            Tesselator.instance.dispose();
+        } catch (Exception e) {
+            firstError = firstError == null ? e : firstError;
+        }
+
+        try {
+            Tesselator.disposeSharedAllocators();
+        } catch (Exception e) {
+            firstError = firstError == null ? e : firstError;
+        }
+
+        // Dispose GPU-backed resources before engine shutdown tears down the graphics device/context.
+        try {
             pipelineRegistry.dispose();
         } catch (Exception e) {
-            CrashReporter.handleError("Failed to clean up resources during shutdown", e);
+            firstError = firstError == null ? e : firstError;
+        }
+
+        try {
+            textureManager.dispose();
+        } catch (Exception e) {
+            firstError = firstError == null ? e : firstError;
+        }
+
+        try {
+            engine.shutdown();
+        } catch (Exception e) {
+            firstError = firstError == null ? e : firstError;
+        }
+
+        if (firstError != null) {
+            CrashReporter.handleError("Failed to clean up resources during shutdown", firstError);
         }
     }
 
@@ -175,18 +229,19 @@ public class Minecraft implements Runnable {
                 gameInputHandler.processMouseLook(this.engine.getWidth(), this.engine.getHeight());
                 engine.resetMouse();
 
+                // Keep renderer dimensions in sync before recording the frame.
+                if (engine.hasResized()) {
+                    renderer.setScreenSize(engine.getWidth(), engine.getHeight());
+                }
+                if (engine.getWidth() <= 0 || engine.getHeight() <= 0) {
+                    continue;
+                }
+
                 // Render the frame
                 this.renderer.render(
                         partialTick,
                         hitResult
                 );
-
-                // Check for window size changes
-                if (engine.hasResized()) {
-                    int newWidth = engine.getWidth();
-                    int newHeight = engine.getHeight();
-                    renderer.setScreenSize(newWidth, newHeight);
-                }
 
                 // Handle window focus change
                 if (!engine.hasFocus()) {
@@ -228,8 +283,9 @@ public class Minecraft implements Runnable {
 
     private void updateDebugStrings() {
         EntityPlayer player = this.gameState.getPlayer();
+        String backendName = GraphicsFactory.getGraphicsAPI().getBackend().name();
         this.renderer.setDebugString(0, String.format("x: %.3f y: %.3f z: %.3f, xd: %.3f yd: %.3f zd: %.3f", player.x, player.y, player.z, player.xd, player.yd, player.zd));
-        this.renderer.setDebugString(1, this.engine.getFpsString());
+        this.renderer.setDebugString(1, this.engine.getFpsString() + ", backend " + backendName);
 
         long usedJavaHeap = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
         long totalJavaHeap = Runtime.getRuntime().totalMemory();

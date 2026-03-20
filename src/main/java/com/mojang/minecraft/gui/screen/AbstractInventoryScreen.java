@@ -170,6 +170,12 @@ public class AbstractInventoryScreen extends GuiScreen {
             inventoryQuadMesh.dispose();
             inventoryQuadMesh = null;
         }
+        stackSizeSelectedItemLabel.dispose();
+        for (Slot slot : slots) {
+            if (slot != null) {
+                slot.dispose();
+            }
+        }
     }
 
 
@@ -243,6 +249,10 @@ public class AbstractInventoryScreen extends GuiScreen {
             if (placeOneAction != null) {
                 placeOneAction.run();
             }
+        }
+
+        void dispose() {
+            stackSizeLabel.dispose();
         }
     }
 }

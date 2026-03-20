@@ -24,6 +24,7 @@ import static org.lwjgl.opengl.GL11.GL_SRC_ALPHA;
 import static org.lwjgl.opengl.GL11.glBlendFunc;
 import static org.lwjgl.opengl.GL11.glClearDepth;
 import static org.lwjgl.opengl.GL11.glDepthFunc;
+import static org.lwjgl.opengl.GL11.glFinish;
 import static org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER;
 import static org.lwjgl.opengl.GL15.GL_DYNAMIC_DRAW;
 import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
@@ -44,6 +45,11 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
 
     // Default VAO (required for OpenGL core profile)
     private int defaultVaoId;
+
+    @Override
+    public Backend getBackend() {
+        return Backend.OPENGL;
+    }
 
     @Override
     public CommandBuffer beginFrame() {
@@ -73,6 +79,11 @@ public class OpenGLGraphicsAPI implements GraphicsAPI {
     public void shutdown() {
         frameCommandBuffer.dispose();
         glDeleteVertexArrays(defaultVaoId);
+    }
+
+    @Override
+    public void waitIdle() {
+        glFinish();
     }
 
     @Override
