@@ -183,6 +183,10 @@ final class VulkanUniform implements Uniform {
         cachedSnapshotOffset = offset;
     }
 
+    int getMutationVersion() {
+        return mutationVersion;
+    }
+
     private void markMutated() {
         mutationVersion++;
     }

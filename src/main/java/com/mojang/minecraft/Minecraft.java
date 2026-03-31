@@ -204,6 +204,7 @@ public class Minecraft implements Runnable {
                 // Check if window is closed
                 if (!engine.update()) {
                     this.stop();
+                    break;
                 }
 
                 // Get time information from engine

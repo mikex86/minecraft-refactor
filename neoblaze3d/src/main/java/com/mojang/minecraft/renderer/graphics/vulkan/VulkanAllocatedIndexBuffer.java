@@ -7,10 +7,12 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 
 import java.nio.IntBuffer;
+import java.nio.LongBuffer;
 
 final class VulkanAllocatedIndexBuffer implements IndexBuffer, VulkanBufferStateTracked, VulkanIndexBufferHandle {
     private final VulkanContext context;
     private final VulkanBufferAllocation allocation;
+    private final boolean hostVisibleWrites;
 
     private int sizeInBytes;
     private int indexCount;
@@ -26,6 +28,7 @@ final class VulkanAllocatedIndexBuffer implements IndexBuffer, VulkanBufferState
         }
         this.context = context;
         this.allocation = allocation;
+        this.hostVisibleWrites = (allocation.getMemoryPropertyFlags() & VK10.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
     }
 
     @Override
@@ -37,7 +40,7 @@ final class VulkanAllocatedIndexBuffer implements IndexBuffer, VulkanBufferState
         if (sizeInBytes > allocation.getSizeInBytes()) {
             throw new IllegalArgumentException("Data size exceeds allocation size");
         }
-        writeMapped(0, data, sizeInBytes);
+        writeData(0, data, sizeInBytes);
         this.sizeInBytes = sizeInBytes;
         this.indexCount = sizeInBytes / 4;
     }
@@ -51,7 +54,7 @@ final class VulkanAllocatedIndexBuffer implements IndexBuffer, VulkanBufferState
         if (offsetInBytes + sizeInBytes > this.sizeInBytes) {
             throw new IllegalArgumentException("Update range exceeds index buffer size");
         }
-        writeMapped(offsetInBytes, data, sizeInBytes);
+        writeData(offsetInBytes, data, sizeInBytes);
     }
 
     @Override
@@ -118,5 +121,20 @@ final class VulkanAllocatedIndexBuffer implements IndexBuffer, VulkanBufferState
             VulkanMemoryCopies.copyIntBuffer(src, pMapped.get(0), sizeInBytes);
             VK10.vkUnmapMemory(context.getDevice(), allocation.getMemory());
         }
+    }
+
+    private void writeData(int dstOffset, IntBuffer src, int sizeInBytes) {
+        if (hostVisibleWrites) {
+            writeMapped(dstOffset, src, sizeInBytes);
+            return;
+        }
+        writeViaStaging(dstOffset, src, sizeInBytes);
+    }
+
+    private void writeViaStaging(int dstOffset, IntBuffer src, int sizeInBytes) {
+        if ((allocation.getUsageFlags() & VK10.VK_BUFFER_USAGE_TRANSFER_DST_BIT) == 0) {
+            throw new IllegalStateException("Allocated index buffer is not TRANSFER_DST-capable for staged upload");
+        }
+        context.uploadToBufferImmediate(src, sizeInBytes, allocation.getBuffer(), allocation.getOffset() + dstOffset);
     }
 }

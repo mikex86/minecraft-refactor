@@ -133,7 +133,7 @@ final class VulkanTexture implements Texture, VulkanTextureStateTracked {
 
             context.copyBufferToImageImmediate(stagingBuffer, image, this.width, this.height);
 
-            context.destroyBufferWithMemory(stagingBuffer, stagingMemory);
+            context.destroyBufferWithMemoryImmediate(stagingBuffer, stagingMemory);
         }
     }
 

@@ -74,7 +74,7 @@ public final class VulkanGraphicsAPI implements GraphicsAPI {
 
     @Override
     public VertexBuffer createVertexBuffer(BufferUsage usage) {
-        return new VulkanVertexBuffer(context, usageFlagsForVertexBuffer(usage));
+        return new VulkanVertexBuffer(context, usageFlagsForVertexBuffer(usage), usage);
     }
 
     @Override
@@ -108,7 +108,7 @@ public final class VulkanGraphicsAPI implements GraphicsAPI {
 
     @Override
     public IndexBuffer createIndexBuffer(BufferUsage usage) {
-        return new VulkanIndexBuffer(context, usageFlagsForIndexBuffer(usage));
+        return new VulkanIndexBuffer(context, usageFlagsForIndexBuffer(usage), usage);
     }
 
     @Override
@@ -222,9 +222,9 @@ public final class VulkanGraphicsAPI implements GraphicsAPI {
 
     private static int usageFlagsForBinding(BufferBinding binding) {
         if (binding == BufferBinding.VERTEX) {
-            return VK10.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+            return VK10.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK10.VK_BUFFER_USAGE_TRANSFER_DST_BIT;
         }
-        return VK10.VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+        return VK10.VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK10.VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     }
 
     private static int usageFlagsForVertexBuffer(BufferUsage usage) {

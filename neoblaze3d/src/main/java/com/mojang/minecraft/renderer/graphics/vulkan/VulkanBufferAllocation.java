@@ -10,4 +10,6 @@ interface VulkanBufferAllocation extends BufferAllocation {
     long getOffset();
 
     int getUsageFlags();
+
+    int getMemoryPropertyFlags();
 }

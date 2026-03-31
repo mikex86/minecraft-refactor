@@ -279,20 +279,14 @@ public class GameRenderer implements Disposable {
                 commandBuffer.endRenderPass();
             }
 
-            // Render held block in 3D with view bobbing
-            ItemStack hotbarItem = player.getInventory().getHotbarItem(player.hotbarSlotIndex);
-            if (hotbarItem != null) {
-                commandBuffer.beginRenderPass(COLOR_LOAD_DEPTH_CLEAR_PASS, 0, 0, this.width, this.height);
-                try {
-                    renderHeldItem(partialTicks);
-                } finally {
-                    commandBuffer.endRenderPass();
-                }
-            }
-
-            // Render HUD elements
+            // Render held block (if any) and HUD in a single pass.
+            // This avoids a second full-screen depth clear + extra pass transition.
             commandBuffer.beginRenderPass(COLOR_LOAD_DEPTH_CLEAR_PASS, 0, 0, this.width, this.height);
             try {
+                ItemStack hotbarItem = player.getInventory().getHotbarItem(player.hotbarSlotIndex);
+                if (hotbarItem != null) {
+                    renderHeldItem(partialTicks);
+                }
                 drawUI(commandBuffer, debugStrings, partialTicks);
             } finally {
                 commandBuffer.endRenderPass();

@@ -34,10 +34,11 @@ final class VulkanDedicatedAllocator implements BufferAllocator<VulkanBufferAllo
         try (MemoryStack stack = MemoryStack.stackPush()) {
             LongBuffer pBuffer = stack.mallocLong(1);
             LongBuffer pMemory = stack.mallocLong(1);
+            int memoryPropertyFlags = VK10.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
             long allocatedSizeInBytes = context.createBuffer(
                     sizeInBytes,
                     usageFlags,
-                    VK10.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK10.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                    memoryPropertyFlags,
                     pBuffer,
                     pMemory
             );
@@ -48,7 +49,8 @@ final class VulkanDedicatedAllocator implements BufferAllocator<VulkanBufferAllo
                     pMemory.get(0),
                     sizeInBytes,
                     allocatedSizeInBytes,
-                    usageFlags
+                    usageFlags,
+                    memoryPropertyFlags
             );
             allocations.put(Long.valueOf(allocation.getBuffer()), allocation);
             allocatedBytes += sizeInBytes;
@@ -100,6 +102,7 @@ final class VulkanDedicatedAllocator implements BufferAllocator<VulkanBufferAllo
         private final long sizeInBytes;
         private final long allocatedSizeInBytes;
         private final int usageFlags;
+        private final int memoryPropertyFlags;
         private boolean freed;
 
         private DedicatedAllocation(
@@ -108,7 +111,8 @@ final class VulkanDedicatedAllocator implements BufferAllocator<VulkanBufferAllo
                 long memory,
                 long sizeInBytes,
                 long allocatedSizeInBytes,
-                int usageFlags
+                int usageFlags,
+                int memoryPropertyFlags
         ) {
             this.owner = owner;
             this.buffer = buffer;
@@ -116,6 +120,7 @@ final class VulkanDedicatedAllocator implements BufferAllocator<VulkanBufferAllo
             this.sizeInBytes = sizeInBytes;
             this.allocatedSizeInBytes = allocatedSizeInBytes;
             this.usageFlags = usageFlags;
+            this.memoryPropertyFlags = memoryPropertyFlags;
         }
 
         @Override
@@ -136,6 +141,11 @@ final class VulkanDedicatedAllocator implements BufferAllocator<VulkanBufferAllo
         @Override
         public int getUsageFlags() {
             return usageFlags;
+        }
+
+        @Override
+        public int getMemoryPropertyFlags() {
+            return memoryPropertyFlags;
         }
 
         @Override

@@ -6,52 +6,7 @@ import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWVulkan;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
-import org.lwjgl.vulkan.EXTDebugUtils;
-import org.lwjgl.vulkan.KHRSurface;
-import org.lwjgl.vulkan.KHRSwapchain;
-import org.lwjgl.vulkan.VK10;
-import org.lwjgl.vulkan.VkApplicationInfo;
-import org.lwjgl.vulkan.VkBufferCreateInfo;
-import org.lwjgl.vulkan.VkCommandBufferAllocateInfo;
-import org.lwjgl.vulkan.VkCommandBufferBeginInfo;
-import org.lwjgl.vulkan.VkCommandPoolCreateInfo;
-import org.lwjgl.vulkan.VkDescriptorPoolCreateInfo;
-import org.lwjgl.vulkan.VkDescriptorPoolSize;
-import org.lwjgl.vulkan.VkDevice;
-import org.lwjgl.vulkan.VkDeviceCreateInfo;
-import org.lwjgl.vulkan.VkDeviceQueueCreateInfo;
-import org.lwjgl.vulkan.VkExtensionProperties;
-import org.lwjgl.vulkan.VkExtent2D;
-import org.lwjgl.vulkan.VkFenceCreateInfo;
-import org.lwjgl.vulkan.VkFramebufferCreateInfo;
-import org.lwjgl.vulkan.VkImageCreateInfo;
-import org.lwjgl.vulkan.VkImageMemoryBarrier;
-import org.lwjgl.vulkan.VkImageSubresourceRange;
-import org.lwjgl.vulkan.VkImageViewCreateInfo;
-import org.lwjgl.vulkan.VkBufferImageCopy;
-import org.lwjgl.vulkan.VkInstance;
-import org.lwjgl.vulkan.VkInstanceCreateInfo;
-import org.lwjgl.vulkan.VkLayerProperties;
-import org.lwjgl.vulkan.VkMemoryAllocateInfo;
-import org.lwjgl.vulkan.VkMemoryRequirements;
-import org.lwjgl.vulkan.VkPhysicalDeviceMemoryProperties;
-import org.lwjgl.vulkan.VkPhysicalDeviceProperties;
-import org.lwjgl.vulkan.VkPhysicalDevice;
-import org.lwjgl.vulkan.VkPipelineCacheCreateInfo;
-import org.lwjgl.vulkan.VkPresentInfoKHR;
-import org.lwjgl.vulkan.VkQueue;
-import org.lwjgl.vulkan.VkQueueFamilyProperties;
-import org.lwjgl.vulkan.VkRenderPassCreateInfo;
-import org.lwjgl.vulkan.VkSemaphoreCreateInfo;
-import org.lwjgl.vulkan.VkSubmitInfo;
-import org.lwjgl.vulkan.VkSubpassDependency;
-import org.lwjgl.vulkan.VkSubpassDescription;
-import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
-import org.lwjgl.vulkan.VkSurfaceFormatKHR;
-import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
-import org.lwjgl.vulkan.VkDebugUtilsMessengerCallbackDataEXT;
-import org.lwjgl.vulkan.VkDebugUtilsMessengerCallbackEXT;
-import org.lwjgl.vulkan.VkDebugUtilsMessengerCreateInfoEXT;
+import org.lwjgl.vulkan.*;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
@@ -61,16 +16,20 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.lwjgl.vulkan.KHRSwapchain.VK_KHR_SWAPCHAIN_EXTENSION_NAME;
 
 final class VulkanContext {
     private static final String VALIDATION_LAYER = "VK_LAYER_KHRONOS_validation";
-    // Keep a single in-flight frame until shared dynamic buffer uploads are
-    // fully frame-staged. This avoids CPU writes racing GPU reads.
-    private static final int FRAMES_IN_FLIGHT = 1;
+    // Allow CPU/GPU overlap. One in-flight frame causes strict serialization
+    // and significantly reduces throughput.
+    private static final int FRAMES_IN_FLIGHT = 3;
     private static final int DEFAULT_UNIFORM_RING_SIZE = 4 * 1024 * 1024;
+    private static final int DEFAULT_INDIRECT_RING_SIZE = 4 * 1024 * 1024;
+    private static final int DEFAULT_IMMEDIATE_UPLOAD_BUFFER_SIZE = 4 * 1024 * 1024;
     private static final int DEFAULT_MAX_DESCRIPTOR_SETS_PER_FRAME = 8192;
+    private static final int MAX_PENDING_BUFFER_DESTROYS_PER_DRAIN = 2048;
 
     private final long windowHandle;
 
@@ -107,14 +66,28 @@ final class VulkanContext {
 
     private long commandPool;
     private long pipelineCache;
+    private VkCommandBuffer immediateCommandBuffer;
+    private long immediateFence;
+    private long immediateUploadBuffer;
+    private long immediateUploadMemory;
+    private long immediateUploadMappedAddress;
+    private int immediateUploadCapacity;
+    private final Object immediateSubmitLock = new Object();
+    private final Object deferredFreeSignal = new Object();
+    private Thread deferredFreeThread;
+    private volatile boolean deferredFreeThreadRunning;
 
     private final Frame[] frames = new Frame[FRAMES_IN_FLIGHT];
+    private final long[] submittedSerialByFrame = new long[FRAMES_IN_FLIGHT];
+    private final AtomicLong completedSubmissionSerial = new AtomicLong(0L);
+    private long nextSubmissionSerial = 1L;
     private int currentFrame;
     private int currentSwapchainImageIndex = -1;
     private int lastSubmittedFrameIndex = -1;
     private boolean frameActive;
 
     private int minUniformBufferOffsetAlignment = 16;
+    private boolean multiDrawIndirectEnabled;
 
     private VulkanTexture fallbackTexture;
     private final Map<Long, Long> liveBufferMemory = new ConcurrentHashMap<>();
@@ -134,17 +107,21 @@ final class VulkanContext {
         createLogicalDevice();
         queryDeviceLimits();
         createCommandPool();
+        createImmediateResources();
         depthFormat = findDepthFormat();
         createSwapchainResources();
         createPipelineCache();
         createPerFrameResources();
+        startDeferredFreeThread();
         this.fallbackTexture = createFallbackTexture();
     }
 
     void dispose() {
         if (device != null) {
+            stopDeferredFreeThread();
             VK10.vkDeviceWaitIdle(device);
-            drainPendingBufferDestroys();
+            markAllSubmittedAsCompleted();
+            drainAllPendingBufferDestroys();
 
             if (fallbackTexture != null && !fallbackTexture.isDisposed()) {
                 fallbackTexture.dispose();
@@ -166,12 +143,13 @@ final class VulkanContext {
                 pipelineCache = VK10.VK_NULL_HANDLE;
             }
 
+            destroyImmediateResources();
             if (commandPool != VK10.VK_NULL_HANDLE) {
                 VK10.vkDestroyCommandPool(device, commandPool, null);
                 commandPool = VK10.VK_NULL_HANDLE;
             }
 
-            drainPendingBufferDestroys();
+            drainAllPendingBufferDestroys();
             destroyTrackedBuffers();
             VK10.vkDestroyDevice(device, null);
             device = null;
@@ -225,6 +203,10 @@ final class VulkanContext {
         return minUniformBufferOffsetAlignment;
     }
 
+    boolean supportsMultiDrawIndirect() {
+        return multiDrawIndirectEnabled;
+    }
+
     VulkanTexture getFallbackTexture() {
         return fallbackTexture;
     }
@@ -241,7 +223,10 @@ final class VulkanContext {
             LongBuffer fences = stack.longs(frame.inFlightFence);
             int waitResult = VK10.vkWaitForFences(device, fences, true, Long.MAX_VALUE);
             checkVk(waitResult, "vkWaitForFences");
-            drainPendingBufferDestroys();
+            long completedSerial = submittedSerialByFrame[currentFrame];
+            if (completedSerial > 0L) {
+                completedSubmissionSerial.accumulateAndGet(completedSerial, Math::max);
+            }
 
             // If capture data from this frame slot was not consumed before reuse, drop it now.
             if (frame.captureBuffer != VK10.VK_NULL_HANDLE) {
@@ -266,10 +251,15 @@ final class VulkanContext {
             if (acquireResult != VK10.VK_SUCCESS && acquireResult != KHRSwapchain.VK_SUBOPTIMAL_KHR) {
                 checkVk(acquireResult, "vkAcquireNextImageKHR");
             }
-            checkVk(VK10.vkWaitForFences(device, stack.longs(frame.imageAcquiredFence), true, Long.MAX_VALUE), "vkWaitForFences(acquire)");
+            LongBuffer acquireFence = stack.longs(frame.imageAcquiredFence);
+            int acquireFenceWait = VK10.vkWaitForFences(device, acquireFence, true, 0L);
+            if (acquireFenceWait == VK10.VK_TIMEOUT) {
+                acquireFenceWait = VK10.vkWaitForFences(device, acquireFence, true, Long.MAX_VALUE);
+            }
+            checkVk(acquireFenceWait, "vkWaitForFences(acquire)");
 
             currentSwapchainImageIndex = pImageIndex.get(0);
-            checkVk(VK10.vkResetFences(device, fences), "vkResetFences");
+            checkVk(VK10.vkResetFences(device, fences), "vkResetFences(submit)");
 
             checkVk(VK10.vkResetCommandBuffer(frame.commandBuffer, 0), "vkResetCommandBuffer");
 
@@ -280,19 +270,23 @@ final class VulkanContext {
 
             if (swapchainImageInitialized != null
                     && currentSwapchainImageIndex >= 0
-                    && currentSwapchainImageIndex < swapchainImageInitialized.length
-                    && !swapchainImageInitialized[currentSwapchainImageIndex]) {
-                // Newly created swapchain images may start in UNDEFINED layout.
-                // Prime the image so the first render pass expecting PRESENT_SRC initial layout is valid.
+                    && currentSwapchainImageIndex < swapchainImageInitialized.length) {
+                boolean initialized = swapchainImageInitialized[currentSwapchainImageIndex];
+                int oldLayout = initialized
+                        ? KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+                        : VK10.VK_IMAGE_LAYOUT_UNDEFINED;
+                int srcStage = initialized
+                        ? VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+                        : VK10.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
                 recordImageBarrier(
                         frame.commandBuffer,
                         swapchainImages[currentSwapchainImageIndex],
                         VK10.VK_IMAGE_ASPECT_COLOR_BIT,
-                        VK10.VK_IMAGE_LAYOUT_UNDEFINED,
-                        KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                        oldLayout,
+                        VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                         0,
-                        0,
-                        VK10.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                        VK10.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                        srcStage,
                         VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
                 );
                 swapchainImageInitialized[currentSwapchainImageIndex] = true;
@@ -300,6 +294,8 @@ final class VulkanContext {
 
             checkVk(VK10.vkResetDescriptorPool(device, frame.descriptorPool, 0), "vkResetDescriptorPool");
             frame.uniformWriteOffset = 0;
+            frame.indirectWriteOffset = 0;
+            frame.submissionSerial = nextSubmissionSerial++;
 
             frameActive = true;
             return frame;
@@ -314,6 +310,18 @@ final class VulkanContext {
         Frame frame = frames[currentFrame];
         long renderFinishedSemaphore = swapchainRenderFinishedSemaphores[currentSwapchainImageIndex];
 
+        recordImageBarrier(
+                frame.commandBuffer,
+                swapchainImages[currentSwapchainImageIndex],
+                VK10.VK_IMAGE_ASPECT_COLOR_BIT,
+                VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                VK10.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                0,
+                VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT
+        );
+
         checkVk(VK10.vkEndCommandBuffer(frame.commandBuffer), "vkEndCommandBuffer");
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -323,6 +331,7 @@ final class VulkanContext {
                     .pSignalSemaphores(stack.longs(renderFinishedSemaphore));
 
             checkVk(VK10.vkQueueSubmit(graphicsQueue, submitInfo, frame.inFlightFence), "vkQueueSubmit");
+            submittedSerialByFrame[currentFrame] = frame.submissionSerial;
 
             VkPresentInfoKHR presentInfo = VkPresentInfoKHR.calloc(stack)
                     .sType(KHRSwapchain.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR)
@@ -343,12 +352,14 @@ final class VulkanContext {
         currentSwapchainImageIndex = -1;
         lastSubmittedFrameIndex = currentFrame;
         currentFrame = (currentFrame + 1) % FRAMES_IN_FLIGHT;
+        signalDeferredFreeThread();
     }
 
     void waitIdle() {
         if (device != null) {
             VK10.vkDeviceWaitIdle(device);
-            drainPendingBufferDestroys();
+            markAllSubmittedAsCompleted();
+            drainAllPendingBufferDestroys();
         }
     }
 
@@ -414,8 +425,35 @@ final class VulkanContext {
         if (buffer == VK10.VK_NULL_HANDLE && memory == VK10.VK_NULL_HANDLE) {
             return;
         }
-        // Defer actual destruction to a synchronized safe-point after in-flight work completes.
-        pendingBufferDestroys.add(new PendingBufferDestroy(buffer, memory));
+        long completedSerial = completedSubmissionSerial.get();
+        long retireSubmissionSerial;
+        if (frameActive) {
+            retireSubmissionSerial = frames[currentFrame].submissionSerial;
+        } else if (lastSubmittedFrameIndex >= 0) {
+            retireSubmissionSerial = submittedSerialByFrame[lastSubmittedFrameIndex];
+        } else {
+            retireSubmissionSerial = completedSerial;
+        }
+        if (retireSubmissionSerial <= completedSerial) {
+            destroyBufferWithMemoryNow(buffer, memory);
+            return;
+        }
+        pendingBufferDestroys.add(new PendingBufferDestroy(buffer, memory, retireSubmissionSerial));
+    }
+
+    /**
+     * Destroys a buffer/memory pair immediately.
+     * Use only when the caller has already synchronized GPU usage (for example,
+     * after an immediate submission path that waits on a fence before returning).
+     */
+    void destroyBufferWithMemoryImmediate(long buffer, long memory) {
+        if (buffer != VK10.VK_NULL_HANDLE) {
+            liveBufferMemory.remove(buffer);
+        }
+        if (device == null) {
+            return;
+        }
+        destroyBufferWithMemoryNow(buffer, memory);
     }
 
     private void drainPendingBufferDestroys() {
@@ -423,14 +461,52 @@ final class VulkanContext {
             pendingBufferDestroys.clear();
             return;
         }
-        PendingBufferDestroy pending;
-        while ((pending = pendingBufferDestroys.poll()) != null) {
-            if (pending.buffer != VK10.VK_NULL_HANDLE) {
-                VK10.vkDestroyBuffer(device, pending.buffer, null);
+        if (pendingBufferDestroys.isEmpty()) {
+            return;
+        }
+        long completedSerial = completedSubmissionSerial.get();
+        int queued = pendingBufferDestroys.size();
+        int destroyedThisFrame = 0;
+        for (int i = 0; i < queued && destroyedThisFrame < MAX_PENDING_BUFFER_DESTROYS_PER_DRAIN; i++) {
+            PendingBufferDestroy pending = pendingBufferDestroys.poll();
+            if (pending == null) {
+                break;
             }
-            if (pending.memory != VK10.VK_NULL_HANDLE) {
-                VK10.vkFreeMemory(device, pending.memory, null);
+            if (pending.retireSubmissionSerial <= completedSerial) {
+                destroyPendingBuffer(pending);
+                destroyedThisFrame++;
+            } else {
+                pendingBufferDestroys.add(pending);
             }
+        }
+    }
+
+    private void drainAllPendingBufferDestroys() {
+        while (!pendingBufferDestroys.isEmpty()) {
+            int before = pendingBufferDestroys.size();
+            drainPendingBufferDestroys();
+            if (pendingBufferDestroys.size() >= before) {
+                // No forward progress; avoid a potential busy loop.
+                break;
+            }
+        }
+    }
+
+    private void markAllSubmittedAsCompleted() {
+        long lastSubmittedSerial = nextSubmissionSerial - 1L;
+        completedSubmissionSerial.accumulateAndGet(lastSubmittedSerial, Math::max);
+    }
+
+    private void destroyPendingBuffer(PendingBufferDestroy pending) {
+        destroyBufferWithMemoryNow(pending.buffer, pending.memory);
+    }
+
+    private void destroyBufferWithMemoryNow(long buffer, long memory) {
+        if (buffer != VK10.VK_NULL_HANDLE) {
+            VK10.vkDestroyBuffer(device, buffer, null);
+        }
+        if (memory != VK10.VK_NULL_HANDLE) {
+            VK10.vkFreeMemory(device, memory, null);
         }
     }
 
@@ -520,60 +596,119 @@ final class VulkanContext {
                                         int dstAccessMask,
                                         int srcStageMask,
                                         int dstStageMask) {
-        org.lwjgl.vulkan.VkCommandBuffer commandBuffer = beginImmediateCommands();
-        try {
-            VkImageMemoryBarrier.Buffer barrier = VkImageMemoryBarrier.calloc(1)
-                    .sType(VK10.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER)
-                    .oldLayout(oldLayout)
-                    .newLayout(newLayout)
-                    .srcQueueFamilyIndex(VK10.VK_QUEUE_FAMILY_IGNORED)
-                    .dstQueueFamilyIndex(VK10.VK_QUEUE_FAMILY_IGNORED)
-                    .image(image)
-                    .srcAccessMask(srcAccessMask)
-                    .dstAccessMask(dstAccessMask);
-            VkImageSubresourceRange range = barrier.subresourceRange();
-            range.aspectMask(aspectMask);
-            range.baseMipLevel(0);
-            range.levelCount(1);
-            range.baseArrayLayer(0);
-            range.layerCount(1);
+        synchronized (immediateSubmitLock) {
+            VkCommandBuffer commandBuffer = beginImmediateCommands();
+            try {
+                VkImageMemoryBarrier.Buffer barrier = VkImageMemoryBarrier.calloc(1)
+                        .sType(VK10.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER)
+                        .oldLayout(oldLayout)
+                        .newLayout(newLayout)
+                        .srcQueueFamilyIndex(VK10.VK_QUEUE_FAMILY_IGNORED)
+                        .dstQueueFamilyIndex(VK10.VK_QUEUE_FAMILY_IGNORED)
+                        .image(image)
+                        .srcAccessMask(srcAccessMask)
+                        .dstAccessMask(dstAccessMask);
+                VkImageSubresourceRange range = barrier.subresourceRange();
+                range.aspectMask(aspectMask);
+                range.baseMipLevel(0);
+                range.levelCount(1);
+                range.baseArrayLayer(0);
+                range.layerCount(1);
 
-            VK10.vkCmdPipelineBarrier(
-                    commandBuffer,
-                    srcStageMask,
-                    dstStageMask,
-                    0,
-                    null,
-                    null,
-                    barrier
-            );
-            barrier.free();
-        } finally {
-            endImmediateCommands(commandBuffer);
+                VK10.vkCmdPipelineBarrier(
+                        commandBuffer,
+                        srcStageMask,
+                        dstStageMask,
+                        0,
+                        null,
+                        null,
+                        barrier
+                );
+                barrier.free();
+            } finally {
+                endImmediateCommands(commandBuffer);
+            }
         }
     }
 
     void copyBufferToImageImmediate(long buffer, long image, int width, int height) {
-        org.lwjgl.vulkan.VkCommandBuffer commandBuffer = beginImmediateCommands();
-        try {
-            VkBufferImageCopy.Buffer region = VkBufferImageCopy.calloc(1);
-            region.bufferOffset(0);
-            region.bufferRowLength(0);
-            region.bufferImageHeight(0);
-            region.imageSubresource().aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT);
-            region.imageSubresource().mipLevel(0);
-            region.imageSubresource().baseArrayLayer(0);
-            region.imageSubresource().layerCount(1);
-            region.imageOffset().set(0, 0, 0);
-            region.imageExtent().set(width, height, 1);
+        synchronized (immediateSubmitLock) {
+            VkCommandBuffer commandBuffer = beginImmediateCommands();
+            try {
+                VkBufferImageCopy.Buffer region = VkBufferImageCopy.calloc(1);
+                region.bufferOffset(0);
+                region.bufferRowLength(0);
+                region.bufferImageHeight(0);
+                region.imageSubresource().aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT);
+                region.imageSubresource().mipLevel(0);
+                region.imageSubresource().baseArrayLayer(0);
+                region.imageSubresource().layerCount(1);
+                region.imageOffset().set(0, 0, 0);
+                region.imageExtent().set(width, height, 1);
 
-            VK10.vkCmdCopyBufferToImage(
-                    commandBuffer,
-                    buffer,
-                    image,
-                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                    region
-            );
+                VK10.vkCmdCopyBufferToImage(
+                        commandBuffer,
+                        buffer,
+                        image,
+                        VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        region
+                );
+                region.free();
+            } finally {
+                endImmediateCommands(commandBuffer);
+            }
+        }
+    }
+
+    void copyBufferImmediate(long srcBuffer, long dstBuffer, long sizeInBytes, long srcOffset, long dstOffset) {
+        if (sizeInBytes <= 0L) {
+            return;
+        }
+        synchronized (immediateSubmitLock) {
+            VkCommandBuffer commandBuffer = beginImmediateCommands();
+            try {
+                VkBufferCopy.Buffer region = VkBufferCopy.calloc(1);
+                region.srcOffset(srcOffset);
+                region.dstOffset(dstOffset);
+                region.size(sizeInBytes);
+                VK10.vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, region);
+                region.free();
+            } finally {
+                endImmediateCommands(commandBuffer);
+            }
+        }
+    }
+
+    void uploadToBufferImmediate(ByteBuffer src, int sizeInBytes, long dstBuffer, long dstOffset) {
+        if (sizeInBytes <= 0) {
+            return;
+        }
+        synchronized (immediateSubmitLock) {
+            ensureImmediateUploadBufferCapacity(sizeInBytes);
+            VulkanMemoryCopies.copyByteBuffer(src, immediateUploadMappedAddress, sizeInBytes);
+            recordImmediateUploadCopy(dstBuffer, dstOffset, sizeInBytes);
+        }
+    }
+
+    void uploadToBufferImmediate(IntBuffer src, int sizeInBytes, long dstBuffer, long dstOffset) {
+        if (sizeInBytes <= 0) {
+            return;
+        }
+        synchronized (immediateSubmitLock) {
+            ensureImmediateUploadBufferCapacity(sizeInBytes);
+            VulkanMemoryCopies.copyIntBuffer(src, immediateUploadMappedAddress, sizeInBytes);
+            recordImmediateUploadCopy(dstBuffer, dstOffset, sizeInBytes);
+        }
+    }
+
+    private void recordImmediateUploadCopy(long dstBuffer, long dstOffset, long sizeInBytes) {
+        VkCommandBuffer commandBuffer = beginImmediateCommands();
+        try {
+            VkBufferCopy.Buffer region = VkBufferCopy.calloc(1);
+            region.srcOffset(0L);
+            region.dstOffset(dstOffset);
+            region.size(sizeInBytes);
+            VK10.vkCmdCopyBuffer(commandBuffer, immediateUploadBuffer, dstBuffer, region);
             region.free();
         } finally {
             endImmediateCommands(commandBuffer);
@@ -726,54 +861,90 @@ final class VulkanContext {
         return out;
     }
 
-    private org.lwjgl.vulkan.VkCommandBuffer beginImmediateCommands() {
-        if (commandPool == VK10.VK_NULL_HANDLE) {
+    private VkCommandBuffer beginImmediateCommands() {
+        if (commandPool == VK10.VK_NULL_HANDLE || immediateCommandBuffer == null || immediateFence == VK10.VK_NULL_HANDLE) {
             throw new IllegalStateException("Cannot begin immediate commands before command pool creation");
         }
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            VkCommandBufferAllocateInfo allocInfo = VkCommandBufferAllocateInfo.calloc(stack)
-                    .sType(VK10.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO)
-                    .commandPool(commandPool)
-                    .level(VK10.VK_COMMAND_BUFFER_LEVEL_PRIMARY)
-                    .commandBufferCount(1);
-
-            PointerBuffer pCommandBuffer = stack.mallocPointer(1);
-            checkVk(VK10.vkAllocateCommandBuffers(device, allocInfo, pCommandBuffer), "vkAllocateCommandBuffers(immediate)");
-            org.lwjgl.vulkan.VkCommandBuffer commandBuffer = new org.lwjgl.vulkan.VkCommandBuffer(pCommandBuffer.get(0), device);
+            checkVk(VK10.vkResetCommandBuffer(immediateCommandBuffer, 0), "vkResetCommandBuffer(immediate)");
 
             VkCommandBufferBeginInfo beginInfo = VkCommandBufferBeginInfo.calloc(stack)
                     .sType(VK10.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO)
                     .flags(VK10.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-            checkVk(VK10.vkBeginCommandBuffer(commandBuffer, beginInfo), "vkBeginCommandBuffer(immediate)");
-            return commandBuffer;
+            checkVk(VK10.vkBeginCommandBuffer(immediateCommandBuffer, beginInfo), "vkBeginCommandBuffer(immediate)");
+            return immediateCommandBuffer;
         }
     }
 
-    private void endImmediateCommands(org.lwjgl.vulkan.VkCommandBuffer commandBuffer) {
+    private void endImmediateCommands(VkCommandBuffer commandBuffer) {
+        if (commandBuffer == null || immediateCommandBuffer == null || commandBuffer.address() != immediateCommandBuffer.address()) {
+            throw new IllegalStateException("Unexpected immediate command buffer");
+        }
         checkVk(VK10.vkEndCommandBuffer(commandBuffer), "vkEndCommandBuffer(immediate)");
 
-        long fence = VK10.VK_NULL_HANDLE;
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            VkFenceCreateInfo fenceInfo = VkFenceCreateInfo.calloc(stack)
-                    .sType(VK10.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO);
-            LongBuffer pFence = stack.mallocLong(1);
-            checkVk(VK10.vkCreateFence(device, fenceInfo, null, pFence), "vkCreateFence(immediate)");
-            fence = pFence.get(0);
+            checkVk(VK10.vkResetFences(device, stack.longs(immediateFence)), "vkResetFences(immediate)");
 
             VkSubmitInfo submitInfo = VkSubmitInfo.calloc(stack)
                     .sType(VK10.VK_STRUCTURE_TYPE_SUBMIT_INFO)
                     .pCommandBuffers(stack.pointers(commandBuffer.address()));
-            checkVk(VK10.vkQueueSubmit(graphicsQueue, submitInfo, fence), "vkQueueSubmit(immediate)");
-            checkVk(VK10.vkWaitForFences(device, stack.longs(fence), true, Long.MAX_VALUE), "vkWaitForFences(immediate submit)");
-        } finally {
-            if (fence != VK10.VK_NULL_HANDLE) {
-                VK10.vkDestroyFence(device, fence, null);
-            }
-            try (MemoryStack stack = MemoryStack.stackPush()) {
-                VK10.vkFreeCommandBuffers(device, commandPool, stack.pointers(commandBuffer.address()));
-            }
+            checkVk(VK10.vkQueueSubmit(graphicsQueue, submitInfo, immediateFence), "vkQueueSubmit(immediate)");
+            checkVk(VK10.vkWaitForFences(device, stack.longs(immediateFence), true, Long.MAX_VALUE), "vkWaitForFences(immediate submit)");
         }
+    }
+
+    private void ensureImmediateUploadBufferCapacity(int requiredSizeInBytes) {
+        if (requiredSizeInBytes <= 0) {
+            throw new IllegalArgumentException("requiredSizeInBytes must be > 0");
+        }
+        if (immediateUploadBuffer != VK10.VK_NULL_HANDLE && immediateUploadCapacity >= requiredSizeInBytes) {
+            return;
+        }
+
+        int newCapacity = Math.max(DEFAULT_IMMEDIATE_UPLOAD_BUFFER_SIZE, immediateUploadCapacity);
+        while (newCapacity < requiredSizeInBytes) {
+            newCapacity = Math.max(newCapacity * 2, requiredSizeInBytes);
+        }
+
+        destroyImmediateUploadBuffer();
+
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            LongBuffer pBuffer = stack.mallocLong(1);
+            LongBuffer pMemory = stack.mallocLong(1);
+            createBuffer(
+                    newCapacity,
+                    VK10.VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                    VK10.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK10.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                    pBuffer,
+                    pMemory
+            );
+            immediateUploadBuffer = pBuffer.get(0);
+            immediateUploadMemory = pMemory.get(0);
+
+            PointerBuffer pMapped = stack.mallocPointer(1);
+            checkVk(VK10.vkMapMemory(device, immediateUploadMemory, 0, newCapacity, 0, pMapped), "vkMapMemory(immediate upload)");
+            immediateUploadMappedAddress = pMapped.get(0);
+            immediateUploadCapacity = newCapacity;
+        }
+    }
+
+    private void destroyImmediateUploadBuffer() {
+        if (device == null) {
+            immediateUploadBuffer = VK10.VK_NULL_HANDLE;
+            immediateUploadMemory = VK10.VK_NULL_HANDLE;
+            immediateUploadMappedAddress = 0L;
+            immediateUploadCapacity = 0;
+            return;
+        }
+        if (immediateUploadMemory != VK10.VK_NULL_HANDLE && immediateUploadMappedAddress != 0L) {
+            VK10.vkUnmapMemory(device, immediateUploadMemory);
+        }
+        immediateUploadMappedAddress = 0L;
+        immediateUploadCapacity = 0;
+        destroyBufferWithMemoryImmediate(immediateUploadBuffer, immediateUploadMemory);
+        immediateUploadBuffer = VK10.VK_NULL_HANDLE;
+        immediateUploadMemory = VK10.VK_NULL_HANDLE;
     }
 
     int findMemoryType(int typeFilter, int properties) {
@@ -815,6 +986,10 @@ final class VulkanContext {
             }
 
             boolean debugRequested = GraphicsFactory.isDebugModeHintEnabled();
+            if (debugRequested && Boolean.getBoolean("neoblaze3d.vulkan.disableValidation")) {
+                debugRequested = false;
+                System.out.println("[Vulkan] Validation disabled by system property: -Dneoblaze3d.vulkan.disableValidation=true");
+            }
             validationLayersEnabled = debugRequested && isValidationLayerSupported();
             boolean debugUtilsSupported = debugRequested && isInstanceExtensionSupported(EXTDebugUtils.VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
             if (debugRequested && !validationLayersEnabled) {
@@ -822,6 +997,9 @@ final class VulkanContext {
             }
             if (debugRequested && !debugUtilsSupported) {
                 System.err.println("[Vulkan] Debug utils extension requested, but VK_EXT_debug_utils is not available.");
+            }
+            if (validationLayersEnabled && debugUtilsSupported) {
+                System.out.println("[Vulkan] Validation layers enabled (DEBUG mode).");
             }
 
             int extensionCount = requiredExtensions.remaining() + (validationLayersEnabled && debugUtilsSupported ? 1 : 0);
@@ -980,82 +1158,191 @@ final class VulkanContext {
             PointerBuffer devices = stack.mallocPointer(deviceCount);
             checkVk(VK10.vkEnumeratePhysicalDevices(instance, pDeviceCount, devices), "vkEnumeratePhysicalDevices(list)");
 
+            VkPhysicalDevice bestDevice = null;
+            int bestScore = Integer.MIN_VALUE;
+            int bestGraphicsFamily = -1;
+            int bestPresentFamily = -1;
+
             for (int i = 0; i < deviceCount; i++) {
                 VkPhysicalDevice candidate = new VkPhysicalDevice(devices.get(i), instance);
-                if (isDeviceSuitable(candidate)) {
-                    physicalDevice = candidate;
-                    return;
+                try (MemoryStack candidateStack = MemoryStack.stackPush()) {
+                    QueueFamilyIndices indices = findQueueFamilies(candidate, candidateStack);
+                    int score = scorePhysicalDevice(candidate, indices, candidateStack);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestDevice = candidate;
+                        bestGraphicsFamily = indices.graphicsFamily;
+                        bestPresentFamily = indices.presentFamily;
+                    }
                 }
+            }
+
+            if (bestDevice != null && bestScore >= 0) {
+                physicalDevice = bestDevice;
+                graphicsQueueFamily = bestGraphicsFamily;
+                presentQueueFamily = bestPresentFamily;
+
+                VkPhysicalDeviceProperties properties = VkPhysicalDeviceProperties.calloc(stack);
+                VK10.vkGetPhysicalDeviceProperties(physicalDevice, properties);
+                System.out.println(
+                        "[Vulkan] Selected GPU: "
+                                + properties.deviceNameString()
+                                + " ("
+                                + physicalDeviceTypeName(properties.deviceType())
+                                + "), graphicsQueueFamily="
+                                + graphicsQueueFamily
+                                + ", presentQueueFamily="
+                                + presentQueueFamily
+                );
+                return;
             }
         }
 
         throw new IllegalStateException("No suitable Vulkan physical device found");
     }
 
-    private boolean isDeviceSuitable(VkPhysicalDevice candidate) {
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            IntBuffer pQueueFamilyCount = stack.ints(0);
-            VK10.vkGetPhysicalDeviceQueueFamilyProperties(candidate, pQueueFamilyCount, null);
-            int queueFamilyCount = pQueueFamilyCount.get(0);
+    private QueueFamilyIndices findQueueFamilies(VkPhysicalDevice candidate, MemoryStack stack) {
+        QueueFamilyIndices indices = new QueueFamilyIndices();
 
-            VkQueueFamilyProperties.Buffer queueFamilies = VkQueueFamilyProperties.calloc(queueFamilyCount, stack);
-            VK10.vkGetPhysicalDeviceQueueFamilyProperties(candidate, pQueueFamilyCount, queueFamilies);
+        IntBuffer pQueueFamilyCount = stack.ints(0);
+        VK10.vkGetPhysicalDeviceQueueFamilyProperties(candidate, pQueueFamilyCount, null);
+        int queueFamilyCount = pQueueFamilyCount.get(0);
+        if (queueFamilyCount <= 0) {
+            return indices;
+        }
 
-            int graphicsFamily = -1;
-            int presentFamily = -1;
+        VkQueueFamilyProperties.Buffer queueFamilies = VkQueueFamilyProperties.calloc(queueFamilyCount, stack);
+        VK10.vkGetPhysicalDeviceQueueFamilyProperties(candidate, pQueueFamilyCount, queueFamilies);
 
-            for (int i = 0; i < queueFamilyCount; i++) {
-                if ((queueFamilies.get(i).queueFlags() & VK10.VK_QUEUE_GRAPHICS_BIT) != 0) {
-                    graphicsFamily = i;
+        for (int i = 0; i < queueFamilyCount; i++) {
+            if (indices.graphicsFamily < 0 && (queueFamilies.get(i).queueFlags() & VK10.VK_QUEUE_GRAPHICS_BIT) != 0) {
+                indices.graphicsFamily = i;
+            }
+
+            IntBuffer pPresentSupport = stack.ints(VK10.VK_FALSE);
+            checkVk(KHRSurface.vkGetPhysicalDeviceSurfaceSupportKHR(candidate, i, surface, pPresentSupport), "vkGetPhysicalDeviceSurfaceSupportKHR");
+            if (indices.presentFamily < 0 && pPresentSupport.get(0) == VK10.VK_TRUE) {
+                indices.presentFamily = i;
+            }
+
+            if (indices.isComplete()) {
+                break;
+            }
+        }
+        return indices;
+    }
+
+    private boolean hasSwapchainExtension(VkPhysicalDevice candidate, MemoryStack stack) {
+        IntBuffer pExtensionCount = stack.ints(0);
+        checkVk(VK10.vkEnumerateDeviceExtensionProperties(candidate, (ByteBuffer) null, pExtensionCount, null), "vkEnumerateDeviceExtensionProperties(count)");
+        int extensionCount = pExtensionCount.get(0);
+        if (extensionCount <= 0) {
+            return false;
+        }
+        if (extensionCount > 16384) {
+            throw new IllegalStateException("Unreasonable Vulkan extension count reported: " + extensionCount);
+        }
+
+        // Avoid variable-size stack allocation here. Some drivers/platforms can report
+        // larger extension arrays and exhaust MemoryStack during device scoring.
+        VkExtensionProperties.Buffer extensions = VkExtensionProperties.calloc(extensionCount);
+        try {
+            checkVk(VK10.vkEnumerateDeviceExtensionProperties(candidate, (ByteBuffer) null, pExtensionCount, extensions), "vkEnumerateDeviceExtensionProperties(list)");
+            for (int i = 0; i < extensionCount; i++) {
+                if (VK_KHR_SWAPCHAIN_EXTENSION_NAME.equals(extensions.get(i).extensionNameString())) {
+                    return true;
                 }
-
-                IntBuffer pPresentSupport = stack.ints(VK10.VK_FALSE);
-                checkVk(KHRSurface.vkGetPhysicalDeviceSurfaceSupportKHR(candidate, i, surface, pPresentSupport), "vkGetPhysicalDeviceSurfaceSupportKHR");
-                if (pPresentSupport.get(0) == VK10.VK_TRUE) {
-                    presentFamily = i;
-                }
-
-                if (graphicsFamily >= 0 && presentFamily >= 0) {
-                    break;
-                }
             }
+            return false;
+        } finally {
+            extensions.free();
+        }
+    }
 
-            if (graphicsFamily < 0 || presentFamily < 0) {
-                return false;
-            }
+    private int scorePhysicalDevice(VkPhysicalDevice candidate, QueueFamilyIndices indices, MemoryStack stack) {
+        if (!indices.isComplete()) {
+            return -1;
+        }
+        if (!hasSwapchainExtension(candidate, stack)) {
+            return -1;
+        }
 
-            IntBuffer pExtensionCount = stack.ints(0);
-            checkVk(VK10.vkEnumerateDeviceExtensionProperties(candidate, (ByteBuffer) null, pExtensionCount, null), "vkEnumerateDeviceExtensionProperties(count)");
-            int extensionCount = pExtensionCount.get(0);
-            if (extensionCount == 0) {
-                return false;
-            }
-            if (extensionCount < 0 || extensionCount > 16384) {
-                throw new IllegalStateException("Unreasonable Vulkan extension count reported: " + extensionCount);
-            }
+        SwapchainSupport support = querySwapchainSupport(candidate, stack);
+        if (support.formats == null || !support.formats.hasRemaining()) {
+            return -1;
+        }
+        if (support.presentModes == null || !support.presentModes.hasRemaining()) {
+            return -1;
+        }
 
-            boolean hasSwapchainExtension = false;
-            org.lwjgl.vulkan.VkExtensionProperties.Buffer extensions = org.lwjgl.vulkan.VkExtensionProperties.calloc(extensionCount);
-            try {
-                checkVk(VK10.vkEnumerateDeviceExtensionProperties(candidate, (ByteBuffer) null, pExtensionCount, extensions), "vkEnumerateDeviceExtensionProperties(list)");
-                for (int i = 0; i < extensionCount; i++) {
-                    String name = extensions.get(i).extensionNameString();
-                    if (VK_KHR_SWAPCHAIN_EXTENSION_NAME.equals(name)) {
-                        hasSwapchainExtension = true;
-                        break;
-                    }
-                }
-            } finally {
-                extensions.free();
-            }
+        VkPhysicalDeviceProperties properties = VkPhysicalDeviceProperties.calloc(stack);
+        VK10.vkGetPhysicalDeviceProperties(candidate, properties);
 
-            if (!hasSwapchainExtension) {
-                return false;
-            }
+        int score = 0;
+        switch (properties.deviceType()) {
+            case VK10.VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+                score += 100_000;
+                break;
+            case VK10.VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+                score += 50_000;
+                break;
+            case VK10.VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+                score += 30_000;
+                break;
+            case VK10.VK_PHYSICAL_DEVICE_TYPE_CPU:
+                score += 10_000;
+                break;
+            default:
+                score += 1_000;
+                break;
+        }
 
-            this.graphicsQueueFamily = graphicsFamily;
-            this.presentQueueFamily = presentFamily;
-            return true;
+        if (indices.graphicsFamily == indices.presentFamily) {
+            score += 5_000;
+        }
+        if (hasPresentMode(support.presentModes, KHRSurface.VK_PRESENT_MODE_IMMEDIATE_KHR)) {
+            score += 2_000;
+        } else if (hasPresentMode(support.presentModes, KHRSurface.VK_PRESENT_MODE_MAILBOX_KHR)) {
+            score += 1_000;
+        }
+
+        score += properties.limits().maxImageDimension2D();
+        return score;
+    }
+
+    private static boolean hasPresentMode(IntBuffer presentModes, int requiredMode) {
+        if (presentModes == null) {
+            return false;
+        }
+        for (int i = 0; i < presentModes.remaining(); i++) {
+            if (presentModes.get(i) == requiredMode) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String physicalDeviceTypeName(int type) {
+        switch (type) {
+            case VK10.VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+                return "DISCRETE_GPU";
+            case VK10.VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+                return "INTEGRATED_GPU";
+            case VK10.VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+                return "VIRTUAL_GPU";
+            case VK10.VK_PHYSICAL_DEVICE_TYPE_CPU:
+                return "CPU";
+            default:
+                return "OTHER";
+        }
+    }
+
+    private static final class QueueFamilyIndices {
+        int graphicsFamily = -1;
+        int presentFamily = -1;
+
+        boolean isComplete() {
+            return graphicsFamily >= 0 && presentFamily >= 0;
         }
     }
 
@@ -1085,6 +1372,15 @@ final class VulkanContext {
                     .sType(VK10.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO)
                     .pQueueCreateInfos(queueCreateInfos)
                     .ppEnabledExtensionNames(extensions);
+
+            VkPhysicalDeviceFeatures supportedFeatures = VkPhysicalDeviceFeatures.calloc(stack);
+            VK10.vkGetPhysicalDeviceFeatures(physicalDevice, supportedFeatures);
+            VkPhysicalDeviceFeatures enabledFeatures = VkPhysicalDeviceFeatures.calloc(stack);
+            multiDrawIndirectEnabled = supportedFeatures.multiDrawIndirect();
+            if (multiDrawIndirectEnabled) {
+                enabledFeatures.multiDrawIndirect(true);
+            }
+            createInfo.pEnabledFeatures(enabledFeatures);
 
             PointerBuffer pDevice = stack.mallocPointer(1);
             checkVk(VK10.vkCreateDevice(physicalDevice, createInfo, null, pDevice), "vkCreateDevice");
@@ -1123,6 +1419,111 @@ final class VulkanContext {
         }
     }
 
+    private void createImmediateResources() {
+        if (commandPool == VK10.VK_NULL_HANDLE) {
+            throw new IllegalStateException("Cannot create immediate resources before command pool creation");
+        }
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            VkCommandBufferAllocateInfo allocInfo = VkCommandBufferAllocateInfo.calloc(stack)
+                    .sType(VK10.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO)
+                    .commandPool(commandPool)
+                    .level(VK10.VK_COMMAND_BUFFER_LEVEL_PRIMARY)
+                    .commandBufferCount(1);
+            PointerBuffer pCommandBuffer = stack.mallocPointer(1);
+            checkVk(VK10.vkAllocateCommandBuffers(device, allocInfo, pCommandBuffer), "vkAllocateCommandBuffers(immediate persistent)");
+            immediateCommandBuffer = new VkCommandBuffer(pCommandBuffer.get(0), device);
+
+            VkFenceCreateInfo fenceInfo = VkFenceCreateInfo.calloc(stack)
+                    .sType(VK10.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO);
+            LongBuffer pFence = stack.mallocLong(1);
+            checkVk(VK10.vkCreateFence(device, fenceInfo, null, pFence), "vkCreateFence(immediate persistent)");
+            immediateFence = pFence.get(0);
+        }
+        ensureImmediateUploadBufferCapacity(DEFAULT_IMMEDIATE_UPLOAD_BUFFER_SIZE);
+    }
+
+    private void destroyImmediateResources() {
+        if (device == null) {
+            immediateCommandBuffer = null;
+            immediateFence = VK10.VK_NULL_HANDLE;
+            immediateUploadBuffer = VK10.VK_NULL_HANDLE;
+            immediateUploadMemory = VK10.VK_NULL_HANDLE;
+            immediateUploadMappedAddress = 0L;
+            immediateUploadCapacity = 0;
+            return;
+        }
+        destroyImmediateUploadBuffer();
+        if (immediateFence != VK10.VK_NULL_HANDLE) {
+            VK10.vkDestroyFence(device, immediateFence, null);
+            immediateFence = VK10.VK_NULL_HANDLE;
+        }
+        if (immediateCommandBuffer != null && commandPool != VK10.VK_NULL_HANDLE) {
+            try (MemoryStack stack = MemoryStack.stackPush()) {
+                VK10.vkFreeCommandBuffers(device, commandPool, stack.pointers(immediateCommandBuffer.address()));
+            }
+            immediateCommandBuffer = null;
+        }
+    }
+
+    private void startDeferredFreeThread() {
+        if (deferredFreeThreadRunning) {
+            return;
+        }
+        deferredFreeThreadRunning = true;
+        deferredFreeThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                runDeferredFreeLoop();
+            }
+        }, "VulkanDeferredFree");
+        deferredFreeThread.setDaemon(true);
+        deferredFreeThread.start();
+    }
+
+    private void stopDeferredFreeThread() {
+        deferredFreeThreadRunning = false;
+        signalDeferredFreeThread();
+        Thread thread = deferredFreeThread;
+        if (thread == null) {
+            return;
+        }
+        try {
+            thread.join(2000L);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
+        deferredFreeThread = null;
+    }
+
+    private void runDeferredFreeLoop() {
+        while (deferredFreeThreadRunning) {
+            synchronized (deferredFreeSignal) {
+                if (!deferredFreeThreadRunning) {
+                    break;
+                }
+                try {
+                    deferredFreeSignal.wait();
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            if (!deferredFreeThreadRunning) {
+                break;
+            }
+            try {
+                drainPendingBufferDestroys();
+            } catch (Throwable t) {
+                System.err.println("[Vulkan] Deferred free worker error: " + t.getMessage());
+            }
+        }
+    }
+
+    private void signalDeferredFreeThread() {
+        synchronized (deferredFreeSignal) {
+            deferredFreeSignal.notifyAll();
+        }
+    }
+
     private void createSwapchainResources() {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             SwapchainSupport support = querySwapchainSupport(physicalDevice, stack);
@@ -1130,8 +1531,13 @@ final class VulkanContext {
             VkSurfaceFormatKHR surfaceFormat = chooseSurfaceFormat(support.formats);
             int presentMode = choosePresentMode(support.presentModes);
             VkExtent2D extent = chooseSwapExtent(support.capabilities, stack);
+            System.out.println("[Vulkan] Using present mode: " + presentModeName(presentMode));
+            if (presentMode == KHRSurface.VK_PRESENT_MODE_FIFO_KHR
+                    || presentMode == KHRSurface.VK_PRESENT_MODE_FIFO_RELAXED_KHR) {
+                System.out.println("[Vulkan] Present mode is v-sync limited by display/compositor.");
+            }
 
-            int imageCount = support.capabilities.minImageCount() + 1;
+            int imageCount = Math.max(support.capabilities.minImageCount() + 1, FRAMES_IN_FLIGHT + 1);
             if (support.capabilities.maxImageCount() > 0 && imageCount > support.capabilities.maxImageCount()) {
                 imageCount = support.capabilities.maxImageCount();
             }
@@ -1270,7 +1676,8 @@ final class VulkanContext {
         }
 
         VK10.vkDeviceWaitIdle(device);
-        drainPendingBufferDestroys();
+        markAllSubmittedAsCompleted();
+        drainAllPendingBufferDestroys();
         destroySwapchainResources();
         createSwapchainResources();
     }
@@ -1305,8 +1712,8 @@ final class VulkanContext {
                     .storeOp(VK10.VK_ATTACHMENT_STORE_OP_STORE)
                     .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
                     .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
-                    .initialLayout(KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
-                    .finalLayout(KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+                    .initialLayout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+                    .finalLayout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
             attachments.get(1)
                     .format(depthFormat)
@@ -1432,19 +1839,16 @@ final class VulkanContext {
 
             for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
                 Frame frame = new Frame();
-                frame.commandBuffer = new org.lwjgl.vulkan.VkCommandBuffer(pCommandBuffers.get(i), device);
+                frame.commandBuffer = new VkCommandBuffer(pCommandBuffers.get(i), device);
 
                 LongBuffer pFence = stack.mallocLong(1);
-                VkFenceCreateInfo acquireFenceInfo = VkFenceCreateInfo.calloc(stack)
-                        .sType(VK10.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO);
-                checkVk(VK10.vkCreateFence(device, acquireFenceInfo, null, pFence), "vkCreateFence(imageAcquired)");
-                frame.imageAcquiredFence = pFence.get(0);
-
                 VkFenceCreateInfo fenceInfo = VkFenceCreateInfo.calloc(stack)
                         .sType(VK10.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO)
                         .flags(VK10.VK_FENCE_CREATE_SIGNALED_BIT);
                 checkVk(VK10.vkCreateFence(device, fenceInfo, null, pFence), "vkCreateFence");
                 frame.inFlightFence = pFence.get(0);
+                checkVk(VK10.vkCreateFence(device, fenceInfo, null, pFence), "vkCreateFence(acquire)");
+                frame.imageAcquiredFence = pFence.get(0);
 
                 VkDescriptorPoolSize.Buffer poolSizes = VkDescriptorPoolSize.calloc(2, stack);
                 poolSizes.get(0)
@@ -1480,6 +1884,20 @@ final class VulkanContext {
                 frame.uniformMappedAddress = pMapped.get(0);
                 frame.uniformMapped = MemoryUtil.memByteBuffer(frame.uniformMappedAddress, frame.uniformCapacity);
 
+                frame.indirectCapacity = DEFAULT_INDIRECT_RING_SIZE;
+                createBuffer(
+                        frame.indirectCapacity,
+                        VK10.VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                        VK10.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK10.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                        pBuffer,
+                        pMemory
+                );
+                frame.indirectBuffer = pBuffer.get(0);
+                frame.indirectBufferMemory = pMemory.get(0);
+                checkVk(VK10.vkMapMemory(device, frame.indirectBufferMemory, 0, frame.indirectCapacity, 0, pMapped), "vkMapMemory(indirect ring)");
+                frame.indirectMappedAddress = pMapped.get(0);
+                frame.indirectMapped = MemoryUtil.memByteBuffer(frame.indirectMappedAddress, frame.indirectCapacity);
+
                 frames[i] = frame;
             }
         }
@@ -1497,7 +1915,7 @@ final class VulkanContext {
         frame.captureHeight = 0;
     }
 
-    private void recordImageBarrier(org.lwjgl.vulkan.VkCommandBuffer commandBuffer,
+    private void recordImageBarrier(VkCommandBuffer commandBuffer,
                                     long image,
                                     int aspectMask,
                                     int oldLayout,
@@ -1549,14 +1967,20 @@ final class VulkanContext {
             destroyBufferWithMemory(frame.uniformBuffer, frame.uniformBufferMemory);
             frame.uniformBuffer = VK10.VK_NULL_HANDLE;
             frame.uniformBufferMemory = VK10.VK_NULL_HANDLE;
+            if (frame.indirectBufferMemory != VK10.VK_NULL_HANDLE) {
+                VK10.vkUnmapMemory(device, frame.indirectBufferMemory);
+            }
+            destroyBufferWithMemory(frame.indirectBuffer, frame.indirectBufferMemory);
+            frame.indirectBuffer = VK10.VK_NULL_HANDLE;
+            frame.indirectBufferMemory = VK10.VK_NULL_HANDLE;
             if (frame.descriptorPool != VK10.VK_NULL_HANDLE) {
                 VK10.vkDestroyDescriptorPool(device, frame.descriptorPool, null);
             }
-            if (frame.imageAcquiredFence != VK10.VK_NULL_HANDLE) {
-                VK10.vkDestroyFence(device, frame.imageAcquiredFence, null);
-            }
             if (frame.inFlightFence != VK10.VK_NULL_HANDLE) {
                 VK10.vkDestroyFence(device, frame.inFlightFence, null);
+            }
+            if (frame.imageAcquiredFence != VK10.VK_NULL_HANDLE) {
+                VK10.vkDestroyFence(device, frame.imageAcquiredFence, null);
             }
 
             frames[i] = null;
@@ -1621,11 +2045,33 @@ final class VulkanContext {
         }
         for (int i = 0; i < presentModes.remaining(); i++) {
             int mode = presentModes.get(i);
+            if (mode == KHRSurface.VK_PRESENT_MODE_IMMEDIATE_KHR) {
+                return mode;
+            }
+        }
+        for (int i = 0; i < presentModes.remaining(); i++) {
+            int mode = presentModes.get(i);
             if (mode == KHRSurface.VK_PRESENT_MODE_MAILBOX_KHR) {
                 return mode;
             }
         }
         return KHRSurface.VK_PRESENT_MODE_FIFO_KHR;
+    }
+
+    private static String presentModeName(int mode) {
+        if (mode == KHRSurface.VK_PRESENT_MODE_IMMEDIATE_KHR) {
+            return "IMMEDIATE";
+        }
+        if (mode == KHRSurface.VK_PRESENT_MODE_MAILBOX_KHR) {
+            return "MAILBOX";
+        }
+        if (mode == KHRSurface.VK_PRESENT_MODE_FIFO_RELAXED_KHR) {
+            return "FIFO_RELAXED";
+        }
+        if (mode == KHRSurface.VK_PRESENT_MODE_FIFO_KHR) {
+            return "FIFO";
+        }
+        return "UNKNOWN(" + mode + ")";
     }
 
     private VkExtent2D chooseSwapExtent(VkSurfaceCapabilitiesKHR capabilities, MemoryStack stack) {
@@ -1688,7 +2134,7 @@ final class VulkanContext {
     }
 
     static final class Frame {
-        org.lwjgl.vulkan.VkCommandBuffer commandBuffer;
+        VkCommandBuffer commandBuffer;
         long imageAcquiredFence;
         long inFlightFence;
         long descriptorPool;
@@ -1699,6 +2145,14 @@ final class VulkanContext {
         ByteBuffer uniformMapped;
         int uniformCapacity;
         int uniformWriteOffset;
+
+        long indirectBuffer;
+        long indirectBufferMemory;
+        long indirectMappedAddress;
+        ByteBuffer indirectMapped;
+        int indirectCapacity;
+        int indirectWriteOffset;
+        long submissionSerial;
 
         long captureBuffer;
         long captureBufferMemory;
@@ -1716,10 +2170,12 @@ final class VulkanContext {
     private static final class PendingBufferDestroy {
         final long buffer;
         final long memory;
+        final long retireSubmissionSerial;
 
-        private PendingBufferDestroy(long buffer, long memory) {
+        private PendingBufferDestroy(long buffer, long memory, long retireSubmissionSerial) {
             this.buffer = buffer;
             this.memory = memory;
+            this.retireSubmissionSerial = retireSubmissionSerial;
         }
     }
 }
